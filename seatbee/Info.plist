@@ -6,5 +6,24 @@
 	<array>
 		<string>remote-notification</string>
 	</array>
+	<key>UIAppFonts</key>
+	<array>
+		<string>Fraunces-Variable.ttf</string>
+		<string>Inter-Variable.ttf</string>
+		<string>RalewayDots-Regular.ttf</string>
+	</array>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>seatbee</string>
+			</array>
+			<key>CFBundleURLName</key>
+			<string>com.seatbee.app</string>
+		</dict>
+	</array>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>
