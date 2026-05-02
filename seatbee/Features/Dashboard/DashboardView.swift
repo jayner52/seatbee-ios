@@ -37,22 +37,32 @@ struct DashboardView: View {
                             .padding(.top, 40)
                     }
 
-                    // Empty state
+                    // Empty state — prompt to create wedding
                     if !isLoading && plans.isEmpty && loadError == nil {
-                        VStack(spacing: 16) {
-                            Image(systemName: "sparkles")
-                                .font(.system(size: 40))
-                                .foregroundStyle(Color.sbGold)
-                            Text("No plans yet")
-                                .font(SBFont.displaySmall)
+                        VStack(spacing: 20) {
+                            Spacer().frame(height: 20)
+
+                            Image("SeatbeeLogo")
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(width: 64, height: 64)
+
+                            Text("Your wedding,\nperfectly seated")
+                                .font(SBFont.displayLarge)
                                 .foregroundStyle(Color.sbCharcoal)
-                            Text("Create your first seating plan on seatbee.app")
+                                .multilineTextAlignment(.center)
+
+                            Text("Create your seating plan in minutes with AI")
                                 .font(SBFont.body)
                                 .foregroundStyle(Color.sbWarm)
                                 .multilineTextAlignment(.center)
+
+                            SBButton(title: "Plan your wedding", icon: "sparkles", variant: .gold, fullWidth: true) {
+                                appState.showOnboarding = true
+                            }
                         }
                         .frame(maxWidth: .infinity)
-                        .padding(.top, 40)
+                        .padding(.top, 20)
                     }
 
                     // Hero card - active event
@@ -93,10 +103,25 @@ struct DashboardView: View {
     // MARK: - Greeting
 
     private var greeting: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        HStack {
             Text(greetingText)
                 .font(SBFont.displayMedium)
                 .foregroundStyle(Color.sbCharcoal)
+
+            Spacer()
+
+            if !plans.isEmpty {
+                Button {
+                    appState.showOnboarding = true
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(Color.sbGoldDk)
+                        .frame(width: 36, height: 36)
+                        .background(Color.sbChampagne)
+                        .clipShape(Circle())
+                }
+            }
         }
     }
 

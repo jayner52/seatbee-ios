@@ -115,44 +115,63 @@ struct GuestsView: View {
     }
 
     private func guestRow(_ guest: Guest) -> some View {
-        HStack(spacing: 12) {
-            SBAvatar(name: guest.displayName, size: 36)
+        Button {
+            navigateToGuest(guest)
+        } label: {
+            HStack(spacing: 12) {
+                SBAvatar(name: guest.displayName, size: 36)
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(guest.displayName)
-                    .font(SBFont.bodySmallBold)
-                    .foregroundStyle(Color.sbCharcoal)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(guest.displayName)
+                        .font(SBFont.bodySmallBold)
+                        .foregroundStyle(Color.sbCharcoal)
 
-                HStack(spacing: 4) {
-                    if !guest.categories.isEmpty {
-                        Text(guest.categories.first ?? "")
-                            .font(SBFont.small)
-                            .foregroundStyle(Color.sbWarm)
+                    HStack(spacing: 4) {
+                        if !guest.categories.isEmpty {
+                            Text(guest.categories.first ?? "")
+                                .font(SBFont.small)
+                                .foregroundStyle(Color.sbWarm)
+                        }
                     }
                 }
-            }
 
-            Spacer()
+                Spacer()
 
-            // RSVP indicator
-            Circle()
-                .fill(rsvpColor(guest.rsvp))
-                .frame(width: 8, height: 8)
+                // RSVP indicator
+                Circle()
+                    .fill(rsvpColor(guest.rsvp))
+                    .frame(width: 8, height: 8)
 
-            // Chips
-            HStack(spacing: 4) {
-                if guest.plusOne == true {
-                    SBChip(text: "+1", variant: .default)
+                // Chips
+                HStack(spacing: 4) {
+                    if guest.plusOne == true {
+                        SBChip(text: "+1", variant: .default)
+                    }
+                    if guest.dietary != nil {
+                        SBChip(text: "Diet", variant: .default)
+                    }
                 }
-                if guest.dietary != nil {
-                    SBChip(text: "Diet", variant: .default)
-                }
-            }
 
-            // Table assignment
-            tableAssignment(for: guest)
+                // Table assignment
+                tableAssignment(for: guest)
+            }
+            .padding(.vertical, 10)
         }
-        .padding(.vertical, 10)
+        .buttonStyle(.plain)
+    }
+
+    private func navigateToGuest(_ guest: Guest) {
+        // If guest is seated, switch to Editor and select their table
+        if let table = assignedTable(for: guest) {
+            appState.selectedTab = .edit
+            // Post notification so EditorView can select this table
+            NotificationCenter.default.post(
+                name: .selectTable,
+                object: nil,
+                userInfo: ["tableId": table.id]
+            )
+            HapticEngine.selection()
+        }
     }
 
     private func tableAssignment(for guest: Guest) -> some View {

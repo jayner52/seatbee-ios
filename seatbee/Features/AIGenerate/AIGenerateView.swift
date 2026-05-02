@@ -205,8 +205,18 @@ struct AIGenerateView: View {
             // Actions
             VStack(spacing: 12) {
                 SBButton(title: "Accept", icon: "checkmark", variant: .gold, fullWidth: true) {
-                    // Accept the AI-generated arrangement
                     HapticEngine.success()
+                    // Persist AI arrangements to Supabase
+                    if let plan = appState.activePlan {
+                        Task {
+                            do {
+                                try await appState.database.savePlanData(plan: plan)
+                                print("[AI] Saved accepted arrangement")
+                            } catch {
+                                print("[AI] Failed to save: \(error)")
+                            }
+                        }
+                    }
                     appState.selectedTab = .edit
                 }
 

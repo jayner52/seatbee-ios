@@ -24,12 +24,15 @@ struct AppRouter: View {
                     .tag(SBTab.share)
             }
             .tabViewStyle(.automatic)
-            // Hide default tab bar
             .toolbar(.hidden, for: .tabBar)
 
             // Custom glassmorphic tab bar
             SBTabBar(selectedTab: $state.selectedTab)
         }
         .ignoresSafeArea(.keyboard)
+        .fullScreenCover(isPresented: $state.showOnboarding) {
+            OnboardingView()
+                .environment(appState)
+        }
     }
 }

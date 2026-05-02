@@ -4,7 +4,7 @@ import Supabase
 final class DatabaseService {
     private var client: SupabaseClient { SupabaseManager.shared.client }
 
-    // MARK: - Seating Plans
+    // MARK: - Fetch Plans
 
     func fetchPlans() async throws -> [SeatingPlan] {
         let response: [SeatingPlanDTO] = try await client
@@ -18,7 +18,7 @@ final class DatabaseService {
         let plans = response.map { $0.toDomain() }
         print("[Seatbee] Fetched \(plans.count) plans")
         for plan in plans {
-            print("[Seatbee] Plan '\(plan.name)': \(plan.guests.count) guests, \(plan.tables.count) tables")
+            print("[Seatbee]   '\(plan.name)': \(plan.guests.count) guests, \(plan.tables.count) tables")
         }
         return plans
     }
@@ -35,11 +35,13 @@ final class DatabaseService {
         return response.toDomain()
     }
 
-    func createPlan(name: String, eventType: String, guests: [GuestDTO]?, tables: [TableDTO]?) async throws -> SeatingPlan {
+    // MARK: - Create Plan
+
+    func createPlan(name: String, eventType: String, eventDate: String?, venue: String?, guests: [GuestDTO]?, tables: [TableDTO]?) async throws -> SeatingPlan {
         let session = try await client.auth.session
 
         let planData = PlanDataDTO(
-            event: EventDataDTO(name: name, date: nil, venue: nil, eventType: eventType, roomWidth: nil, roomHeight: nil, roomShape: nil),
+            event: EventDataDTO(name: name, date: eventDate, venue: venue, eventType: eventType, roomWidth: nil, roomHeight: nil, roomShape: nil),
             guests: guests,
             tables: tables,
             rules: nil,
@@ -54,13 +56,19 @@ final class DatabaseService {
             let event_type: String
             let user_id: String
             let data: PlanDataDTO
+            let event_date: String?
+            let event_venue_name: String?
+            let seated_guest_count: Int
         }
 
         let payload = CreatePlanPayload(
             name: name,
             event_type: eventType,
             user_id: session.user.id.uuidString,
-            data: planData
+            data: planData,
+            event_date: eventDate,
+            event_venue_name: venue,
+            seated_guest_count: guests?.count ?? 0
         )
 
         let response: SeatingPlanDTO = try await client
@@ -71,8 +79,48 @@ final class DatabaseService {
             .execute()
             .value
 
+        print("[Seatbee] Created plan '\(name)' with id: \(response.id)")
         return response.toDomain()
     }
+
+    // MARK: - Save Full Plan Data (write-back)
+
+    func savePlanData(plan: SeatingPlan) async throws {
+        let planData = plan.toPlanData()
+
+        struct SavePayload: Codable {
+            let data: PlanDataDTO
+            let name: String
+            let updated_at: String
+            let seated_guest_count: Int
+            let event_venue_name: String?
+            let event_date: String?
+            let event_type: String?
+        }
+
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+
+        let payload = SavePayload(
+            data: planData,
+            name: plan.name,
+            updated_at: ISO8601DateFormatter().string(from: Date()),
+            seated_guest_count: plan.guests.count,
+            event_venue_name: plan.venue,
+            event_date: plan.eventDate.map { dateFormatter.string(from: $0) },
+            event_type: plan.eventType.rawValue
+        )
+
+        try await client
+            .from("seating_plans")
+            .update(payload)
+            .eq("id", value: plan.id)
+            .execute()
+
+        print("[Seatbee] Saved plan '\(plan.name)' — \(plan.guests.count) guests, \(plan.tables.count) tables")
+    }
+
+    // MARK: - Simple Updates
 
     func updatePlan(id: String, updates: [String: String]) async throws {
         try await client

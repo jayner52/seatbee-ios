@@ -88,9 +88,15 @@ struct EditorView: View {
             }
         }
         .onAppear {
-            // Auto-select first table if none selected
             if selectedTableId == nil, let firstTable = tables.first {
                 selectedTableId = firstTable.id
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .selectTable)) { notification in
+            if let tableId = notification.userInfo?["tableId"] as? String {
+                withAnimation(.seatbee) {
+                    selectedTableId = tableId
+                }
             }
         }
     }
@@ -364,12 +370,10 @@ struct EditorView: View {
         appState.activePlan = updatedPlan
         HapticEngine.success()
 
-        // Persist to Supabase in background
+        // Persist full plan data to Supabase
         Task {
             do {
-                try await appState.database.updatePlan(id: updatedPlan.id, updates: [
-                    "updated_at": ISO8601DateFormatter().string(from: Date())
-                ])
+                try await appState.database.savePlanData(plan: updatedPlan)
             } catch {
                 print("[Editor] Failed to save assignment: \(error)")
             }

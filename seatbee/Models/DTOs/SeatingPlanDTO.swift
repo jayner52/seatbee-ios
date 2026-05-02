@@ -91,7 +91,13 @@ struct AssignmentDTO: Codable {
     let tableId: String?
     let seatIndex: Int?
 
-    // Handle both {tableId, seatIndex} and direct tableId string
+    // Direct initializer for creating from domain model
+    init(tableId: String?, seatIndex: Int?) {
+        self.tableId = tableId
+        self.seatIndex = seatIndex
+    }
+
+    // Handle both {tableId, seatIndex} and direct tableId string from JSON
     init(from decoder: Decoder) throws {
         if let container = try? decoder.container(keyedBy: CodingKeys.self) {
             tableId = try container.decodeIfPresent(String.self, forKey: .tableId)

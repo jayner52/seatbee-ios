@@ -95,6 +95,10 @@ struct ShareView: View {
 
                 // Copy link button
                 Button {
+                    if let plan = appState.activePlan {
+                        let url = "https://seatbee.app/plan/\(plan.id)"
+                        UIPasteboard.general.string = url
+                    }
                     linkCopied = true
                     HapticEngine.success()
                     DispatchQueue.main.asyncAfter(deadline: .now() + 2) {

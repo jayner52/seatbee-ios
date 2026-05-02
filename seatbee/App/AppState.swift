@@ -6,6 +6,7 @@ final class AppState {
     var activePlan: SeatingPlan?
     var isOnline = true
     var showAuth = false
+    var showOnboarding = false
 
     // Navigation paths for each tab
     var plansPath = NavigationPath()

@@ -2,8 +2,11 @@ import SwiftUI
 
 struct TableDrawerView: View {
     let table: SeatTable
-    @State private var selectedTab = "Seats"
+    @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
+    @State private var selectedTab = "Seats"
+    @State private var showRenameAlert = false
+    @State private var renameText = ""
 
     private let tabs = ["Seats", "Notes", "Tags"]
 
@@ -51,6 +54,12 @@ struct TableDrawerView: View {
             .padding(.top, SBSpacing.lg)
         }
         .background(Color.sbIvory)
+        .alert("Rename Table", isPresented: $showRenameAlert) {
+            TextField("Table name", text: $renameText)
+            Button("Save") { renameTable() }
+            Button("Cancel", role: .cancel) {}
+        }
+        .onAppear { renameText = table.name }
     }
 
     // MARK: - Action Strip
@@ -58,18 +67,31 @@ struct TableDrawerView: View {
     private var actionStrip: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 12) {
-                actionButton(icon: "pencil", label: "Rename")
-                actionButton(icon: "lock", label: "Lock")
-                actionButton(icon: "doc.on.doc", label: "Duplicate")
-                actionButton(icon: "arrow.triangle.2.circlepath", label: "Rotate")
-                actionButton(icon: "trash", label: "Delete")
+                actionButton(icon: "pencil", label: "Rename") {
+                    showRenameAlert = true
+                }
+                actionButton(icon: table.locked == true ? "lock.fill" : "lock", label: table.locked == true ? "Unlock" : "Lock") {
+                    toggleLock()
+                }
+                actionButton(icon: "doc.on.doc", label: "Duplicate") {
+                    duplicateTable()
+                }
+                actionButton(icon: "plus.circle", label: "Add Seat") {
+                    addSeat()
+                }
+                actionButton(icon: "trash", label: "Delete") {
+                    deleteTable()
+                }
             }
             .padding(.horizontal, SBSpacing.cardPadding)
         }
     }
 
-    private func actionButton(icon: String, label: String) -> some View {
-        Button { HapticEngine.light() } label: {
+    private func actionButton(icon: String, label: String, action: @escaping () -> Void) -> some View {
+        Button {
+            action()
+            HapticEngine.light()
+        } label: {
             VStack(spacing: 6) {
                 Image(systemName: icon)
                     .font(.system(size: 18))
@@ -115,12 +137,10 @@ struct TableDrawerView: View {
         VStack(spacing: 6) {
             ForEach(0..<table.seats, id: \.self) { index in
                 HStack(spacing: 10) {
-                    // Drag handle
                     Image(systemName: "line.3.horizontal")
                         .font(.system(size: 12))
                         .foregroundStyle(Color.sbWarm2)
 
-                    // Seat badge
                     ZStack {
                         Circle()
                             .fill(Color.sbGold)
@@ -130,10 +150,13 @@ struct TableDrawerView: View {
                             .foregroundStyle(.white)
                     }
 
-                    // Guest name or empty
-                    Text("Seat \(index + 1)")
+                    // Show assigned guest name or "Seat N"
+                    let guestId = table.assignments.first { $0.value == index }?.key
+                    let guest = appState.activePlan?.guests.first { $0.id == guestId }
+
+                    Text(guest?.displayName ?? "Seat \(index + 1)")
                         .font(SBFont.bodySmall)
-                        .foregroundStyle(Color.sbCharcoal)
+                        .foregroundStyle(guest != nil ? Color.sbCharcoal : Color.sbWarm)
 
                     Spacer()
                 }
@@ -142,7 +165,10 @@ struct TableDrawerView: View {
             }
 
             // Add seat button
-            Button { HapticEngine.light() } label: {
+            Button {
+                addSeat()
+                HapticEngine.light()
+            } label: {
                 HStack {
                     Image(systemName: "plus")
                     Text("Add seat")
@@ -181,6 +207,72 @@ struct TableDrawerView: View {
                 .padding(SBSpacing.cardPadding)
         }
     }
+
+    // MARK: - Actions
+
+    private func renameTable() {
+        guard var plan = appState.activePlan,
+              let idx = plan.tables.firstIndex(where: { $0.id == table.id }) else { return }
+        plan.tables[idx].name = renameText
+        appState.activePlan = plan
+        savePlan(plan)
+    }
+
+    private func toggleLock() {
+        guard var plan = appState.activePlan,
+              let idx = plan.tables.firstIndex(where: { $0.id == table.id }) else { return }
+        plan.tables[idx].locked = !(plan.tables[idx].locked ?? false)
+        appState.activePlan = plan
+        savePlan(plan)
+    }
+
+    private func duplicateTable() {
+        guard var plan = appState.activePlan,
+              let idx = plan.tables.firstIndex(where: { $0.id == table.id }) else { return }
+        var newTable = plan.tables[idx]
+        newTable = SeatTable(
+            id: UUID().uuidString,
+            name: "\(table.name) copy",
+            type: table.type,
+            seats: table.seats,
+            x: table.x + 80,
+            y: table.y + 80,
+            rotation: table.rotation,
+            assignments: [:],
+            locked: false,
+            color: table.color
+        )
+        plan.tables.append(newTable)
+        appState.activePlan = plan
+        savePlan(plan)
+        HapticEngine.success()
+    }
+
+    private func addSeat() {
+        guard var plan = appState.activePlan,
+              let idx = plan.tables.firstIndex(where: { $0.id == table.id }) else { return }
+        plan.tables[idx].seats += 1
+        appState.activePlan = plan
+        savePlan(plan)
+    }
+
+    private func deleteTable() {
+        guard var plan = appState.activePlan else { return }
+        plan.tables.removeAll { $0.id == table.id }
+        appState.activePlan = plan
+        savePlan(plan)
+        dismiss()
+    }
+
+    private func savePlan(_ plan: SeatingPlan) {
+        Task {
+            do {
+                try await appState.database.savePlanData(plan: plan)
+            } catch {
+                print("[Drawer] Save failed: \(error)")
+            }
+        }
+    }
 }
 
 #Preview {
@@ -188,4 +280,5 @@ struct TableDrawerView: View {
         id: "1", name: "Table 5", type: .round, seats: 8,
         x: 100, y: 100, assignments: [:]
     ))
+    .environment(AppState())
 }

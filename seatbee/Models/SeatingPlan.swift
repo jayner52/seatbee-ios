@@ -122,3 +122,90 @@ struct RoomObject: Identifiable, Codable {
     var height: Double
     var rotation: Double?
 }
+
+// MARK: - Reverse Mapping (Domain → DTO for saving to Supabase)
+
+extension SeatingPlan {
+    func toPlanData() -> PlanDataDTO {
+        // Build assignments map: guestId -> AssignmentDTO
+        var assignmentsMap: [String: AssignmentDTO] = [:]
+        for table in tables {
+            for (guestId, seatIndex) in table.assignments {
+                assignmentsMap[guestId] = AssignmentDTO(tableId: table.id, seatIndex: seatIndex)
+            }
+        }
+
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+
+        return PlanDataDTO(
+            event: EventDataDTO(
+                name: name,
+                date: eventDate.map { dateFormatter.string(from: $0) },
+                venue: venue,
+                eventType: eventType.rawValue,
+                roomWidth: roomWidth,
+                roomHeight: roomHeight,
+                roomShape: nil
+            ),
+            guests: guests.map { guest in
+                GuestDTO(
+                    id: guest.id,
+                    name: guest.name,
+                    firstName: guest.firstName,
+                    lastName: guest.lastName,
+                    email: guest.email,
+                    categories: guest.categories,
+                    dietary: guest.dietary,
+                    notes: guest.notes,
+                    rsvp: guest.rsvp.rawValue,
+                    side: guest.side.rawValue,
+                    vip: guest.vip,
+                    accessibility: guest.accessibility,
+                    plusOne: guest.plusOne,
+                    party: guest.party,
+                    display: guest.displayName
+                )
+            },
+            tables: tables.map { table in
+                TableDTO(
+                    id: table.id,
+                    name: table.name,
+                    type: table.type.rawValue,
+                    seats: table.seats,
+                    x: table.x,
+                    y: table.y,
+                    rotation: table.rotation,
+                    locked: table.locked,
+                    color: table.color
+                )
+            },
+            rules: rules.map { rule in
+                RuleDTO(
+                    id: rule.id,
+                    type: rule.type.rawValue,
+                    guests: rule.guests,
+                    tableId: rule.tableId,
+                    weight: rule.weight,
+                    hard: rule.hard,
+                    enabled: rule.enabled
+                )
+            },
+            objects: objects.map { obj in
+                ObjectDTO(
+                    id: obj.id,
+                    type: obj.type,
+                    name: obj.name,
+                    x: obj.x,
+                    y: obj.y,
+                    width: obj.width,
+                    height: obj.height,
+                    rotation: obj.rotation
+                )
+            },
+            categories: nil,
+            assignments: assignmentsMap.isEmpty ? nil : assignmentsMap,
+            parties: nil
+        )
+    }
+}
