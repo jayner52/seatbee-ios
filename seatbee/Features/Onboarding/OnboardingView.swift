@@ -32,7 +32,10 @@ struct OnboardingView: View {
                         pasteArea
 
                         // Upload alternative
-                        Button {} label: {
+                        Button {
+                            HapticEngine.light()
+                            // TODO: File importer for CSV/Excel
+                        } label: {
                             Text("Or upload CSV / Excel")
                                 .font(SBFont.bodySmall)
                                 .foregroundStyle(Color.sbGoldDk)

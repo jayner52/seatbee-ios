@@ -4,6 +4,8 @@ struct EditorView: View {
     @Environment(AppState.self) private var appState
     @State private var selectedTableId: String?
     @State private var showDrawer = false
+    @State private var showGuestPicker = false
+    @State private var assigningSeatIndex: Int?
 
     private var plan: SeatingPlan? { appState.activePlan }
     private var tables: [SeatTable] { plan?.tables ?? [] }
@@ -28,24 +30,40 @@ struct EditorView: View {
                     )
                 )
 
-                // Split view: 40% canvas, 60% detail
-                GeometryReader { geo in
-                    VStack(spacing: 0) {
-                        // Canvas region (40%)
-                        canvasView
-                            .frame(height: geo.size.height * 0.4)
+                if plan == nil {
+                    // Empty state
+                    Spacer()
+                    VStack(spacing: 12) {
+                        Image(systemName: "square.grid.2x2")
+                            .font(.system(size: 40))
+                            .foregroundStyle(Color.sbWarm2)
+                        Text("Select a plan from the Plans tab")
+                            .font(SBFont.body)
+                            .foregroundStyle(Color.sbWarm)
+                    }
+                    Spacer()
+                } else {
+                    // Split view: canvas top, detail bottom
+                    GeometryReader { geo in
+                        let canvasHeight = geo.size.height * 0.38
+                        let detailHeight = geo.size.height - canvasHeight - 18 // 18 for drag handle
 
-                        // Drag handle
-                        dragHandle
+                        VStack(spacing: 0) {
+                            // Canvas region — clipped and scrollable
+                            canvasView
+                                .frame(height: canvasHeight)
+                                .clipped()
 
-                        // Detail panel (60%)
-                        detailPanel
-                            .frame(maxHeight: .infinity)
+                            // Drag handle
+                            dragHandle
+
+                            // Detail panel — takes remaining space
+                            detailPanel
+                                .frame(height: detailHeight)
+                                .clipped()
+                        }
                     }
                 }
-
-                // Tab bar space
-                Spacer().frame(height: 0)
             }
             .background(Color.sbIvory)
         }
@@ -55,6 +73,24 @@ struct EditorView: View {
                     .presentationDetents([.fraction(0.82)])
                     .presentationDragIndicator(.visible)
                     .presentationCornerRadius(24)
+            }
+        }
+        .sheet(isPresented: $showGuestPicker) {
+            if let plan {
+                GuestPickerSheet(
+                    guests: plan.guests,
+                    tables: plan.tables
+                ) { guest in
+                    assignGuest(guest)
+                }
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+            }
+        }
+        .onAppear {
+            // Auto-select first table if none selected
+            if selectedTableId == nil, let firstTable = tables.first {
+                selectedTableId = firstTable.id
             }
         }
     }
@@ -67,39 +103,47 @@ struct EditorView: View {
             Color.sbIvory2
                 .overlay(dotPattern)
 
-            // Tables grid
-            let columns = min(3, tables.count)
-            let spacing: CGFloat = 14
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: spacing), count: max(1, columns)), spacing: spacing) {
-                ForEach(tables) { table in
-                    SBTableGraphic(
-                        totalSeats: table.seats,
-                        filledSeats: table.filledCount,
-                        label: "\(table.filledCount)",
-                        size: 70,
-                        isSelected: table.id == selectedTableId
-                    )
-                    .onTapGesture {
-                        withAnimation(.seatbee) {
-                            selectedTableId = table.id
+            // Scrollable table grid
+            ScrollView([.vertical, .horizontal], showsIndicators: false) {
+                let columns = min(3, max(1, tables.count))
+                let tableSize: CGFloat = tables.count > 12 ? 56 : 70
+                let gridSpacing: CGFloat = tables.count > 12 ? 10 : 14
+
+                LazyVGrid(
+                    columns: Array(repeating: GridItem(.fixed(tableSize), spacing: gridSpacing), count: columns),
+                    spacing: gridSpacing
+                ) {
+                    ForEach(tables) { table in
+                        SBTableGraphic(
+                            totalSeats: table.seats,
+                            filledSeats: table.filledCount,
+                            label: "\(table.filledCount)",
+                            size: tableSize,
+                            isSelected: table.id == selectedTableId
+                        )
+                        .onTapGesture {
+                            withAnimation(.seatbee) {
+                                selectedTableId = table.id
+                            }
+                            HapticEngine.selection()
                         }
-                        HapticEngine.selection()
                     }
                 }
+                .padding(16)
             }
-            .padding(20)
 
-            // Floating AI pill
+            // Floating AI pill — bottom right
             VStack {
                 Spacer()
                 HStack {
                     Spacer()
                     aiPill
-                        .padding(16)
+                        .padding(.trailing, 12)
+                        .padding(.bottom, 8)
                 }
             }
 
-            // Pinch/drag hint
+            // Pinch/drag hint — top right
             VStack {
                 HStack {
                     Spacer()
@@ -110,7 +154,7 @@ struct EditorView: View {
                         .padding(.vertical, 4)
                         .background(.ultraThinMaterial)
                         .clipShape(RoundedRectangle(cornerRadius: 6))
-                        .padding(12)
+                        .padding(8)
                 }
                 Spacer()
             }
@@ -137,8 +181,7 @@ struct EditorView: View {
             HStack(spacing: 6) {
                 Image(systemName: "sparkles")
                     .font(.system(size: 12, weight: .semibold))
-                let unseated = unseatedCount
-                Text("AI seat \(unseated)")
+                Text("AI seat \(unseatedCount)")
                     .font(SBFont.inter(12, weight: .semibold))
             }
             .foregroundStyle(.white)
@@ -166,7 +209,11 @@ struct EditorView: View {
                 Spacer()
             }
             .padding(.vertical, 7)
+            Rectangle()
+                .fill(Color.sbLine)
+                .frame(height: 0.5)
         }
+        .background(Color.sbIvory)
     }
 
     // MARK: - Detail Panel
@@ -186,12 +233,6 @@ struct EditorView: View {
                             .foregroundStyle(Color.sbWarm)
                     }
 
-                    // Tags row
-                    HStack(spacing: 8) {
-                        SBChip(text: "Family", variant: .gold)
-                        SBChip(text: "+ tag", variant: .muted)
-                    }
-
                     // Open full detail link
                     Button {
                         showDrawer = true
@@ -203,11 +244,15 @@ struct EditorView: View {
 
                     // Seat list
                     seatList(table: table)
+
+                    // Bottom padding for tab bar
+                    Spacer().frame(height: 80)
                 }
-                .padding(SBSpacing.screenMargin)
+                .padding(.horizontal, SBSpacing.screenMargin)
+                .padding(.top, 12)
             } else {
                 VStack(spacing: 12) {
-                    Spacer().frame(height: 60)
+                    Spacer().frame(height: 40)
                     Image(systemName: "hand.tap")
                         .font(.system(size: 32))
                         .foregroundStyle(Color.sbWarm2)
@@ -218,6 +263,7 @@ struct EditorView: View {
                 .frame(maxWidth: .infinity)
             }
         }
+        .background(Color.sbIvory)
     }
 
     private func seatList(table: SeatTable) -> some View {
@@ -237,7 +283,6 @@ struct EditorView: View {
 
     private func filledSeatRow(index: Int, guest: Guest) -> some View {
         HStack(spacing: 10) {
-            // Seat number badge
             ZStack {
                 Circle()
                     .fill(Color.sbGold)
@@ -272,26 +317,33 @@ struct EditorView: View {
     }
 
     private func emptySeatRow(index: Int) -> some View {
-        HStack(spacing: 10) {
-            Circle()
-                .strokeBorder(Color.sbWarm2, style: StrokeStyle(lineWidth: 1, dash: [3, 2]))
-                .frame(width: 22, height: 22)
+        Button {
+            assigningSeatIndex = index
+            showGuestPicker = true
+            HapticEngine.light()
+        } label: {
+            HStack(spacing: 10) {
+                Circle()
+                    .strokeBorder(Color.sbWarm2, style: StrokeStyle(lineWidth: 1, dash: [3, 2]))
+                    .frame(width: 22, height: 22)
 
-            Text("Empty seat · tap to assign")
-                .font(SBFont.meta)
-                .foregroundStyle(Color.sbWarm)
+                Text("Empty seat · tap to assign")
+                    .font(SBFont.meta)
+                    .foregroundStyle(Color.sbWarm)
 
-            Spacer()
+                Spacer()
 
-            Image(systemName: "plus")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(Color.sbWarm2)
+                Image(systemName: "plus")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Color.sbWarm2)
+            }
+            .padding(8)
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .strokeBorder(Color.sbLine, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+            )
         }
-        .padding(8)
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .strokeBorder(Color.sbLine, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
-        )
+        .buttonStyle(.plain)
     }
 
     // MARK: - Helpers
@@ -300,6 +352,28 @@ struct EditorView: View {
         guard let plan else { return 0 }
         let seated = plan.tables.reduce(0) { $0 + $1.filledCount }
         return max(0, plan.guests.count - seated)
+    }
+
+    private func assignGuest(_ guest: Guest) {
+        guard let seatIndex = assigningSeatIndex,
+              let tableId = selectedTableId,
+              var updatedPlan = appState.activePlan,
+              let tableIndex = updatedPlan.tables.firstIndex(where: { $0.id == tableId }) else { return }
+
+        updatedPlan.tables[tableIndex].assignments[guest.id] = seatIndex
+        appState.activePlan = updatedPlan
+        HapticEngine.success()
+
+        // Persist to Supabase in background
+        Task {
+            do {
+                try await appState.database.updatePlan(id: updatedPlan.id, updates: [
+                    "updated_at": ISO8601DateFormatter().string(from: Date())
+                ])
+            } catch {
+                print("[Editor] Failed to save assignment: \(error)")
+            }
+        }
     }
 }
 

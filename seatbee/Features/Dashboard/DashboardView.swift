@@ -4,6 +4,7 @@ struct DashboardView: View {
     @Environment(AppState.self) private var appState
     @State private var plans: [SeatingPlan] = []
     @State private var isLoading = true
+    @State private var loadError: String?
 
     private var activePlan: SeatingPlan? { plans.first }
 
@@ -14,13 +15,60 @@ struct DashboardView: View {
                     // Greeting
                     greeting
 
+                    // Error state
+                    if let loadError {
+                        VStack(spacing: 8) {
+                            Image(systemName: "exclamationmark.triangle")
+                                .font(.system(size: 24))
+                                .foregroundStyle(Color.sbError)
+                            Text(loadError)
+                                .font(SBFont.caption)
+                                .foregroundStyle(Color.sbWarm)
+                                .multilineTextAlignment(.center)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                    }
+
+                    // Loading state
+                    if isLoading {
+                        ProgressView()
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, 40)
+                    }
+
+                    // Empty state
+                    if !isLoading && plans.isEmpty && loadError == nil {
+                        VStack(spacing: 16) {
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 40))
+                                .foregroundStyle(Color.sbGold)
+                            Text("No plans yet")
+                                .font(SBFont.displaySmall)
+                                .foregroundStyle(Color.sbCharcoal)
+                            Text("Create your first seating plan on seatbee.app")
+                                .font(SBFont.body)
+                                .foregroundStyle(Color.sbWarm)
+                                .multilineTextAlignment(.center)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 40)
+                    }
+
                     // Hero card - active event
                     if let plan = activePlan {
-                        heroCard(plan)
+                        Button {
+                            selectPlan(plan)
+                        } label: {
+                            heroCard(plan)
+                        }
+                        .buttonStyle(.plain)
                     }
 
                     // Quick actions
-                    quickActions
+                    if !plans.isEmpty {
+                        quickActions
+                    }
 
                     // Other plans
                     if plans.count > 1 {
@@ -186,28 +234,38 @@ struct DashboardView: View {
     }
 
     private func planRow(_ plan: SeatingPlan) -> some View {
-        HStack(spacing: 12) {
-            // Mini table graphic
-            SBTableGraphic(totalSeats: 8, filledSeats: min(plan.guests.count, 8), size: 44)
+        Button {
+            selectPlan(plan)
+        } label: {
+            HStack(spacing: 12) {
+                SBTableGraphic(totalSeats: 8, filledSeats: min(plan.guests.count, 8), size: 44)
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(plan.name)
-                    .font(SBFont.bodySmallBold)
-                    .foregroundStyle(Color.sbCharcoal)
-                Text("\(plan.guests.count) guests · \(plan.tables.count) tables")
-                    .font(SBFont.caption)
-                    .foregroundStyle(Color.sbWarm)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(plan.name)
+                        .font(SBFont.bodySmallBold)
+                        .foregroundStyle(Color.sbCharcoal)
+                    Text("\(plan.guests.count) guests · \(plan.tables.count) tables")
+                        .font(SBFont.caption)
+                        .foregroundStyle(Color.sbWarm)
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Color.sbWarm2)
             }
-
-            Spacer()
-
-            Image(systemName: "chevron.right")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(Color.sbWarm2)
+            .padding(12)
+            .background(Color.sbIvory2)
+            .clipShape(RoundedRectangle(cornerRadius: SBRadius.card))
         }
-        .padding(12)
-        .background(Color.sbIvory2)
-        .clipShape(RoundedRectangle(cornerRadius: SBRadius.card))
+        .buttonStyle(.plain)
+    }
+
+    private func selectPlan(_ plan: SeatingPlan) {
+        appState.activePlan = plan
+        appState.selectedTab = .edit
+        HapticEngine.selection()
     }
 
     // MARK: - Helpers
@@ -227,8 +285,10 @@ struct DashboardView: View {
         do {
             plans = try await appState.database.fetchPlans()
             appState.activePlan = plans.first
+            print("[Dashboard] Loaded \(plans.count) plans, active: \(plans.first?.name ?? "none")")
         } catch {
-            // Handle silently for now
+            print("[Dashboard] Error loading plans: \(error)")
+            loadError = error.localizedDescription
         }
         isLoading = false
     }

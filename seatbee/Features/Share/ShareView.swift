@@ -137,7 +137,9 @@ struct ShareView: View {
                 }
             }
 
-            Button {} label: {
+            Button {
+                HapticEngine.light()
+            } label: {
                 HStack {
                     Image(systemName: "plus")
                     Text("Invite people")
@@ -162,7 +164,9 @@ struct ShareView: View {
     }
 
     private func socialButton(icon: String, label: String) -> some View {
-        Button {} label: {
+        Button {
+            sharePlan(via: label)
+        } label: {
             VStack(spacing: 6) {
                 Image(systemName: icon)
                     .font(.system(size: 20))
@@ -198,8 +202,23 @@ struct ShareView: View {
         }
     }
 
+    private func sharePlan(via method: String) {
+        guard let plan = appState.activePlan else { return }
+        let shareURL = "https://seatbee.app/plan/\(plan.id)"
+        let activityVC = UIActivityViewController(
+            activityItems: ["\(plan.name) — View seating plan", URL(string: shareURL)!],
+            applicationActivities: nil
+        )
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let rootVC = windowScene.windows.first?.rootViewController {
+            rootVC.present(activityVC, animated: true)
+        }
+    }
+
     private func exportCard(icon: String, title: String) -> some View {
-        Button {} label: {
+        Button {
+            sharePlan(via: title)
+        } label: {
             VStack(spacing: 8) {
                 Image(systemName: icon)
                     .font(.system(size: 24))

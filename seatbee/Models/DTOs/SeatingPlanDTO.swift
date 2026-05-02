@@ -1,45 +1,126 @@
 import Foundation
 
-// DTOs matching Supabase database schema exactly
-// The web app stores tables, guests, rules as JSONB columns within seating_plans
+// The web app stores everything inside a single `data` JSONB column.
+// Schema: seating_plans(id, user_id, name, data, event_date, event_type,
+//         event_venue_name, seated_guest_count, created_at, updated_at, deleted_at)
 
 struct SeatingPlanDTO: Codable {
     let id: String
     let user_id: String?
     let name: String
+    let data: PlanDataDTO?
     let event_date: String?
-    let venue: String?
     let event_type: String?
-    let tables: [TableDTO]?
-    let guests: [GuestDTO]?
-    let rules: [RuleDTO]?
-    let objects: [ObjectDTO]?
-    let room_width: Double?
-    let room_height: Double?
+    let event_venue_name: String?
+    let seated_guest_count: Int?
     let tier: String?
     let created_at: String?
     let updated_at: String?
     let deleted_at: String?
 
     func toDomain() -> SeatingPlan {
-        SeatingPlan(
+        let planData = data
+
+        // Parse assignments from data.assignments (guestId -> {tableId, seatIndex})
+        let assignmentMap = planData?.assignments ?? [:]
+
+        // Build tables with their assignments embedded
+        var domainTables = (planData?.tables ?? []).map { $0.toDomain() }
+        for (guestId, assignment) in assignmentMap {
+            if let tableIndex = domainTables.firstIndex(where: { $0.id == assignment.tableId }) {
+                domainTables[tableIndex].assignments[guestId] = assignment.seatIndex ?? 0
+            }
+        }
+
+        return SeatingPlan(
             id: id,
             name: name,
-            eventDate: event_date.flatMap { ISO8601DateFormatter().date(from: $0) },
-            venue: venue,
-            eventType: SeatingPlan.EventType(rawValue: event_type ?? "wedding") ?? .wedding,
-            tables: (tables ?? []).map { $0.toDomain() },
-            guests: (guests ?? []).map { $0.toDomain() },
-            rules: (rules ?? []).map { $0.toDomain() },
-            objects: (objects ?? []).map { $0.toDomain() },
-            roomWidth: room_width,
-            roomHeight: room_height,
-            createdAt: created_at.flatMap { ISO8601DateFormatter().date(from: $0) },
-            updatedAt: updated_at.flatMap { ISO8601DateFormatter().date(from: $0) },
+            eventDate: event_date.flatMap { parseDate($0) },
+            venue: event_venue_name ?? planData?.event?.venue,
+            eventType: SeatingPlan.EventType(rawValue: event_type ?? planData?.event?.eventType ?? "wedding") ?? .wedding,
+            tables: domainTables,
+            guests: (planData?.guests ?? []).map { $0.toDomain() },
+            rules: (planData?.rules ?? []).map { $0.toDomain() },
+            objects: (planData?.objects ?? []).map { $0.toDomain() },
+            roomWidth: planData?.event?.roomWidth,
+            roomHeight: planData?.event?.roomHeight,
+            createdAt: created_at.flatMap { parseDate($0) },
+            updatedAt: updated_at.flatMap { parseDate($0) },
             userId: user_id,
             tier: tier
         )
     }
+
+    private func parseDate(_ string: String) -> Date? {
+        // Try ISO8601 first
+        let iso = ISO8601DateFormatter()
+        if let date = iso.date(from: string) { return date }
+        // Try with fractional seconds
+        iso.formatOptions.insert(.withFractionalSeconds)
+        if let date = iso.date(from: string) { return date }
+        // Try simple date format (YYYY-MM-DD)
+        let simple = DateFormatter()
+        simple.dateFormat = "yyyy-MM-dd"
+        return simple.date(from: string)
+    }
+}
+
+// The `data` JSONB blob structure
+struct PlanDataDTO: Codable {
+    let event: EventDataDTO?
+    let guests: [GuestDTO]?
+    let tables: [TableDTO]?
+    let rules: [RuleDTO]?
+    let objects: [ObjectDTO]?
+    let categories: [CategoryDTO]?
+    let assignments: [String: AssignmentDTO]?
+    let parties: [PartyDTO]?
+}
+
+struct EventDataDTO: Codable {
+    let name: String?
+    let date: String?
+    let venue: String?
+    let eventType: String?
+    let roomWidth: Double?
+    let roomHeight: Double?
+    let roomShape: String?
+}
+
+struct AssignmentDTO: Codable {
+    let tableId: String?
+    let seatIndex: Int?
+
+    // Handle both {tableId, seatIndex} and direct tableId string
+    init(from decoder: Decoder) throws {
+        if let container = try? decoder.container(keyedBy: CodingKeys.self) {
+            tableId = try container.decodeIfPresent(String.self, forKey: .tableId)
+            seatIndex = try container.decodeIfPresent(Int.self, forKey: .seatIndex)
+        } else if let singleValue = try? decoder.singleValueContainer(),
+                  let stringValue = try? singleValue.decode(String.self) {
+            tableId = stringValue
+            seatIndex = nil
+        } else {
+            tableId = nil
+            seatIndex = nil
+        }
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case tableId, seatIndex
+    }
+}
+
+struct CategoryDTO: Codable {
+    let id: String?
+    let name: String?
+    let color: String?
+}
+
+struct PartyDTO: Codable {
+    let id: String?
+    let name: String?
+    let members: [String]?
 }
 
 struct TableDTO: Codable {
@@ -50,7 +131,6 @@ struct TableDTO: Codable {
     let x: Double?
     let y: Double?
     let rotation: Double?
-    let assignments: [String: Int]?
     let locked: Bool?
     let color: String?
 
@@ -63,7 +143,7 @@ struct TableDTO: Codable {
             x: x ?? 0,
             y: y ?? 0,
             rotation: rotation,
-            assignments: assignments ?? [:],
+            assignments: [:], // Filled in by SeatingPlanDTO.toDomain()
             locked: locked,
             color: color
         )
@@ -85,11 +165,13 @@ struct GuestDTO: Codable {
     let accessibility: String?
     let plusOne: Bool?
     let party: String?
+    let display: String?
 
     func toDomain() -> Guest {
-        Guest(
+        let displayName = display ?? name ?? "\(firstName ?? "") \(lastName ?? "")".trimmingCharacters(in: .whitespaces)
+        return Guest(
             id: id,
-            name: name ?? "\(firstName ?? "") \(lastName ?? "")".trimmingCharacters(in: .whitespaces),
+            name: displayName.isEmpty ? "Guest" : displayName,
             firstName: firstName,
             lastName: lastName,
             email: email,

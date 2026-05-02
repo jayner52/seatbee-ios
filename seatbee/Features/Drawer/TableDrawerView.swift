@@ -69,7 +69,7 @@ struct TableDrawerView: View {
     }
 
     private func actionButton(icon: String, label: String) -> some View {
-        Button {} label: {
+        Button { HapticEngine.light() } label: {
             VStack(spacing: 6) {
                 Image(systemName: icon)
                     .font(.system(size: 18))
@@ -142,7 +142,7 @@ struct TableDrawerView: View {
             }
 
             // Add seat button
-            Button {} label: {
+            Button { HapticEngine.light() } label: {
                 HStack {
                     Image(systemName: "plus")
                     Text("Add seat")
