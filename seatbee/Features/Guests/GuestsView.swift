@@ -4,6 +4,8 @@ struct GuestsView: View {
     @Environment(AppState.self) private var appState
     @State private var searchText = ""
     @State private var selectedFilter = "All"
+    @State private var showAddGuest = false
+    @State private var editingGuest: Guest?
 
     private var plan: SeatingPlan? { appState.activePlan }
     private var guests: [Guest] { plan?.guests ?? [] }
@@ -13,7 +15,18 @@ struct GuestsView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                SBNavHeader(title: "Guests")
+                SBNavHeader(
+                    title: "Guests",
+                    rightContent: AnyView(
+                        Button {
+                            showAddGuest = true
+                        } label: {
+                            Image(systemName: "plus")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(Color.sbGoldDk)
+                        }
+                    )
+                )
 
                 ScrollView {
                     VStack(alignment: .leading, spacing: SBSpacing.sectionGap) {
@@ -48,6 +61,14 @@ struct GuestsView: View {
                 }
             }
             .background(Color.sbIvory)
+            .sheet(isPresented: $showAddGuest) {
+                GuestDetailSheet(guest: nil)
+                    .environment(appState)
+            }
+            .sheet(item: $editingGuest) { guest in
+                GuestDetailSheet(guest: guest)
+                    .environment(appState)
+            }
         }
     }
 
@@ -106,6 +127,13 @@ struct GuestsView: View {
         LazyVStack(spacing: 0) {
             ForEach(filteredGuests) { guest in
                 guestRow(guest)
+                    .swipeActions(edge: .trailing) {
+                        Button(role: .destructive) {
+                            deleteGuest(guest)
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                    }
                 if guest.id != filteredGuests.last?.id {
                     Divider()
                         .foregroundStyle(Color.sbLine)
@@ -161,17 +189,18 @@ struct GuestsView: View {
     }
 
     private func navigateToGuest(_ guest: Guest) {
-        // If guest is seated, switch to Editor and select their table
-        if let table = assignedTable(for: guest) {
-            appState.selectedTab = .edit
-            // Post notification so EditorView can select this table
-            NotificationCenter.default.post(
-                name: .selectTable,
-                object: nil,
-                userInfo: ["tableId": table.id]
-            )
-            HapticEngine.selection()
+        editingGuest = guest
+    }
+
+    private func deleteGuest(_ guest: Guest) {
+        guard var plan = appState.activePlan else { return }
+        plan.guests.removeAll { $0.id == guest.id }
+        for i in plan.tables.indices {
+            plan.tables[i].assignments.removeValue(forKey: guest.id)
         }
+        appState.activePlan = plan
+        HapticEngine.medium()
+        Task { try? await appState.database.savePlanData(plan: plan) }
     }
 
     private func tableAssignment(for guest: Guest) -> some View {

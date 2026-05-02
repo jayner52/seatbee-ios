@@ -5,6 +5,7 @@ struct EditorView: View {
     @State private var selectedTableId: String?
     @State private var showDrawer = false
     @State private var showGuestPicker = false
+    @State private var showAddTable = false
     @State private var assigningSeatIndex: Int?
 
     private var plan: SeatingPlan? { appState.activePlan }
@@ -87,6 +88,12 @@ struct EditorView: View {
                 .presentationDragIndicator(.visible)
             }
         }
+        .sheet(isPresented: $showAddTable) {
+            AddTableSheet()
+                .environment(appState)
+                .presentationDetents([.medium])
+                .presentationDragIndicator(.visible)
+        }
         .onAppear {
             if selectedTableId == nil, let firstTable = tables.first {
                 selectedTableId = firstTable.id
@@ -138,11 +145,30 @@ struct EditorView: View {
                 .padding(16)
             }
 
-            // Floating AI pill — bottom right
+            // Floating buttons — bottom
             VStack {
                 Spacer()
                 HStack {
+                    // Add table button — bottom left
+                    Button {
+                        showAddTable = true
+                        HapticEngine.light()
+                    } label: {
+                        Image(systemName: "plus")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundStyle(.white)
+                            .frame(width: 40, height: 40)
+                            .background(Color.sbCharcoal)
+                            .clipShape(Circle())
+                            .shadow(color: Color.sbCharcoal.opacity(0.3), radius: 8, x: 0, y: 4)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.leading, 12)
+                    .padding(.bottom, 8)
+
                     Spacer()
+
+                    // AI pill — bottom right
                     aiPill
                         .padding(.trailing, 12)
                         .padding(.bottom, 8)
@@ -312,6 +338,16 @@ struct EditorView: View {
             }
 
             Spacer()
+
+            // Unassign button
+            Button {
+                unassignGuest(guest)
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 16))
+                    .foregroundStyle(Color.sbWarm2)
+            }
+            .buttonStyle(.plain)
         }
         .padding(8)
         .background(
@@ -358,6 +394,20 @@ struct EditorView: View {
         guard let plan else { return 0 }
         let seated = plan.tables.reduce(0) { $0 + $1.filledCount }
         return max(0, plan.guests.count - seated)
+    }
+
+    private func unassignGuest(_ guest: Guest) {
+        guard let tableId = selectedTableId,
+              var updatedPlan = appState.activePlan,
+              let tableIndex = updatedPlan.tables.firstIndex(where: { $0.id == tableId }) else { return }
+
+        updatedPlan.tables[tableIndex].assignments.removeValue(forKey: guest.id)
+        appState.activePlan = updatedPlan
+        HapticEngine.medium()
+
+        Task {
+            try? await appState.database.savePlanData(plan: updatedPlan)
+        }
     }
 
     private func assignGuest(_ guest: Guest) {

@@ -5,6 +5,7 @@ struct DashboardView: View {
     @State private var plans: [SeatingPlan] = []
     @State private var isLoading = true
     @State private var loadError: String?
+    @State private var showEditPlan = false
 
     private var activePlan: SeatingPlan? { plans.first }
 
@@ -98,6 +99,10 @@ struct DashboardView: View {
         .task {
             await loadPlans()
         }
+        .sheet(isPresented: $showEditPlan) {
+            EditPlanSheet()
+                .environment(appState)
+        }
     }
 
     // MARK: - Greeting
@@ -139,9 +144,23 @@ struct DashboardView: View {
     private func heroCard(_ plan: SeatingPlan) -> some View {
         SBCard(elevated: true, backgroundColor: .sbIvory2) {
             VStack(alignment: .leading, spacing: 14) {
-                Text(plan.name)
-                    .font(SBFont.fraunces(26, weight: .medium))
-                    .foregroundStyle(Color.sbCharcoal)
+                HStack {
+                    Text(plan.name)
+                        .font(SBFont.fraunces(26, weight: .medium))
+                        .foregroundStyle(Color.sbCharcoal)
+                    Spacer()
+                    Button {
+                        showEditPlan = true
+                    } label: {
+                        Image(systemName: "pencil")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(Color.sbGoldDk)
+                            .frame(width: 30, height: 30)
+                            .background(Color.sbChampagne)
+                            .clipShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                }
 
                 if let date = plan.eventDate {
                     HStack(spacing: 6) {
