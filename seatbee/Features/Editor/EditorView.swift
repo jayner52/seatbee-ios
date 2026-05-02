@@ -8,6 +8,13 @@ struct EditorView: View {
     @State private var showAddTable = false
     @State private var assigningSeatIndex: Int?
 
+    // Canvas viewport state
+    @State private var canvasOffset: CGSize = .zero
+    @State private var canvasScale: CGFloat = 1.0
+    @State private var lastCanvasOffset: CGSize = .zero
+    @State private var lastCanvasScale: CGFloat = 1.0
+    @State private var draggingTableId: String?
+
     private var plan: SeatingPlan? { appState.activePlan }
     private var tables: [SeatTable] { plan?.tables ?? [] }
     private var selectedTable: SeatTable? {
@@ -111,85 +118,159 @@ struct EditorView: View {
     // MARK: - Canvas
 
     private var canvasView: some View {
-        ZStack {
-            // Background with dot pattern
-            Color.sbIvory2
-                .overlay(dotPattern)
+        GeometryReader { geo in
+            ZStack {
+                // Background with dot pattern
+                Color.sbIvory2
+                    .overlay(dotPattern)
 
-            // Scrollable table grid
-            ScrollView([.vertical, .horizontal], showsIndicators: false) {
-                let columns = min(3, max(1, tables.count))
-                let tableSize: CGFloat = tables.count > 12 ? 56 : 70
-                let gridSpacing: CGFloat = tables.count > 12 ? 10 : 14
+                // Tables positioned by their x,y coordinates
+                ForEach(tables) { table in
+                    let tableSize: CGFloat = 70
+                    let posX = table.x * canvasScale + canvasOffset.width
+                    let posY = table.y * canvasScale + canvasOffset.height
 
-                LazyVGrid(
-                    columns: Array(repeating: GridItem(.fixed(tableSize), spacing: gridSpacing), count: columns),
-                    spacing: gridSpacing
-                ) {
-                    ForEach(tables) { table in
-                        SBTableGraphic(
-                            totalSeats: table.seats,
-                            filledSeats: table.filledCount,
-                            label: "\(table.filledCount)",
-                            size: tableSize,
-                            isSelected: table.id == selectedTableId
-                        )
-                        .onTapGesture {
-                            withAnimation(.seatbee) {
-                                selectedTableId = table.id
+                    SBTableGraphic(
+                        totalSeats: table.seats,
+                        filledSeats: table.filledCount,
+                        label: table.name,
+                        size: tableSize * canvasScale,
+                        isSelected: table.id == selectedTableId
+                    )
+                    .position(x: posX, y: posY)
+                    .gesture(
+                        DragGesture()
+                            .onChanged { value in
+                                draggingTableId = table.id
+                                moveTable(table, by: value.translation)
                             }
-                            HapticEngine.selection()
+                            .onEnded { _ in
+                                draggingTableId = nil
+                                saveTablePositions()
+                            }
+                    )
+                    .onTapGesture {
+                        withAnimation(.seatbee) {
+                            selectedTableId = table.id
+                        }
+                        HapticEngine.selection()
+                    }
+                    .zIndex(table.id == selectedTableId ? 10 : (table.id == draggingTableId ? 5 : 1))
+                }
+            }
+            .clipped()
+            .contentShape(Rectangle())
+            // Pan gesture on canvas background
+            .gesture(
+                DragGesture()
+                    .onChanged { value in
+                        if draggingTableId == nil {
+                            canvasOffset = CGSize(
+                                width: lastCanvasOffset.width + value.translation.width,
+                                height: lastCanvasOffset.height + value.translation.height
+                            )
                         }
                     }
-                }
-                .padding(16)
-            }
-
-            // Floating buttons — bottom
-            VStack {
-                Spacer()
-                HStack {
-                    // Add table button — bottom left
-                    Button {
-                        showAddTable = true
-                        HapticEngine.light()
-                    } label: {
-                        Image(systemName: "plus")
-                            .font(.system(size: 16, weight: .bold))
-                            .foregroundStyle(.white)
-                            .frame(width: 40, height: 40)
-                            .background(Color.sbCharcoal)
-                            .clipShape(Circle())
-                            .shadow(color: Color.sbCharcoal.opacity(0.3), radius: 8, x: 0, y: 4)
+                    .onEnded { _ in
+                        lastCanvasOffset = canvasOffset
                     }
-                    .buttonStyle(.plain)
-                    .padding(.leading, 12)
-                    .padding(.bottom, 8)
-
-                    Spacer()
-
-                    // AI pill — bottom right
-                    aiPill
-                        .padding(.trailing, 12)
-                        .padding(.bottom, 8)
+            )
+            // Pinch to zoom
+            .gesture(
+                MagnifyGesture()
+                    .onChanged { value in
+                        canvasScale = max(0.3, min(3.0, lastCanvasScale * value.magnification))
+                    }
+                    .onEnded { _ in
+                        lastCanvasScale = canvasScale
+                    }
+            )
+            .overlay(alignment: .bottomLeading) {
+                // Add table button
+                Button {
+                    showAddTable = true
+                    HapticEngine.light()
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 40, height: 40)
+                        .background(Color.sbCharcoal)
+                        .clipShape(Circle())
+                        .shadow(color: Color.sbCharcoal.opacity(0.3), radius: 8, x: 0, y: 4)
                 }
+                .buttonStyle(.plain)
+                .padding(12)
             }
-
-            // Pinch/drag hint — top right
-            VStack {
-                HStack {
-                    Spacer()
-                    Text("pinch · drag")
-                        .font(SBFont.capsLabel)
-                        .foregroundStyle(Color.sbWarm)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(.ultraThinMaterial)
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
-                        .padding(8)
+            .overlay(alignment: .bottomTrailing) {
+                // AI pill
+                aiPill
+                    .padding(12)
+            }
+            .overlay(alignment: .topTrailing) {
+                // Zoom controls
+                VStack(spacing: 6) {
+                    Button {
+                        withAnimation(.seatbee) {
+                            canvasScale = min(3.0, canvasScale * 1.3)
+                            lastCanvasScale = canvasScale
+                        }
+                    } label: {
+                        Image(systemName: "plus.magnifyingglass")
+                            .font(.system(size: 14))
+                            .foregroundStyle(Color.sbCharcoal)
+                            .frame(width: 32, height: 32)
+                            .background(.ultraThinMaterial)
+                            .clipShape(Circle())
+                    }
+                    Button {
+                        withAnimation(.seatbee) {
+                            canvasScale = max(0.3, canvasScale / 1.3)
+                            lastCanvasScale = canvasScale
+                        }
+                    } label: {
+                        Image(systemName: "minus.magnifyingglass")
+                            .font(.system(size: 14))
+                            .foregroundStyle(Color.sbCharcoal)
+                            .frame(width: 32, height: 32)
+                            .background(.ultraThinMaterial)
+                            .clipShape(Circle())
+                    }
+                    Button {
+                        withAnimation(.seatbee) {
+                            canvasScale = 1.0
+                            lastCanvasScale = 1.0
+                            canvasOffset = .zero
+                            lastCanvasOffset = .zero
+                        }
+                    } label: {
+                        Image(systemName: "arrow.counterclockwise")
+                            .font(.system(size: 12))
+                            .foregroundStyle(Color.sbWarm)
+                            .frame(width: 32, height: 32)
+                            .background(.ultraThinMaterial)
+                            .clipShape(Circle())
+                    }
                 }
-                Spacer()
+                .buttonStyle(.plain)
+                .padding(8)
             }
+        }
+    }
+
+    private func moveTable(_ table: SeatTable, by translation: CGSize) {
+        guard var updatedPlan = appState.activePlan,
+              let idx = updatedPlan.tables.firstIndex(where: { $0.id == table.id }) else { return }
+
+        updatedPlan.tables[idx].x = table.x + Double(translation.width / canvasScale)
+        updatedPlan.tables[idx].y = table.y + Double(translation.height / canvasScale)
+        appState.activePlan = updatedPlan
+    }
+
+    private func saveTablePositions() {
+        guard let plan = appState.activePlan else { return }
+        Task {
+            try? await appState.database.savePlanData(plan: plan)
         }
     }
 
