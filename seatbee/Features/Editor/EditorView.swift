@@ -71,8 +71,8 @@ struct EditorView: View {
                 } else {
                     // Split view: canvas top, detail bottom
                     GeometryReader { geo in
-                        let canvasHeight = geo.size.height * 0.38
-                        let detailHeight = geo.size.height - canvasHeight - 18 // 18 for drag handle
+                        let canvasHeight = max(100, geo.size.height * 0.38)
+                        let detailHeight = max(100, geo.size.height - canvasHeight - 18)
 
                         VStack(spacing: 0) {
                             // Canvas region — clipped and scrollable

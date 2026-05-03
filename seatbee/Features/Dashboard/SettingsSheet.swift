@@ -1,4 +1,5 @@
 import SwiftUI
+import Auth
 
 struct SettingsSheet: View {
     @Environment(AppState.self) private var appState
