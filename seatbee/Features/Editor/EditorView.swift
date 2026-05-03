@@ -8,13 +8,14 @@ struct EditorView: View {
     @State private var showAddTable = false
     @State private var showAddVenueObject = false
     @State private var showRoomSetup = false
+    @State private var showDetailSheet = false
     @State private var assigningSeatIndex: Int?
 
-    // Canvas viewport state
+    // Canvas viewport
     @State private var canvasOffset: CGSize = .zero
-    @State private var canvasScale: CGFloat = 1.0
+    @State private var canvasScale: CGFloat = 0.8
     @State private var lastCanvasOffset: CGSize = .zero
-    @State private var lastCanvasScale: CGFloat = 1.0
+    @State private var lastCanvasScale: CGFloat = 0.8
     @State private var draggingTableId: String?
 
     private var plan: SeatingPlan? { appState.activePlan }
@@ -24,78 +25,41 @@ struct EditorView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                // Nav header
-                SBNavHeader(
-                    title: plan?.name ?? "Editor",
-                    rightContent: AnyView(
-                        HStack(spacing: 12) {
-                            // Undo/Redo
-                            Button { appState.undo(); HapticEngine.light() } label: {
-                                Image(systemName: "arrow.uturn.backward")
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundStyle(appState.undoManager.canUndo ? Color.sbCharcoal : Color.sbWarm2)
-                            }
-                            .disabled(!appState.undoManager.canUndo)
+        ZStack {
+            if plan == nil {
+                emptyState
+            } else {
+                // Full-screen canvas
+                canvasView
+                    .ignoresSafeArea(.all, edges: .bottom)
 
-                            Button { appState.redo(); HapticEngine.light() } label: {
-                                Image(systemName: "arrow.uturn.forward")
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundStyle(appState.undoManager.canRedo ? Color.sbCharcoal : Color.sbWarm2)
-                            }
-                            .disabled(!appState.undoManager.canRedo)
-
-                            // Room setup
-                            Button { showRoomSetup = true } label: {
-                                Image(systemName: "square.dashed")
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundStyle(Color.sbGoldDk)
-                            }
-                        }
-                    )
-                )
-
-                if plan == nil {
-                    // Empty state
+                // Top bar overlay
+                VStack {
+                    topBar
                     Spacer()
-                    VStack(spacing: 12) {
-                        Image(systemName: "square.grid.2x2")
-                            .font(.system(size: 40))
-                            .foregroundStyle(Color.sbWarm2)
-                        Text("Select a plan from the Plans tab")
-                            .font(SBFont.body)
-                            .foregroundStyle(Color.sbWarm)
-                    }
+                }
+
+                // Bottom controls overlay
+                VStack {
                     Spacer()
-                } else {
-                    // Split view: canvas top, detail bottom
-                    GeometryReader { geo in
-                        let canvasHeight = max(100, geo.size.height * 0.38)
-                        let detailHeight = max(100, geo.size.height - canvasHeight - 18)
-
-                        VStack(spacing: 0) {
-                            // Canvas region — clipped and scrollable
-                            canvasView
-                                .frame(height: canvasHeight)
-                                .clipped()
-
-                            // Drag handle
-                            dragHandle
-
-                            // Detail panel — takes remaining space
-                            detailPanel
-                                .frame(height: detailHeight)
-                                .clipped()
-                        }
-                    }
+                    bottomControls
                 }
             }
-            .background(Color.sbIvory)
+        }
+        .background(Color.sbIvory2)
+        .sheet(isPresented: $showDetailSheet) {
+            if let table = selectedTable {
+                tableDetailSheet(table)
+                    .presentationDetents([.fraction(0.45), .large])
+                    .presentationDragIndicator(.visible)
+                    .presentationBackgroundInteraction(.enabled(upThrough: .fraction(0.45)))
+                    .presentationCornerRadius(24)
+            }
         }
         .sheet(isPresented: $showDrawer) {
             if let table = selectedTable {
                 TableDrawerView(table: table)
+                    .environment(appState)
                     .presentationDetents([.fraction(0.82)])
                     .presentationDragIndicator(.visible)
                     .presentationCornerRadius(24)
@@ -103,12 +67,10 @@ struct EditorView: View {
         }
         .sheet(isPresented: $showGuestPicker) {
             if let plan {
-                GuestPickerSheet(
-                    guests: plan.guests,
-                    tables: plan.tables
-                ) { guest in
+                GuestPickerSheet(guests: plan.guests, tables: plan.tables) { guest in
                     assignGuest(guest)
                 }
+                .environment(appState)
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
             }
@@ -130,301 +92,348 @@ struct EditorView: View {
                 .environment(appState)
         }
         .onAppear {
-            if selectedTableId == nil, let firstTable = tables.first {
-                selectedTableId = firstTable.id
+            if selectedTableId == nil, let first = tables.first {
+                selectedTableId = first.id
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .selectTable)) { notification in
             if let tableId = notification.userInfo?["tableId"] as? String {
                 withAnimation(.seatbee) {
                     selectedTableId = tableId
+                    showDetailSheet = true
                 }
             }
         }
     }
 
-    // MARK: - Canvas
+    // MARK: - Empty State
 
-    private var canvasView: some View {
-        GeometryReader { geo in
-            ZStack {
-                // Background with dot pattern
-                Color.sbIvory2
-                    .overlay(dotPattern)
+    private var emptyState: some View {
+        VStack(spacing: 16) {
+            Spacer()
+            Image(systemName: "square.grid.2x2")
+                .font(.system(size: 40))
+                .foregroundStyle(Color.sbWarm2)
+            Text("Select a plan from the Plans tab")
+                .font(SBFont.body)
+                .foregroundStyle(Color.sbWarm)
+            Spacer()
+        }
+        .frame(maxWidth: .infinity)
+        .background(Color.sbIvory)
+    }
 
-                // Tables positioned by their x,y coordinates
-                ForEach(tables) { table in
-                    let tableSize: CGFloat = 70
-                    let posX = table.x * canvasScale + canvasOffset.width
-                    let posY = table.y * canvasScale + canvasOffset.height
+    // MARK: - Top Bar
 
-                    SBTableGraphic(
-                        totalSeats: table.seats,
-                        filledSeats: table.filledCount,
-                        label: table.name,
-                        size: tableSize * canvasScale,
-                        isSelected: table.id == selectedTableId
-                    )
-                    .position(x: posX, y: posY)
-                    .gesture(
-                        DragGesture()
-                            .onChanged { value in
-                                draggingTableId = table.id
-                                moveTable(table, by: value.translation)
-                            }
-                            .onEnded { _ in
-                                draggingTableId = nil
-                                saveTablePositions()
-                            }
-                    )
-                    .onTapGesture {
-                        withAnimation(.seatbee) {
-                            selectedTableId = table.id
-                        }
-                        HapticEngine.selection()
-                    }
-                    .zIndex(table.id == selectedTableId ? 10 : (table.id == draggingTableId ? 5 : 1))
-                }
+    private var topBar: some View {
+        HStack(spacing: 10) {
+            // Plan name
+            Text(plan?.name ?? "")
+                .font(SBFont.displayNav)
+                .foregroundStyle(Color.sbCharcoal)
+                .lineLimit(1)
 
-                // Venue objects
-                ForEach(plan?.objects ?? []) { obj in
-                    let posX = obj.x * canvasScale + canvasOffset.width
-                    let posY = obj.y * canvasScale + canvasOffset.height
-                    let objW = obj.width * canvasScale
-                    let objH = obj.height * canvasScale
-                    let def = venueObjectTypes.first { $0.type == obj.type }
+            Spacer()
 
-                    RoundedRectangle(cornerRadius: 8 * canvasScale)
-                        .fill(Color(hex: def?.color ?? "#8B8680").opacity(0.7))
-                        .frame(width: objW, height: objH)
-                        .overlay(
-                            VStack(spacing: 2) {
-                                Image(systemName: def?.icon ?? "square")
-                                    .font(.system(size: 14 * canvasScale))
-                                    .foregroundStyle(def?.color == "#2D2D2D" ? .white : Color.sbCharcoal.opacity(0.6))
-                                if canvasScale > 0.6 {
-                                    Text(obj.name)
-                                        .font(.system(size: 9 * canvasScale, weight: .medium))
-                                        .foregroundStyle(def?.color == "#2D2D2D" ? .white : Color.sbCharcoal)
-                                }
-                            }
-                        )
-                        .position(x: posX, y: posY)
-                        .gesture(
-                            DragGesture()
-                                .onChanged { value in
-                                    moveObject(obj, by: value.translation)
-                                }
-                                .onEnded { _ in
-                                    saveTablePositions()
-                                }
-                        )
-                        .onLongPressGesture {
-                            deleteObject(obj)
-                        }
-                }
+            // Undo
+            Button { appState.undo(); HapticEngine.light() } label: {
+                Image(systemName: "arrow.uturn.backward")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(appState.undoManager.canUndo ? Color.sbCharcoal : Color.sbWarm2)
+                    .frame(width: 34, height: 34)
+                    .background(.ultraThinMaterial)
+                    .clipShape(Circle())
             }
-            .clipped()
-            .contentShape(Rectangle())
-            // Pan gesture on canvas background
-            .gesture(
-                DragGesture()
-                    .onChanged { value in
-                        if draggingTableId == nil {
-                            canvasOffset = CGSize(
-                                width: lastCanvasOffset.width + value.translation.width,
-                                height: lastCanvasOffset.height + value.translation.height
-                            )
+            .disabled(!appState.undoManager.canUndo)
+
+            // Redo
+            Button { appState.redo(); HapticEngine.light() } label: {
+                Image(systemName: "arrow.uturn.forward")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(appState.undoManager.canRedo ? Color.sbCharcoal : Color.sbWarm2)
+                    .frame(width: 34, height: 34)
+                    .background(.ultraThinMaterial)
+                    .clipShape(Circle())
+            }
+            .disabled(!appState.undoManager.canRedo)
+
+            // Room setup
+            Button { showRoomSetup = true } label: {
+                Image(systemName: "square.dashed")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(Color.sbGoldDk)
+                    .frame(width: 34, height: 34)
+                    .background(.ultraThinMaterial)
+                    .clipShape(Circle())
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
+        .padding(.bottom, 6)
+        .background(
+            LinearGradient(colors: [Color.sbIvory2, Color.sbIvory2.opacity(0)], startPoint: .top, endPoint: .bottom)
+        )
+    }
+
+    // MARK: - Bottom Controls
+
+    private var bottomControls: some View {
+        VStack(spacing: 0) {
+            // Selected table pill
+            if let table = selectedTable {
+                Button {
+                    showDetailSheet = true
+                } label: {
+                    HStack(spacing: 10) {
+                        SBTableGraphic(totalSeats: table.seats, filledSeats: table.filledCount, size: 36)
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(table.name)
+                                .font(SBFont.bodySmallBold)
+                                .foregroundStyle(Color.sbCharcoal)
+                            Text("\(table.filledCount)/\(table.seats) seated · \(table.type.rawValue)")
+                                .font(SBFont.caption)
+                                .foregroundStyle(Color.sbWarm)
                         }
+
+                        Spacer()
+
+                        Image(systemName: "chevron.up")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(Color.sbGoldDk)
                     }
-                    .onEnded { _ in
-                        lastCanvasOffset = canvasOffset
-                    }
-            )
-            // Pinch to zoom
-            .gesture(
-                MagnifyGesture()
-                    .onChanged { value in
-                        canvasScale = max(0.3, min(3.0, lastCanvasScale * value.magnification))
-                    }
-                    .onEnded { _ in
-                        lastCanvasScale = canvasScale
-                    }
-            )
-            .overlay(alignment: .bottomLeading) {
+                    .padding(14)
+                    .background(.regularMaterial)
+                    .clipShape(RoundedRectangle(cornerRadius: SBRadius.card))
+                    .shadow(color: Color.black.opacity(0.08), radius: 12, x: 0, y: -4)
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 12)
+                .padding(.bottom, 8)
+            }
+
+            // Action bar
+            HStack(spacing: 16) {
                 // Add menu
                 Menu {
-                    Button {
-                        showAddTable = true
-                    } label: {
+                    Button { showAddTable = true } label: {
                         Label("Add Table", systemImage: "circle")
                     }
-                    Button {
-                        showAddVenueObject = true
-                    } label: {
-                        Label("Add Venue Object", systemImage: "square.on.square")
+                    Button { showAddVenueObject = true } label: {
+                        Label("Venue Object", systemImage: "square.on.square")
                     }
                 } label: {
                     Image(systemName: "plus")
                         .font(.system(size: 16, weight: .bold))
                         .foregroundStyle(.white)
-                        .frame(width: 40, height: 40)
+                        .frame(width: 44, height: 44)
                         .background(Color.sbCharcoal)
                         .clipShape(Circle())
-                        .shadow(color: Color.sbCharcoal.opacity(0.3), radius: 8, x: 0, y: 4)
+                        .shadow(color: Color.black.opacity(0.15), radius: 8, x: 0, y: 4)
                 }
-                .padding(12)
-            }
-            .overlay(alignment: .bottomTrailing) {
-                // AI pill
-                aiPill
-                    .padding(12)
-            }
-            .overlay(alignment: .topTrailing) {
+
+                Spacer()
+
                 // Zoom controls
-                VStack(spacing: 6) {
-                    Button {
-                        withAnimation(.seatbee) {
-                            canvasScale = min(3.0, canvasScale * 1.3)
-                            lastCanvasScale = canvasScale
-                        }
-                    } label: {
-                        Image(systemName: "plus.magnifyingglass")
-                            .font(.system(size: 14))
-                            .foregroundStyle(Color.sbCharcoal)
-                            .frame(width: 32, height: 32)
-                            .background(.ultraThinMaterial)
-                            .clipShape(Circle())
-                    }
+                HStack(spacing: 4) {
                     Button {
                         withAnimation(.seatbee) {
                             canvasScale = max(0.3, canvasScale / 1.3)
                             lastCanvasScale = canvasScale
                         }
                     } label: {
-                        Image(systemName: "minus.magnifyingglass")
-                            .font(.system(size: 14))
-                            .foregroundStyle(Color.sbCharcoal)
-                            .frame(width: 32, height: 32)
-                            .background(.ultraThinMaterial)
+                        Image(systemName: "minus")
+                            .font(.system(size: 13, weight: .bold))
+                            .frame(width: 34, height: 34)
+                            .background(.regularMaterial)
                             .clipShape(Circle())
                     }
+
+                    Text("\(Int(canvasScale * 100))%")
+                        .font(SBFont.capsLabel)
+                        .foregroundStyle(Color.sbWarm)
+                        .frame(width: 40)
+
                     Button {
                         withAnimation(.seatbee) {
-                            canvasScale = 1.0
-                            lastCanvasScale = 1.0
+                            canvasScale = min(3.0, canvasScale * 1.3)
+                            lastCanvasScale = canvasScale
+                        }
+                    } label: {
+                        Image(systemName: "plus")
+                            .font(.system(size: 13, weight: .bold))
+                            .frame(width: 34, height: 34)
+                            .background(.regularMaterial)
+                            .clipShape(Circle())
+                    }
+
+                    Button {
+                        withAnimation(.seatbee) {
+                            canvasScale = 0.8
+                            lastCanvasScale = 0.8
                             canvasOffset = .zero
                             lastCanvasOffset = .zero
                         }
                     } label: {
                         Image(systemName: "arrow.counterclockwise")
-                            .font(.system(size: 12))
-                            .foregroundStyle(Color.sbWarm)
-                            .frame(width: 32, height: 32)
-                            .background(.ultraThinMaterial)
+                            .font(.system(size: 11, weight: .medium))
+                            .frame(width: 34, height: 34)
+                            .background(.regularMaterial)
                             .clipShape(Circle())
                     }
                 }
                 .buttonStyle(.plain)
-                .padding(8)
+
+                Spacer()
+
+                // AI pill
+                aiPill
             }
+            .padding(.horizontal, 12)
+            .padding(.bottom, 90) // Tab bar clearance
         }
     }
 
-    private func moveTable(_ table: SeatTable, by translation: CGSize) {
-        guard var updatedPlan = appState.activePlan,
-              let idx = updatedPlan.tables.firstIndex(where: { $0.id == table.id }) else { return }
+    // MARK: - Full-Screen Canvas
 
-        updatedPlan.tables[idx].x = table.x + Double(translation.width / canvasScale)
-        updatedPlan.tables[idx].y = table.y + Double(translation.height / canvasScale)
-        appState.activePlan = updatedPlan
-    }
+    private var canvasView: some View {
+        GeometryReader { geo in
+            ZStack {
+                // Background
+                Color.sbIvory2
+                    .overlay(dotPattern)
 
-    private func saveTablePositions() {
-        guard let plan = appState.activePlan else { return }
-        Task {
-            try? await appState.database.savePlanData(plan: plan)
-        }
-    }
+                // Center offset for initial view
+                let centerX = geo.size.width / 2
+                let centerY = geo.size.height / 2
 
-    private func moveObject(_ obj: RoomObject, by translation: CGSize) {
-        guard var updatedPlan = appState.activePlan,
-              let idx = updatedPlan.objects.firstIndex(where: { $0.id == obj.id }) else { return }
-        updatedPlan.objects[idx].x = obj.x + Double(translation.width / canvasScale)
-        updatedPlan.objects[idx].y = obj.y + Double(translation.height / canvasScale)
-        appState.activePlan = updatedPlan
-    }
+                // Tables
+                ForEach(tables) { table in
+                    let posX = (table.x - 200) * canvasScale + centerX + canvasOffset.width
+                    let posY = (table.y - 200) * canvasScale + centerY + canvasOffset.height
+                    let size = max(40, 70 * canvasScale)
 
-    private func deleteObject(_ obj: RoomObject) {
-        guard var plan = appState.activePlan else { return }
-        plan.objects.removeAll { $0.id == obj.id }
-        appState.activePlan = plan
-        HapticEngine.medium()
-        Task { try? await appState.database.savePlanData(plan: plan) }
-    }
+                    SBTableGraphic(
+                        totalSeats: table.seats,
+                        filledSeats: table.filledCount,
+                        label: table.name,
+                        size: size,
+                        isSelected: table.id == selectedTableId
+                    )
+                    .position(x: posX, y: posY)
+                    .gesture(tableDragGesture(table))
+                    .simultaneousGesture(tableTapGesture(table))
+                    .zIndex(table.id == selectedTableId ? 10 : (table.id == draggingTableId ? 5 : 1))
+                }
 
-    private var dotPattern: some View {
-        Canvas { context, size in
-            let spacing: CGFloat = 18
-            let dotSize: CGFloat = 2
-            for x in stride(from: spacing, through: size.width, by: spacing) {
-                for y in stride(from: spacing, through: size.height, by: spacing) {
-                    let rect = CGRect(x: x - dotSize/2, y: y - dotSize/2, width: dotSize, height: dotSize)
-                    context.fill(Path(ellipseIn: rect), with: .color(.sbGold.opacity(0.15)))
+                // Venue objects
+                ForEach(plan?.objects ?? []) { obj in
+                    let posX = (obj.x - 200) * canvasScale + centerX + canvasOffset.width
+                    let posY = (obj.y - 200) * canvasScale + centerY + canvasOffset.height
+                    let objW = max(30, obj.width * canvasScale)
+                    let objH = max(20, obj.height * canvasScale)
+                    let def = venueObjectTypes.first { $0.type == obj.type }
+
+                    venueObjectView(obj: obj, def: def, width: objW, height: objH)
+                        .position(x: posX, y: posY)
+                        .gesture(objectDragGesture(obj))
+                        .onLongPressGesture { deleteObject(obj) }
                 }
             }
+            .contentShape(Rectangle())
+            .gesture(canvasPanGesture)
+            .simultaneousGesture(canvasZoomGesture)
         }
     }
 
-    private var aiPill: some View {
-        Button {
-            appState.selectedTab = .ai
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 12, weight: .semibold))
-                Text("AI seat \(unseatedCount)")
-                    .font(SBFont.inter(12, weight: .semibold))
+    private func venueObjectView(obj: RoomObject, def: VenueObjectDef?, width: CGFloat, height: CGFloat) -> some View {
+        RoundedRectangle(cornerRadius: max(4, 8 * canvasScale))
+            .fill(Color(hex: def?.color ?? "#8B8680").opacity(0.8))
+            .frame(width: width, height: height)
+            .overlay(
+                VStack(spacing: 2) {
+                    Image(systemName: def?.icon ?? "square")
+                        .font(.system(size: max(8, 16 * canvasScale)))
+                        .foregroundStyle(def?.color == "#2D2D2D" ? .white : Color.sbCharcoal.opacity(0.7))
+                    if canvasScale > 0.5 {
+                        Text(obj.name)
+                            .font(.system(size: max(6, 10 * canvasScale), weight: .medium))
+                            .foregroundStyle(def?.color == "#2D2D2D" ? .white : Color.sbCharcoal)
+                            .lineLimit(1)
+                    }
+                }
+            )
+            .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 2)
+    }
+
+    // MARK: - Gestures
+
+    private func tableDragGesture(_ table: SeatTable) -> some Gesture {
+        DragGesture(minimumDistance: 5)
+            .onChanged { value in
+                draggingTableId = table.id
+                moveTable(table, by: value.translation)
             }
-            .foregroundStyle(.white)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-            .background(Color.sbGold)
-            .clipShape(Capsule())
-            .shadow(color: Color.sbGold.opacity(0.3), radius: 12, x: 0, y: 4)
-        }
-        .buttonStyle(.plain)
-    }
-
-    // MARK: - Drag Handle
-
-    private var dragHandle: some View {
-        VStack(spacing: 0) {
-            Rectangle()
-                .fill(Color.sbLine)
-                .frame(height: 0.5)
-            HStack {
-                Spacer()
-                RoundedRectangle(cornerRadius: 2)
-                    .fill(Color.sbWarm2)
-                    .frame(width: 36, height: 4)
-                Spacer()
+            .onEnded { _ in
+                draggingTableId = nil
+                savePositions()
+                HapticEngine.light()
             }
-            .padding(.vertical, 7)
-            Rectangle()
-                .fill(Color.sbLine)
-                .frame(height: 0.5)
-        }
-        .background(Color.sbIvory)
     }
 
-    // MARK: - Detail Panel
+    private func tableTapGesture(_ table: SeatTable) -> some Gesture {
+        TapGesture()
+            .onEnded {
+                withAnimation(.seatbee) {
+                    selectedTableId = table.id
+                    showDetailSheet = true
+                }
+                HapticEngine.selection()
+            }
+    }
 
-    private var detailPanel: some View {
-        ScrollView {
-            if let table = selectedTable {
+    private func objectDragGesture(_ obj: RoomObject) -> some Gesture {
+        DragGesture(minimumDistance: 5)
+            .onChanged { value in
+                moveObject(obj, by: value.translation)
+            }
+            .onEnded { _ in
+                savePositions()
+                HapticEngine.light()
+            }
+    }
+
+    private var canvasPanGesture: some Gesture {
+        DragGesture(minimumDistance: 10)
+            .onChanged { value in
+                guard draggingTableId == nil else { return }
+                canvasOffset = CGSize(
+                    width: lastCanvasOffset.width + value.translation.width,
+                    height: lastCanvasOffset.height + value.translation.height
+                )
+            }
+            .onEnded { _ in
+                lastCanvasOffset = canvasOffset
+            }
+    }
+
+    private var canvasZoomGesture: some Gesture {
+        MagnifyGesture()
+            .onChanged { value in
+                canvasScale = max(0.3, min(3.0, lastCanvasScale * value.magnification))
+            }
+            .onEnded { _ in
+                lastCanvasScale = canvasScale
+            }
+    }
+
+    // MARK: - Table Detail Sheet
+
+    private func tableDetailSheet(_ table: SeatTable) -> some View {
+        NavigationStack {
+            ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
-                    // Table header
+                    // Header
                     HStack {
                         Text(table.name)
                             .font(SBFont.displaySmall)
@@ -435,37 +444,73 @@ struct EditorView: View {
                             .foregroundStyle(Color.sbWarm)
                     }
 
-                    // Open full detail link
-                    Button {
-                        showDrawer = true
-                    } label: {
-                        Text("Open full detail →")
-                            .font(SBFont.caption)
+                    // Action buttons
+                    HStack(spacing: 8) {
+                        Button {
+                            showDetailSheet = false
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                showDrawer = true
+                            }
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "slider.horizontal.3")
+                                Text("Edit")
+                            }
+                            .font(SBFont.inter(12, weight: .semibold))
                             .foregroundStyle(Color.sbGoldDk)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(Color.sbChampagne)
+                            .clipShape(RoundedRectangle(cornerRadius: SBRadius.small))
+                        }
+                        .buttonStyle(.plain)
+
+                        Spacer()
                     }
 
                     // Seat list
                     seatList(table: table)
-
-                    // Bottom padding for tab bar
-                    Spacer().frame(height: 80)
                 }
                 .padding(.horizontal, SBSpacing.screenMargin)
                 .padding(.top, 12)
-            } else {
-                VStack(spacing: 12) {
-                    Spacer().frame(height: 40)
-                    Image(systemName: "hand.tap")
-                        .font(.system(size: 32))
-                        .foregroundStyle(Color.sbWarm2)
-                    Text("Tap a table to see details")
-                        .font(SBFont.body)
-                        .foregroundStyle(Color.sbWarm)
+            }
+            .background(Color.sbIvory)
+        }
+    }
+
+    // MARK: - Shared Components
+
+    private var dotPattern: some View {
+        Canvas { context, size in
+            let spacing: CGFloat = 18
+            let dotSize: CGFloat = 2
+            for x in stride(from: spacing, through: size.width, by: spacing) {
+                for y in stride(from: spacing, through: size.height, by: spacing) {
+                    let rect = CGRect(x: x - dotSize/2, y: y - dotSize/2, width: dotSize, height: dotSize)
+                    context.fill(Path(ellipseIn: rect), with: .color(.sbGold.opacity(0.12)))
                 }
-                .frame(maxWidth: .infinity)
             }
         }
-        .background(Color.sbIvory)
+    }
+
+    private var aiPill: some View {
+        Button {
+            appState.selectedTab = .ai
+        } label: {
+            HStack(spacing: 5) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 11, weight: .semibold))
+                Text("AI seat \(unseatedCount)")
+                    .font(SBFont.inter(11, weight: .semibold))
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(Color.sbGold)
+            .clipShape(Capsule())
+            .shadow(color: Color.sbGold.opacity(0.3), radius: 8, x: 0, y: 3)
+        }
+        .buttonStyle(.plain)
     }
 
     private func seatList(table: SeatTable) -> some View {
@@ -493,9 +538,7 @@ struct EditorView: View {
                     .font(SBFont.inter(10, weight: .bold))
                     .foregroundStyle(.white)
             }
-
             SBAvatar(name: guest.displayName, size: 30)
-
             VStack(alignment: .leading, spacing: 1) {
                 Text(guest.displayName)
                     .font(SBFont.bodySmallBold)
@@ -506,13 +549,8 @@ struct EditorView: View {
                         .foregroundStyle(Color.sbWarm)
                 }
             }
-
             Spacer()
-
-            // Unassign button
-            Button {
-                unassignGuest(guest)
-            } label: {
+            Button { unassignGuest(guest) } label: {
                 Image(systemName: "xmark.circle.fill")
                     .font(.system(size: 16))
                     .foregroundStyle(Color.sbWarm2)
@@ -522,8 +560,7 @@ struct EditorView: View {
         .padding(8)
         .background(
             guest.side == .bride || guest.side == .groom
-                ? Color.sbChampagne.opacity(0.5)
-                : Color.clear
+                ? Color.sbChampagne.opacity(0.4) : Color.clear
         )
         .clipShape(RoundedRectangle(cornerRadius: 8))
     }
@@ -538,13 +575,10 @@ struct EditorView: View {
                 Circle()
                     .strokeBorder(Color.sbWarm2, style: StrokeStyle(lineWidth: 1, dash: [3, 2]))
                     .frame(width: 22, height: 22)
-
                 Text("Empty seat · tap to assign")
                     .font(SBFont.meta)
                     .foregroundStyle(Color.sbWarm)
-
                 Spacer()
-
                 Image(systemName: "plus")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(Color.sbWarm2)
@@ -558,7 +592,7 @@ struct EditorView: View {
         .buttonStyle(.plain)
     }
 
-    // MARK: - Helpers
+    // MARK: - Data Actions
 
     private var unseatedCount: Int {
         guard let plan else { return 0 }
@@ -566,38 +600,54 @@ struct EditorView: View {
         return max(0, plan.guests.count - seated)
     }
 
+    private func moveTable(_ table: SeatTable, by translation: CGSize) {
+        guard var p = appState.activePlan,
+              let idx = p.tables.firstIndex(where: { $0.id == table.id }) else { return }
+        p.tables[idx].x = table.x + Double(translation.width / canvasScale)
+        p.tables[idx].y = table.y + Double(translation.height / canvasScale)
+        appState.activePlan = p
+    }
+
+    private func moveObject(_ obj: RoomObject, by translation: CGSize) {
+        guard var p = appState.activePlan,
+              let idx = p.objects.firstIndex(where: { $0.id == obj.id }) else { return }
+        p.objects[idx].x = obj.x + Double(translation.width / canvasScale)
+        p.objects[idx].y = obj.y + Double(translation.height / canvasScale)
+        appState.activePlan = p
+    }
+
+    private func deleteObject(_ obj: RoomObject) {
+        guard var p = appState.activePlan else { return }
+        p.objects.removeAll { $0.id == obj.id }
+        appState.activePlan = p
+        HapticEngine.medium()
+        Task { try? await appState.database.savePlanData(plan: p) }
+    }
+
+    private func savePositions() {
+        guard let plan = appState.activePlan else { return }
+        Task { try? await appState.database.savePlanData(plan: plan) }
+    }
+
     private func unassignGuest(_ guest: Guest) {
         guard let tableId = selectedTableId,
-              var updatedPlan = appState.activePlan,
-              let tableIndex = updatedPlan.tables.firstIndex(where: { $0.id == tableId }) else { return }
-
-        updatedPlan.tables[tableIndex].assignments.removeValue(forKey: guest.id)
-        appState.activePlan = updatedPlan
+              var p = appState.activePlan,
+              let ti = p.tables.firstIndex(where: { $0.id == tableId }) else { return }
+        p.tables[ti].assignments.removeValue(forKey: guest.id)
+        appState.activePlan = p
         HapticEngine.medium()
-
-        Task {
-            try? await appState.database.savePlanData(plan: updatedPlan)
-        }
+        Task { try? await appState.database.savePlanData(plan: p) }
     }
 
     private func assignGuest(_ guest: Guest) {
         guard let seatIndex = assigningSeatIndex,
               let tableId = selectedTableId,
-              var updatedPlan = appState.activePlan,
-              let tableIndex = updatedPlan.tables.firstIndex(where: { $0.id == tableId }) else { return }
-
-        updatedPlan.tables[tableIndex].assignments[guest.id] = seatIndex
-        appState.activePlan = updatedPlan
+              var p = appState.activePlan,
+              let ti = p.tables.firstIndex(where: { $0.id == tableId }) else { return }
+        p.tables[ti].assignments[guest.id] = seatIndex
+        appState.activePlan = p
         HapticEngine.success()
-
-        // Persist full plan data to Supabase
-        Task {
-            do {
-                try await appState.database.savePlanData(plan: updatedPlan)
-            } catch {
-                print("[Editor] Failed to save assignment: \(error)")
-            }
-        }
+        Task { try? await appState.database.savePlanData(plan: p) }
     }
 }
 
