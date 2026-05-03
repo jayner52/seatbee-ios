@@ -30,9 +30,71 @@ struct TableDrawerView: View {
             .padding(.horizontal, SBSpacing.cardPadding)
             .padding(.top, SBSpacing.screenMargin)
 
+            // Seat count stepper + table type
+            HStack(spacing: 16) {
+                // Seat stepper
+                HStack(spacing: 0) {
+                    Button { changeSeatCount(-1) } label: {
+                        Image(systemName: "minus")
+                            .font(.system(size: 14, weight: .bold))
+                            .frame(width: 32, height: 32)
+                            .background(Color.sbIvory2)
+                            .clipShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+
+                    Text("\(table.seats)")
+                        .font(SBFont.statNumberSmall)
+                        .foregroundStyle(Color.sbCharcoal)
+                        .frame(width: 40)
+                        .contentTransition(.numericText())
+
+                    Button { changeSeatCount(1) } label: {
+                        Image(systemName: "plus")
+                            .font(.system(size: 14, weight: .bold))
+                            .frame(width: 32, height: 32)
+                            .background(Color.sbIvory2)
+                            .clipShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+
+                    Text("seats")
+                        .font(SBFont.caption)
+                        .foregroundStyle(Color.sbWarm)
+                        .padding(.leading, 4)
+                }
+
+                Spacer()
+
+                // Table type
+                Menu {
+                    ForEach(SeatTable.TableType.allCases, id: \.self) { type in
+                        Button {
+                            changeTableType(type)
+                        } label: {
+                            Label(type.rawValue.capitalized, systemImage: typeIcon(type))
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: typeIcon(table.type))
+                            .font(.system(size: 12))
+                        Text(table.type.rawValue.capitalized)
+                            .font(SBFont.inter(12, weight: .semibold))
+                    }
+                    .foregroundStyle(Color.sbGoldDk)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Color.sbChampagne)
+                    .clipShape(RoundedRectangle(cornerRadius: SBRadius.small))
+                }
+            }
+            .padding(.horizontal, SBSpacing.cardPadding)
+            .padding(.top, 12)
+
             // Action strip
             actionStrip
-                .padding(.top, SBSpacing.screenMargin)
+                .padding(.top, 12)
 
             // Tabs
             tabRow
@@ -254,6 +316,37 @@ struct TableDrawerView: View {
         plan.tables[idx].seats += 1
         appState.activePlan = plan
         savePlan(plan)
+    }
+
+    private func changeSeatCount(_ delta: Int) {
+        guard var plan = appState.activePlan,
+              let idx = plan.tables.firstIndex(where: { $0.id == table.id }) else { return }
+        let minSeats = table.type == .sweetheart ? 2 : 2
+        let maxSeats = table.type == .sweetheart ? 2 : (table.type == .round ? 16 : 20)
+        let newCount = max(minSeats, min(maxSeats, table.seats + delta))
+        guard newCount != table.seats else { return }
+        plan.tables[idx].seats = newCount
+        appState.activePlan = plan
+        savePlan(plan)
+        HapticEngine.selection()
+    }
+
+    private func changeTableType(_ type: SeatTable.TableType) {
+        guard var plan = appState.activePlan,
+              let idx = plan.tables.firstIndex(where: { $0.id == table.id }) else { return }
+        plan.tables[idx].type = type
+        appState.activePlan = plan
+        savePlan(plan)
+        HapticEngine.selection()
+    }
+
+    private func typeIcon(_ type: SeatTable.TableType) -> String {
+        switch type {
+        case .round: return "circle"
+        case .rect: return "rectangle"
+        case .head: return "person.2"
+        case .sweetheart: return "heart"
+        }
     }
 
     private func deleteTable() {

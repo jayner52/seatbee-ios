@@ -85,11 +85,11 @@ final class AIService {
 
     func parseGuestList(text: String) async throws -> [Guest] {
         let systemPrompt = """
-        You are a helpful assistant that parses guest lists.
+        You are a helpful assistant that parses wedding guest lists.
         Extract guest information and return it as a JSON array.
-        Each guest should have: name, dietary (if mentioned), notes (if any), categories (like "family", "friends", "work").
+        Each guest should have: id (random string), name, dietary (if mentioned), notes (if any), categories (array like ["family", "friends", "work"]), side ("bride", "groom", or "none" — extract from context like "bride's side", "groom's family"), vip (boolean), plusOne (boolean if "+1" or "plus one" mentioned).
         If someone is mentioned as a couple or family, create separate entries but note the relationship.
-        Return ONLY valid JSON, no explanation.
+        Return ONLY valid JSON array, no explanation.
         """
 
         let result = try await call(
@@ -139,6 +139,69 @@ final class AIService {
         }
 
         return try JSONDecoder().decode(SeatingResult.self, from: responseData)
+    }
+
+    // MARK: - Conflict Detection
+
+    func detectConflicts(guests: [Guest], tables: [SeatTable]) async throws -> ConflictResult {
+        let systemPrompt = """
+        You are analyzing a seating arrangement for potential conflicts.
+        Look for: people who shouldn't sit together, dietary issues, accessibility needs, family dynamics.
+        Return a JSON object with:
+        - conflicts: array of {type ("critical"|"warning"|"suggestion"), guests (array of names), message, suggestion}
+        - score: 1-100 rating of overall arrangement quality
+        - summary: brief text summary
+        """
+
+        struct ConflictContext: Codable {
+            let guests: [Guest]
+            let tables: [SeatTable]
+        }
+
+        let context = ConflictContext(guests: guests, tables: tables)
+        let contextData = try JSONEncoder().encode(context)
+        let contextString = String(data: contextData, encoding: .utf8) ?? "{}"
+
+        let resultString = try await call(
+            action: .detectConflicts,
+            systemPrompt: systemPrompt,
+            userMessage: "Check for conflicts:\n\n\(contextString)"
+        )
+
+        guard let responseData = resultString.data(using: String.Encoding.utf8) else {
+            throw AIError.parseError
+        }
+
+        return try JSONDecoder().decode(ConflictResult.self, from: responseData)
+    }
+
+    // MARK: - Tag Classification
+
+    func classifyTags(tagNames: [String]) async throws -> [String: TagClassification] {
+        let systemPrompt = """
+        You are classifying tags for a wedding seating app.
+        For each tag, determine its TYPE and AFFINITY WEIGHT (0-100) for seating decisions.
+        CATEGORIES: administrative (0), family (85), weddingParty (95), eventAttendance (65), organization (65), social (40), kids (65), vip (40), unknown (40).
+        Return ONLY valid JSON object: {"tagName": {"type": "category", "weight": 0-100, "reason": "brief explanation"}, ...}
+        """
+
+        let resultString = try await call(
+            action: .classifyTags,
+            systemPrompt: systemPrompt,
+            userMessage: "Classify these tags for seating affinity:\n\n\(tagNames.joined(separator: ", "))"
+        )
+
+        guard let responseData = resultString.data(using: String.Encoding.utf8) else {
+            throw AIError.parseError
+        }
+
+        return try JSONDecoder().decode([String: TagClassification].self, from: responseData)
+    }
+
+    struct TagClassification: Codable {
+        let type: String
+        let weight: Int
+        let reason: String?
     }
 
     // MARK: - Errors

@@ -8,6 +8,7 @@ struct GuestsView: View {
     @State private var showCSVImport = false
     @State private var showCategories = false
     @State private var showRules = false
+    @State private var showParties = false
     @State private var editingGuest: Guest?
 
     private var plan: SeatingPlan? { appState.activePlan }
@@ -59,6 +60,9 @@ struct GuestsView: View {
                             SBButton(title: "Rules", icon: "list.bullet", variant: .default, size: .small) {
                                 showRules = true
                             }
+                            SBButton(title: "Parties", icon: "person.3", variant: .default, size: .small) {
+                                showParties = true
+                            }
                         }
 
                         // Filter chips
@@ -91,6 +95,10 @@ struct GuestsView: View {
             }
             .sheet(isPresented: $showRules) {
                 RulesView()
+                    .environment(appState)
+            }
+            .sheet(isPresented: $showParties) {
+                PartiesSheet()
                     .environment(appState)
             }
             .sheet(item: $editingGuest) { guest in
