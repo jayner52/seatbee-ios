@@ -30,15 +30,45 @@ struct AIGenerateView: View {
             ZStack {
                 Color.sbIvory.ignoresSafeArea()
 
-                switch phase {
-                case .ready:
-                    readyState
-                case .generating:
-                    generatingState
-                case .complete:
-                    completeState
+                if appState.activePlan == nil {
+                    noPlanState
+                } else {
+                    switch phase {
+                    case .ready:
+                        readyState.transition(.opacity)
+                    case .generating:
+                        generatingState.transition(.opacity)
+                    case .complete:
+                        completeState.transition(.opacity)
+                    }
                 }
             }
+            .animation(.seatbeeScreen, value: phase)
+        }
+        .task {
+            if appState.activePlan == nil {
+                let plans = (try? await appState.database.fetchPlans()) ?? []
+                if let first = plans.first { appState.activePlan = first }
+            }
+        }
+    }
+
+    private var noPlanState: some View {
+        VStack(spacing: 16) {
+            Spacer()
+            Image(systemName: "sparkles")
+                .font(.system(size: 44))
+                .foregroundStyle(Color.sbWarm2)
+            Text("No plan selected")
+                .font(SBFont.displaySmall)
+                .foregroundStyle(Color.sbCharcoal)
+            Text("Create or select a plan first")
+                .font(SBFont.body)
+                .foregroundStyle(Color.sbWarm)
+            SBButton(title: "Go to Plans", icon: "square.grid.2x2", variant: .gold) {
+                appState.selectedTab = .plans
+            }
+            Spacer()
         }
     }
 

@@ -13,6 +13,24 @@ struct ShareView: View {
             VStack(spacing: 0) {
                 SBNavHeader(title: "Share plan")
 
+                if appState.activePlan == nil {
+                    Spacer()
+                    VStack(spacing: 16) {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.system(size: 44))
+                            .foregroundStyle(Color.sbWarm2)
+                        Text("No plan to share")
+                            .font(SBFont.displaySmall)
+                            .foregroundStyle(Color.sbCharcoal)
+                        Text("Select a plan first")
+                            .font(SBFont.body)
+                            .foregroundStyle(Color.sbWarm)
+                        SBButton(title: "Go to Plans", icon: "square.grid.2x2", variant: .gold) {
+                            appState.selectedTab = .plans
+                        }
+                    }
+                    Spacer()
+                } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: SBSpacing.sectionGap) {
                         // Plan preview
@@ -41,8 +59,15 @@ struct ShareView: View {
                     .padding(.horizontal, SBSpacing.screenMargin)
                     .padding(.top, SBSpacing.screenMargin)
                 }
+                } // end else
             }
             .background(Color.sbIvory)
+            .task {
+                if appState.activePlan == nil {
+                    let plans = (try? await appState.database.fetchPlans()) ?? []
+                    if let first = plans.first { appState.activePlan = first }
+                }
+            }
         }
     }
 

@@ -91,7 +91,12 @@ struct EditorView: View {
             RoomSetupSheet()
                 .environment(appState)
         }
-        .onAppear {
+        .task {
+            // Auto-load plan if none selected
+            if appState.activePlan == nil {
+                let plans = (try? await appState.database.fetchPlans()) ?? []
+                if let first = plans.first { appState.activePlan = first }
+            }
             if selectedTableId == nil, let first = tables.first {
                 selectedTableId = first.id
             }

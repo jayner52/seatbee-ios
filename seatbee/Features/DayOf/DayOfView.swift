@@ -59,6 +59,12 @@ struct DayOfView: View {
                 }
             }
             .background(Color.sbIvory)
+            .task {
+                if appState.activePlan == nil {
+                    let plans = (try? await appState.database.fetchPlans()) ?? []
+                    if let first = plans.first { appState.activePlan = first }
+                }
+            }
         }
     }
 

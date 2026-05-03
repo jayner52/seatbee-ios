@@ -33,9 +33,114 @@ struct GuestsView: View {
                 )
 
                 ScrollView {
+                    if plan == nil {
+                        noPlanState
+                    } else if guests.isEmpty {
+                        emptyGuestsState
+                    } else {
+                        guestsContent
+                    }
+                }
+            }
+            .background(Color.sbIvory)
+            .task {
+                // Auto-load active plan if not set
+                if appState.activePlan == nil {
+                    do {
+                        let plans = try await appState.database.fetchPlans()
+                        if let first = plans.first {
+                            appState.activePlan = first
+                        }
+                    } catch {}
+                }
+            }
+            .sheet(isPresented: $showAddGuest) {
+                GuestDetailSheet(guest: nil)
+                    .environment(appState)
+            }
+            .sheet(isPresented: $showCSVImport) {
+                CSVImportSheet()
+                    .environment(appState)
+            }
+            .sheet(isPresented: $showCategories) {
+                CategoriesSheet()
+                    .environment(appState)
+            }
+            .sheet(isPresented: $showRules) {
+                RulesView()
+                    .environment(appState)
+            }
+            .sheet(isPresented: $showParties) {
+                PartiesSheet()
+                    .environment(appState)
+            }
+            .sheet(item: $editingGuest) { guest in
+                GuestDetailSheet(guest: guest)
+                    .environment(appState)
+            }
+        }
+    }
+
+    // MARK: - States
+
+    private var noPlanState: some View {
+        VStack(spacing: 16) {
+            Spacer().frame(height: 80)
+            Image(systemName: "person.2.slash")
+                .font(.system(size: 44))
+                .foregroundStyle(Color.sbWarm2)
+            Text("No plan selected")
+                .font(SBFont.displaySmall)
+                .foregroundStyle(Color.sbCharcoal)
+            Text("Go to Plans tab to select or create a plan")
+                .font(SBFont.body)
+                .foregroundStyle(Color.sbWarm)
+                .multilineTextAlignment(.center)
+            SBButton(title: "Go to Plans", icon: "square.grid.2x2", variant: .gold) {
+                appState.selectedTab = .plans
+            }
+            Spacer()
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, SBSpacing.screenMargin)
+        .transition(.opacity)
+    }
+
+    private var emptyGuestsState: some View {
+        VStack(spacing: 20) {
+            Spacer().frame(height: 60)
+            Image(systemName: "person.badge.plus")
+                .font(.system(size: 44))
+                .foregroundStyle(Color.sbGold)
+            Text("No guests yet")
+                .font(SBFont.displaySmall)
+                .foregroundStyle(Color.sbCharcoal)
+            Text("Add guests to start planning your seating")
+                .font(SBFont.body)
+                .foregroundStyle(Color.sbWarm)
+                .multilineTextAlignment(.center)
+            VStack(spacing: 10) {
+                SBButton(title: "Add Guest", icon: "plus", variant: .gold, fullWidth: true) {
+                    showAddGuest = true
+                }
+                SBButton(title: "Import CSV", icon: "square.and.arrow.down", variant: .primary, fullWidth: true) {
+                    showCSVImport = true
+                }
+            }
+            Spacer()
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, SBSpacing.screenMargin)
+        .transition(.opacity)
+    }
+
+    // MARK: - Main Content
+
+    private var guestsContent: some View {
                     VStack(alignment: .leading, spacing: SBSpacing.sectionGap) {
                         // Stats row
                         statsRow
+                            .animation(.seatbee, value: guests.count)
 
                         // AI CTA
                         if unseatedCount > 0 {
@@ -79,31 +184,6 @@ struct GuestsView: View {
                     .padding(.horizontal, SBSpacing.screenMargin)
                     .padding(.top, SBSpacing.screenMargin)
                 }
-            }
-            .background(Color.sbIvory)
-            .sheet(isPresented: $showAddGuest) {
-                GuestDetailSheet(guest: nil)
-                    .environment(appState)
-            }
-            .sheet(isPresented: $showCSVImport) {
-                CSVImportSheet()
-                    .environment(appState)
-            }
-            .sheet(isPresented: $showCategories) {
-                CategoriesSheet()
-                    .environment(appState)
-            }
-            .sheet(isPresented: $showRules) {
-                RulesView()
-                    .environment(appState)
-            }
-            .sheet(isPresented: $showParties) {
-                PartiesSheet()
-                    .environment(appState)
-            }
-            .sheet(item: $editingGuest) { guest in
-                GuestDetailSheet(guest: guest)
-                    .environment(appState)
             }
         }
     }
