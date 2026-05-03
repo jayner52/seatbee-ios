@@ -13,17 +13,7 @@ struct EditorView: View {
     @State private var showDeleteConfirm = false
     @State private var assigningSeatIndex: Int?
 
-    // Canvas viewport — use CGPoint for cleaner math
-    @State private var viewOffset: CGPoint = .zero
-    @State private var viewScale: CGFloat = 0.8
-    @State private var gestureStartOffset: CGPoint = .zero
-    @State private var gestureStartScale: CGFloat = 0.8
-
-    // Drag tracking — store position at drag start to avoid cumulative bugs
-    @State private var isDraggingItem = false
-    @State private var dragItemId: String?
-    @State private var dragItemType: String? // "table" or "object"
-    @State private var dragStartPos: CGPoint = .zero
+    // Selection tracking
 
     private var plan: SeatingPlan? { appState.activePlan }
     private var tables: [SeatTable] { plan?.tables ?? [] }
@@ -37,8 +27,39 @@ struct EditorView: View {
             if plan == nil {
                 emptyState
             } else {
-                canvas
-                    .ignoresSafeArea(.all, edges: .bottom)
+                // UIKit-based canvas — rock solid gestures
+                CanvasViewRepresentable(
+                    tables: tables,
+                    objects: objects,
+                    guests: plan?.guests ?? [],
+                    selectedTableId: selectedTableId,
+                    selectedObjectId: selectedObjectId,
+                    onSelectTable: { id in
+                        selectedObjectId = nil
+                        selectedTableId = id
+                        showDetailSheet = true
+                        HapticEngine.selection()
+                    },
+                    onSelectObject: { id in
+                        selectedTableId = nil
+                        selectedObjectId = id
+                        HapticEngine.selection()
+                    },
+                    onDeselectAll: {
+                        selectedTableId = nil
+                        selectedObjectId = nil
+                        showDetailSheet = false
+                    },
+                    onMoveTable: { id, x, y in
+                        updateTablePosition(id: id, x: x, y: y)
+                        savePositions()
+                    },
+                    onMoveObject: { id, x, y in
+                        updateObjectPosition(id: id, x: x, y: y)
+                        savePositions()
+                    }
+                )
+                .ignoresSafeArea(.all, edges: .bottom)
 
                 VStack {
                     topBar
@@ -269,33 +290,6 @@ struct EditorView: View {
 
                 Spacer()
 
-                // Zoom
-                HStack(spacing: 4) {
-                    Button {
-                        withAnimation(.seatbee) { viewScale = max(0.3, viewScale / 1.3); gestureStartScale = viewScale }
-                    } label: {
-                        Image(systemName: "minus").font(.system(size: 13, weight: .bold))
-                            .frame(width: 34, height: 34).background(.regularMaterial).clipShape(Circle())
-                    }
-                    Text("\(Int(viewScale * 100))%")
-                        .font(SBFont.capsLabel).foregroundStyle(Color.sbWarm).frame(width: 40)
-                    Button {
-                        withAnimation(.seatbee) { viewScale = min(3.0, viewScale * 1.3); gestureStartScale = viewScale }
-                    } label: {
-                        Image(systemName: "plus").font(.system(size: 13, weight: .bold))
-                            .frame(width: 34, height: 34).background(.regularMaterial).clipShape(Circle())
-                    }
-                    Button {
-                        withAnimation(.seatbee) { viewScale = 0.8; gestureStartScale = 0.8; viewOffset = .zero; gestureStartOffset = .zero }
-                    } label: {
-                        Image(systemName: "arrow.counterclockwise").font(.system(size: 11, weight: .medium))
-                            .frame(width: 34, height: 34).background(.regularMaterial).clipShape(Circle())
-                    }
-                }
-                .buttonStyle(.plain)
-
-                Spacer()
-
                 // AI pill
                 Button { appState.selectedTab = .ai } label: {
                     HStack(spacing: 5) {
@@ -312,192 +306,6 @@ struct EditorView: View {
             }
             .padding(.horizontal, 12)
             .padding(.bottom, 90)
-        }
-    }
-
-    // MARK: - Canvas
-
-    private var canvas: some View {
-        GeometryReader { geo in
-            let cx = geo.size.width / 2
-            let cy = geo.size.height / 2
-
-            ZStack {
-                Color.sbIvory2.overlay(dotPattern)
-
-                // --- Tables ---
-                ForEach(tables) { table in
-                    let pos = worldToScreen(x: table.x, y: table.y, cx: cx, cy: cy)
-                    let size = max(40, 70 * viewScale)
-
-                    SBTableGraphic(
-                        totalSeats: table.seats,
-                        filledSeats: table.filledCount,
-                        label: table.name,
-                        size: size,
-                        isSelected: table.id == selectedTableId
-                    )
-                    .position(x: pos.x, y: pos.y)
-                    .highPriorityGesture(
-                        DragGesture(minimumDistance: 8)
-                            .onChanged { value in
-                                if !isDraggingItem || dragItemId != table.id {
-                                    // Drag started — capture start position
-                                    isDraggingItem = true
-                                    dragItemId = table.id
-                                    dragItemType = "table"
-                                    dragStartPos = CGPoint(x: table.x, y: table.y)
-                                }
-                                // Calculate new position from start + delta
-                                let newX = dragStartPos.x + Double(value.translation.width / viewScale)
-                                let newY = dragStartPos.y + Double(value.translation.height / viewScale)
-                                updateTablePosition(id: table.id, x: newX, y: newY)
-                            }
-                            .onEnded { _ in
-                                isDraggingItem = false
-                                dragItemId = nil
-                                savePositions()
-                                HapticEngine.light()
-                            }
-                    )
-                    .simultaneousGesture(
-                        TapGesture().onEnded {
-                            guard !isDraggingItem else { return }
-                            selectedObjectId = nil
-                            withAnimation(.seatbee) {
-                                selectedTableId = table.id
-                                showDetailSheet = true
-                            }
-                            HapticEngine.selection()
-                        }
-                    )
-                    .zIndex(table.id == dragItemId ? 100 : (table.id == selectedTableId ? 10 : 1))
-                }
-
-                // --- Venue Objects ---
-                ForEach(objects) { obj in
-                    let pos = worldToScreen(x: obj.x, y: obj.y, cx: cx, cy: cy)
-                    let w = max(30, obj.width * viewScale)
-                    let h = max(20, obj.height * viewScale)
-                    let def = venueObjectTypes.first { $0.type == obj.type }
-                    let isSelected = obj.id == selectedObjectId
-
-                    venueObjectView(obj: obj, def: def, width: w, height: h, selected: isSelected)
-                        .position(x: pos.x, y: pos.y)
-                        .highPriorityGesture(
-                            DragGesture(minimumDistance: 8)
-                                .onChanged { value in
-                                    if !isDraggingItem || dragItemId != obj.id {
-                                        isDraggingItem = true
-                                        dragItemId = obj.id
-                                        dragItemType = "object"
-                                        dragStartPos = CGPoint(x: obj.x, y: obj.y)
-                                    }
-                                    let newX = dragStartPos.x + Double(value.translation.width / viewScale)
-                                    let newY = dragStartPos.y + Double(value.translation.height / viewScale)
-                                    updateObjectPosition(id: obj.id, x: newX, y: newY)
-                                }
-                                .onEnded { _ in
-                                    isDraggingItem = false
-                                    dragItemId = nil
-                                    savePositions()
-                                    HapticEngine.light()
-                                }
-                        )
-                        .simultaneousGesture(
-                            TapGesture().onEnded {
-                                guard !isDraggingItem else { return }
-                                selectedTableId = nil
-                                withAnimation(.seatbee) {
-                                    selectedObjectId = obj.id
-                                }
-                                HapticEngine.selection()
-                            }
-                        )
-                        .zIndex(obj.id == dragItemId ? 100 : (isSelected ? 10 : 0))
-                }
-            }
-            .contentShape(Rectangle())
-            .gesture(
-                DragGesture(minimumDistance: 15)
-                    .onChanged { value in
-                        guard !isDraggingItem else { return }
-                        viewOffset = CGPoint(
-                            x: gestureStartOffset.x + value.translation.width,
-                            y: gestureStartOffset.y + value.translation.height
-                        )
-                    }
-                    .onEnded { _ in
-                        gestureStartOffset = viewOffset
-                    }
-            )
-            .simultaneousGesture(
-                MagnifyGesture()
-                    .onChanged { value in
-                        viewScale = max(0.3, min(3.0, gestureStartScale * value.magnification))
-                    }
-                    .onEnded { _ in
-                        gestureStartScale = viewScale
-                    }
-            )
-            .onTapGesture {
-                // Tap on empty canvas — deselect everything
-                withAnimation(.seatbee) {
-                    selectedTableId = nil
-                    selectedObjectId = nil
-                    showDetailSheet = false
-                }
-            }
-        }
-    }
-
-    // MARK: - Coordinate Conversion
-
-    private func worldToScreen(x: Double, y: Double, cx: CGFloat, cy: CGFloat) -> CGPoint {
-        CGPoint(
-            x: (x - 200) * viewScale + cx + viewOffset.x,
-            y: (y - 200) * viewScale + cy + viewOffset.y
-        )
-    }
-
-    // MARK: - Venue Object View
-
-    private func venueObjectView(obj: RoomObject, def: VenueObjectDef?, width: CGFloat, height: CGFloat, selected: Bool) -> some View {
-        RoundedRectangle(cornerRadius: max(4, 8 * viewScale))
-            .fill(Color(hex: def?.color ?? "#8B8680").opacity(0.85))
-            .frame(width: width, height: height)
-            .overlay(
-                VStack(spacing: 2) {
-                    Image(systemName: def?.icon ?? "square")
-                        .font(.system(size: max(8, 16 * viewScale)))
-                        .foregroundStyle(def?.color == "#2D2D2D" ? .white : Color.sbCharcoal.opacity(0.7))
-                    if viewScale > 0.5 {
-                        Text(obj.name)
-                            .font(.system(size: max(6, 10 * viewScale), weight: .medium))
-                            .foregroundStyle(def?.color == "#2D2D2D" ? .white : Color.sbCharcoal)
-                            .lineLimit(1)
-                    }
-                }
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: max(4, 8 * viewScale))
-                    .strokeBorder(Color.sbGold, lineWidth: selected ? 2 : 0)
-            )
-            .shadow(color: Color.black.opacity(selected ? 0.2 : 0.1), radius: selected ? 8 : 4, x: 0, y: 2)
-    }
-
-    // MARK: - Dot Pattern
-
-    private var dotPattern: some View {
-        Canvas { context, size in
-            let spacing: CGFloat = 18
-            let dotSize: CGFloat = 2
-            for x in stride(from: spacing, through: size.width, by: spacing) {
-                for y in stride(from: spacing, through: size.height, by: spacing) {
-                    let rect = CGRect(x: x - dotSize/2, y: y - dotSize/2, width: dotSize, height: dotSize)
-                    context.fill(Path(ellipseIn: rect), with: .color(.sbGold.opacity(0.12)))
-                }
-            }
         }
     }
 
