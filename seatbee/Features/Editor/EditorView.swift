@@ -6,6 +6,8 @@ struct EditorView: View {
     @State private var showDrawer = false
     @State private var showGuestPicker = false
     @State private var showAddTable = false
+    @State private var showAddVenueObject = false
+    @State private var showRoomSetup = false
     @State private var assigningSeatIndex: Int?
 
     // Canvas viewport state
@@ -28,12 +30,28 @@ struct EditorView: View {
                 SBNavHeader(
                     title: plan?.name ?? "Editor",
                     rightContent: AnyView(
-                        Button {
-                            appState.selectedTab = .share
-                        } label: {
-                            Text("Share")
-                                .font(SBFont.bodySmallBold)
-                                .foregroundStyle(Color.sbGoldDk)
+                        HStack(spacing: 12) {
+                            // Undo/Redo
+                            Button { appState.undo(); HapticEngine.light() } label: {
+                                Image(systemName: "arrow.uturn.backward")
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundStyle(appState.undoManager.canUndo ? Color.sbCharcoal : Color.sbWarm2)
+                            }
+                            .disabled(!appState.undoManager.canUndo)
+
+                            Button { appState.redo(); HapticEngine.light() } label: {
+                                Image(systemName: "arrow.uturn.forward")
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundStyle(appState.undoManager.canRedo ? Color.sbCharcoal : Color.sbWarm2)
+                            }
+                            .disabled(!appState.undoManager.canRedo)
+
+                            // Room setup
+                            Button { showRoomSetup = true } label: {
+                                Image(systemName: "square.dashed")
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundStyle(Color.sbGoldDk)
+                            }
                         }
                     )
                 )
@@ -101,6 +119,16 @@ struct EditorView: View {
                 .presentationDetents([.medium])
                 .presentationDragIndicator(.visible)
         }
+        .sheet(isPresented: $showAddVenueObject) {
+            VenueObjectsSheet()
+                .environment(appState)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $showRoomSetup) {
+            RoomSetupSheet()
+                .environment(appState)
+        }
         .onAppear {
             if selectedTableId == nil, let firstTable = tables.first {
                 selectedTableId = firstTable.id
@@ -157,6 +185,44 @@ struct EditorView: View {
                     }
                     .zIndex(table.id == selectedTableId ? 10 : (table.id == draggingTableId ? 5 : 1))
                 }
+
+                // Venue objects
+                ForEach(plan?.objects ?? []) { obj in
+                    let posX = obj.x * canvasScale + canvasOffset.width
+                    let posY = obj.y * canvasScale + canvasOffset.height
+                    let objW = obj.width * canvasScale
+                    let objH = obj.height * canvasScale
+                    let def = venueObjectTypes.first { $0.type == obj.type }
+
+                    RoundedRectangle(cornerRadius: 8 * canvasScale)
+                        .fill(Color(hex: def?.color ?? "#8B8680").opacity(0.7))
+                        .frame(width: objW, height: objH)
+                        .overlay(
+                            VStack(spacing: 2) {
+                                Image(systemName: def?.icon ?? "square")
+                                    .font(.system(size: 14 * canvasScale))
+                                    .foregroundStyle(def?.color == "#2D2D2D" ? .white : Color.sbCharcoal.opacity(0.6))
+                                if canvasScale > 0.6 {
+                                    Text(obj.name)
+                                        .font(.system(size: 9 * canvasScale, weight: .medium))
+                                        .foregroundStyle(def?.color == "#2D2D2D" ? .white : Color.sbCharcoal)
+                                }
+                            }
+                        )
+                        .position(x: posX, y: posY)
+                        .gesture(
+                            DragGesture()
+                                .onChanged { value in
+                                    moveObject(obj, by: value.translation)
+                                }
+                                .onEnded { _ in
+                                    saveTablePositions()
+                                }
+                        )
+                        .onLongPressGesture {
+                            deleteObject(obj)
+                        }
+                }
             }
             .clipped()
             .contentShape(Rectangle())
@@ -186,10 +252,18 @@ struct EditorView: View {
                     }
             )
             .overlay(alignment: .bottomLeading) {
-                // Add table button
-                Button {
-                    showAddTable = true
-                    HapticEngine.light()
+                // Add menu
+                Menu {
+                    Button {
+                        showAddTable = true
+                    } label: {
+                        Label("Add Table", systemImage: "circle")
+                    }
+                    Button {
+                        showAddVenueObject = true
+                    } label: {
+                        Label("Add Venue Object", systemImage: "square.on.square")
+                    }
                 } label: {
                     Image(systemName: "plus")
                         .font(.system(size: 16, weight: .bold))
@@ -199,7 +273,6 @@ struct EditorView: View {
                         .clipShape(Circle())
                         .shadow(color: Color.sbCharcoal.opacity(0.3), radius: 8, x: 0, y: 4)
                 }
-                .buttonStyle(.plain)
                 .padding(12)
             }
             .overlay(alignment: .bottomTrailing) {
@@ -272,6 +345,22 @@ struct EditorView: View {
         Task {
             try? await appState.database.savePlanData(plan: plan)
         }
+    }
+
+    private func moveObject(_ obj: RoomObject, by translation: CGSize) {
+        guard var updatedPlan = appState.activePlan,
+              let idx = updatedPlan.objects.firstIndex(where: { $0.id == obj.id }) else { return }
+        updatedPlan.objects[idx].x = obj.x + Double(translation.width / canvasScale)
+        updatedPlan.objects[idx].y = obj.y + Double(translation.height / canvasScale)
+        appState.activePlan = updatedPlan
+    }
+
+    private func deleteObject(_ obj: RoomObject) {
+        guard var plan = appState.activePlan else { return }
+        plan.objects.removeAll { $0.id == obj.id }
+        appState.activePlan = plan
+        HapticEngine.medium()
+        Task { try? await appState.database.savePlanData(plan: plan) }
     }
 
     private var dotPattern: some View {

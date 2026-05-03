@@ -198,12 +198,183 @@ final class PDFExportService {
 
         let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("\(plan.name) Seating.pdf")
         try? data.write(to: tempURL)
+        shareFile(tempURL)
+    }
 
+    // MARK: - Place Cards PDF
+
+    static func generatePlaceCards(plan: SeatingPlan) -> Data? {
+        let cardWidth: CGFloat = 252  // 3.5 inches
+        let cardHeight: CGFloat = 180 // 2.5 inches
+        let pageWidth: CGFloat = 612
+        let pageHeight: CGFloat = 792
+        let cols = 2
+        let rows = 4
+        let marginX: CGFloat = (pageWidth - CGFloat(cols) * cardWidth) / CGFloat(cols + 1)
+        let marginY: CGFloat = (pageHeight - CGFloat(rows) * cardHeight) / CGFloat(rows + 1)
+
+        let goldColor = UIColor(red: 201/255, green: 169/255, blue: 97/255, alpha: 1)
+        let charcoalColor = UIColor(red: 45/255, green: 45/255, blue: 45/255, alpha: 1)
+        let warmColor = UIColor(red: 139/255, green: 134/255, blue: 128/255, alpha: 1)
+
+        // Collect all seated guests
+        var seatedGuests: [(guest: Guest, table: SeatTable, seat: Int)] = []
+        for table in plan.tables {
+            for (guestId, seatIdx) in table.assignments {
+                if let guest = plan.guests.first(where: { $0.id == guestId }) {
+                    seatedGuests.append((guest, table, seatIdx))
+                }
+            }
+        }
+        seatedGuests.sort { $0.guest.displayName < $1.guest.displayName }
+
+        let cardsPerPage = cols * rows
+        let renderer = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: pageWidth, height: pageHeight))
+
+        return renderer.pdfData { context in
+            let chunks = stride(from: 0, to: seatedGuests.count, by: cardsPerPage).map {
+                Array(seatedGuests[$0..<min($0 + cardsPerPage, seatedGuests.count)])
+            }
+
+            for chunk in chunks {
+                context.beginPage()
+                for (i, entry) in chunk.enumerated() {
+                    let col = i % cols
+                    let row = i / cols
+                    let x = marginX + CGFloat(col) * (cardWidth + marginX)
+                    let y = marginY + CGFloat(row) * (cardHeight + marginY)
+
+                    // Card border
+                    let cardRect = CGRect(x: x, y: y, width: cardWidth, height: cardHeight)
+                    context.cgContext.setStrokeColor(goldColor.cgColor)
+                    context.cgContext.setLineWidth(1)
+                    context.cgContext.addRect(cardRect)
+                    context.cgContext.strokePath()
+
+                    // Guest name
+                    let nameAttrs: [NSAttributedString.Key: Any] = [
+                        .font: UIFont.systemFont(ofSize: 18, weight: .medium),
+                        .foregroundColor: charcoalColor
+                    ]
+                    let name = NSString(string: entry.guest.displayName)
+                    let nameSize = name.size(withAttributes: nameAttrs)
+                    name.draw(at: CGPoint(x: x + (cardWidth - nameSize.width) / 2, y: y + 50), withAttributes: nameAttrs)
+
+                    // Table assignment
+                    let tableAttrs: [NSAttributedString.Key: Any] = [
+                        .font: UIFont.systemFont(ofSize: 12),
+                        .foregroundColor: goldColor
+                    ]
+                    let tableStr = NSString(string: "\(entry.table.name) · Seat \(entry.seat + 1)")
+                    let tableSize = tableStr.size(withAttributes: tableAttrs)
+                    tableStr.draw(at: CGPoint(x: x + (cardWidth - tableSize.width) / 2, y: y + 80), withAttributes: tableAttrs)
+
+                    // Dietary note
+                    if let dietary = entry.guest.dietary {
+                        let dietAttrs: [NSAttributedString.Key: Any] = [
+                            .font: UIFont.systemFont(ofSize: 10),
+                            .foregroundColor: warmColor
+                        ]
+                        let dietStr = NSString(string: dietary)
+                        let dietSize = dietStr.size(withAttributes: dietAttrs)
+                        dietStr.draw(at: CGPoint(x: x + (cardWidth - dietSize.width) / 2, y: y + 110), withAttributes: dietAttrs)
+                    }
+                }
+            }
+        }
+    }
+
+    static func sharePlaceCards(plan: SeatingPlan) {
+        guard let data = generatePlaceCards(plan: plan) else { return }
+        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("\(plan.name) Place Cards.pdf")
+        try? data.write(to: tempURL)
+        shareFile(tempURL)
+    }
+
+    // MARK: - Social Image
+
+    @MainActor
+    static func generateSocialImage(plan: SeatingPlan) -> UIImage? {
+        let width: CGFloat = 1080
+        let height: CGFloat = 1080
+
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: width, height: height))
+        return renderer.image { context in
+            let ctx = context.cgContext
+            let goldColor = UIColor(red: 201/255, green: 169/255, blue: 97/255, alpha: 1)
+            let ivoryColor = UIColor(red: 255/255, green: 254/255, blue: 249/255, alpha: 1)
+            let charcoalColor = UIColor(red: 45/255, green: 45/255, blue: 45/255, alpha: 1)
+
+            // Background
+            ctx.setFillColor(ivoryColor.cgColor)
+            ctx.fill(CGRect(x: 0, y: 0, width: width, height: height))
+
+            // Title
+            let titleAttrs: [NSAttributedString.Key: Any] = [
+                .font: UIFont.systemFont(ofSize: 48, weight: .medium),
+                .foregroundColor: charcoalColor
+            ]
+            let title = NSString(string: plan.name)
+            let titleSize = title.size(withAttributes: titleAttrs)
+            title.draw(at: CGPoint(x: (width - titleSize.width) / 2, y: 120), withAttributes: titleAttrs)
+
+            // Subtitle
+            let subAttrs: [NSAttributedString.Key: Any] = [
+                .font: UIFont.systemFont(ofSize: 24),
+                .foregroundColor: goldColor
+            ]
+            let sub = NSString(string: "Seating Arrangement")
+            let subSize = sub.size(withAttributes: subAttrs)
+            sub.draw(at: CGPoint(x: (width - subSize.width) / 2, y: 180), withAttributes: subAttrs)
+
+            // Stats
+            let statsY: CGFloat = 280
+            let statAttrs: [NSAttributedString.Key: Any] = [
+                .font: UIFont.systemFont(ofSize: 64, weight: .medium),
+                .foregroundColor: goldColor
+            ]
+            let labelAttrs: [NSAttributedString.Key: Any] = [
+                .font: UIFont.systemFont(ofSize: 18, weight: .semibold),
+                .foregroundColor: charcoalColor
+            ]
+
+            let stats = [("\(plan.guests.count)", "GUESTS"), ("\(plan.tables.count)", "TABLES")]
+            for (i, stat) in stats.enumerated() {
+                let x = width / 3 * CGFloat(i + 1)
+                let numStr = NSString(string: stat.0)
+                let numSize = numStr.size(withAttributes: statAttrs)
+                numStr.draw(at: CGPoint(x: x - numSize.width / 2, y: statsY), withAttributes: statAttrs)
+                let labStr = NSString(string: stat.1)
+                let labSize = labStr.size(withAttributes: labelAttrs)
+                labStr.draw(at: CGPoint(x: x - labSize.width / 2, y: statsY + 72), withAttributes: labelAttrs)
+            }
+
+            // Footer
+            let footerAttrs: [NSAttributedString.Key: Any] = [
+                .font: UIFont.systemFont(ofSize: 16),
+                .foregroundColor: UIColor.gray
+            ]
+            let footer = NSString(string: "Made with Seatbee · seatbee.app")
+            let footerSize = footer.size(withAttributes: footerAttrs)
+            footer.draw(at: CGPoint(x: (width - footerSize.width) / 2, y: height - 60), withAttributes: footerAttrs)
+        }
+    }
+
+    static func shareSocialImage(plan: SeatingPlan) {
+        guard let image = generateSocialImage(plan: plan),
+              let data = image.pngData() else { return }
+        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("\(plan.name) Seating.png")
+        try? data.write(to: tempURL)
+        shareFile(tempURL)
+    }
+
+    // MARK: - Share Helper
+
+    private static func shareFile(_ url: URL) {
         let activityVC = UIActivityViewController(
-            activityItems: [tempURL],
+            activityItems: [url],
             applicationActivities: nil
         )
-
         if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
            let rootVC = windowScene.windows.first?.rootViewController {
             rootVC.present(activityVC, animated: true)

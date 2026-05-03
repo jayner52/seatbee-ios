@@ -19,4 +19,26 @@ final class AppState {
     let auth = AuthService()
     let database = DatabaseService()
     let ai = AIService()
+    let undoManager = SBUndoManager()
+
+    // Push current state before a mutation
+    func pushUndo() {
+        if let plan = activePlan {
+            undoManager.pushState(plan)
+        }
+    }
+
+    func undo() {
+        guard let plan = activePlan,
+              let previous = undoManager.undo(current: plan) else { return }
+        activePlan = previous
+        Task { try? await database.savePlanData(plan: previous) }
+    }
+
+    func redo() {
+        guard let plan = activePlan,
+              let next = undoManager.redo(current: plan) else { return }
+        activePlan = next
+        Task { try? await database.savePlanData(plan: next) }
+    }
 }

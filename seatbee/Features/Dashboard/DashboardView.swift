@@ -6,6 +6,7 @@ struct DashboardView: View {
     @State private var isLoading = true
     @State private var loadError: String?
     @State private var showEditPlan = false
+    @State private var showSettings = false
 
     private var activePlan: SeatingPlan? { plans.first }
 
@@ -103,6 +104,10 @@ struct DashboardView: View {
             EditPlanSheet()
                 .environment(appState)
         }
+        .sheet(isPresented: $showSettings) {
+            SettingsSheet()
+                .environment(appState)
+        }
     }
 
     // MARK: - Greeting
@@ -126,6 +131,17 @@ struct DashboardView: View {
                         .background(Color.sbChampagne)
                         .clipShape(Circle())
                 }
+            }
+
+            Button {
+                showSettings = true
+            } label: {
+                Image(systemName: "gearshape")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(Color.sbWarm)
+                    .frame(width: 36, height: 36)
+                    .background(Color.sbIvory2)
+                    .clipShape(Circle())
             }
         }
     }
