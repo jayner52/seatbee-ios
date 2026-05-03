@@ -1,0 +1,212 @@
+import SwiftUI
+import PDFKit
+
+@MainActor
+final class PDFExportService {
+
+    static func generateSeatingPDF(plan: SeatingPlan) -> Data? {
+        let pageWidth: CGFloat = 612  // Letter
+        let pageHeight: CGFloat = 792
+        let margin: CGFloat = 40
+
+        let renderer = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: pageWidth, height: pageHeight))
+
+        let data = renderer.pdfData { context in
+            // PAGE 1: Cover
+            context.beginPage()
+            drawCoverPage(context: context.cgContext, plan: plan, pageWidth: pageWidth, pageHeight: pageHeight, margin: margin)
+
+            // PAGE 2+: Table assignments
+            let tablesPerPage = 4
+            let tableChunks = stride(from: 0, to: plan.tables.count, by: tablesPerPage).map {
+                Array(plan.tables[$0..<min($0 + tablesPerPage, plan.tables.count)])
+            }
+
+            for chunk in tableChunks {
+                context.beginPage()
+                drawTablePage(context: context.cgContext, tables: chunk, guests: plan.guests, plan: plan, pageWidth: pageWidth, pageHeight: pageHeight, margin: margin)
+            }
+        }
+
+        return data
+    }
+
+    private static func drawCoverPage(context: CGContext, plan: SeatingPlan, pageWidth: CGFloat, pageHeight: CGFloat, margin: CGFloat) {
+        let goldColor = UIColor(red: 201/255, green: 169/255, blue: 97/255, alpha: 1)
+        let charcoalColor = UIColor(red: 45/255, green: 45/255, blue: 45/255, alpha: 1)
+        let warmColor = UIColor(red: 139/255, green: 134/255, blue: 128/255, alpha: 1)
+
+        // Title
+        let titleAttrs: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 36, weight: .medium),
+            .foregroundColor: charcoalColor
+        ]
+        let title = NSString(string: plan.name)
+        let titleSize = title.size(withAttributes: titleAttrs)
+        title.draw(at: CGPoint(x: (pageWidth - titleSize.width) / 2, y: pageHeight * 0.3), withAttributes: titleAttrs)
+
+        // Subtitle
+        let subtitleAttrs: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 18, weight: .regular),
+            .foregroundColor: warmColor
+        ]
+        let subtitle = NSString(string: "Seating Arrangement")
+        let subSize = subtitle.size(withAttributes: subtitleAttrs)
+        subtitle.draw(at: CGPoint(x: (pageWidth - subSize.width) / 2, y: pageHeight * 0.3 + 50), withAttributes: subtitleAttrs)
+
+        // Date & venue
+        var detailY = pageHeight * 0.3 + 90
+        let detailAttrs: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 14),
+            .foregroundColor: warmColor
+        ]
+
+        if let date = plan.eventDate {
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateStyle = .long
+            let dateStr = NSString(string: dateFormatter.string(from: date))
+            let dateSize = dateStr.size(withAttributes: detailAttrs)
+            dateStr.draw(at: CGPoint(x: (pageWidth - dateSize.width) / 2, y: detailY), withAttributes: detailAttrs)
+            detailY += 24
+        }
+
+        if let venue = plan.venue {
+            let venueStr = NSString(string: venue)
+            let venueSize = venueStr.size(withAttributes: detailAttrs)
+            venueStr.draw(at: CGPoint(x: (pageWidth - venueSize.width) / 2, y: detailY), withAttributes: detailAttrs)
+            detailY += 24
+        }
+
+        // Stats
+        let statsY = pageHeight * 0.55
+        let statsAttrs: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 28, weight: .medium),
+            .foregroundColor: goldColor
+        ]
+        let labelAttrs: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 11, weight: .semibold),
+            .foregroundColor: warmColor
+        ]
+
+        let stats = [
+            ("\(plan.guests.count)", "GUESTS"),
+            ("\(plan.tables.count)", "TABLES"),
+            ("\(plan.tables.reduce(0) { $0 + $1.seats })", "SEATS")
+        ]
+
+        let statSpacing = pageWidth / CGFloat(stats.count + 1)
+        for (i, stat) in stats.enumerated() {
+            let x = statSpacing * CGFloat(i + 1)
+            let numStr = NSString(string: stat.0)
+            let numSize = numStr.size(withAttributes: statsAttrs)
+            numStr.draw(at: CGPoint(x: x - numSize.width / 2, y: statsY), withAttributes: statsAttrs)
+
+            let labStr = NSString(string: stat.1)
+            let labSize = labStr.size(withAttributes: labelAttrs)
+            labStr.draw(at: CGPoint(x: x - labSize.width / 2, y: statsY + 36), withAttributes: labelAttrs)
+        }
+
+        // Footer
+        let footerAttrs: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 10),
+            .foregroundColor: warmColor
+        ]
+        let footer = NSString(string: "Generated by Seatbee · seatbee.app")
+        let footerSize = footer.size(withAttributes: footerAttrs)
+        footer.draw(at: CGPoint(x: (pageWidth - footerSize.width) / 2, y: pageHeight - margin - 20), withAttributes: footerAttrs)
+    }
+
+    private static func drawTablePage(context: CGContext, tables: [SeatTable], guests: [Guest], plan: SeatingPlan, pageWidth: CGFloat, pageHeight: CGFloat, margin: CGFloat) {
+        let charcoalColor = UIColor(red: 45/255, green: 45/255, blue: 45/255, alpha: 1)
+        let goldColor = UIColor(red: 201/255, green: 169/255, blue: 97/255, alpha: 1)
+        let warmColor = UIColor(red: 139/255, green: 134/255, blue: 128/255, alpha: 1)
+        let ivoryColor = UIColor(red: 250/255, green: 246/255, blue: 236/255, alpha: 1)
+
+        // Header
+        let headerAttrs: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 12, weight: .semibold),
+            .foregroundColor: warmColor
+        ]
+        let header = NSString(string: "SEATING ASSIGNMENTS — \(plan.name.uppercased())")
+        header.draw(at: CGPoint(x: margin, y: margin), withAttributes: headerAttrs)
+
+        // Draw tables in 2-column layout
+        let colWidth = (pageWidth - margin * 3) / 2
+        var y = margin + 40
+
+        for (i, table) in tables.enumerated() {
+            let col = CGFloat(i % 2)
+            let x = margin + col * (colWidth + margin)
+
+            if i > 0 && i % 2 == 0 {
+                y += 180
+            }
+
+            // Table card background
+            let cardRect = CGRect(x: x, y: y, width: colWidth, height: 160)
+            context.setFillColor(ivoryColor.cgColor)
+            let path = UIBezierPath(roundedRect: cardRect, cornerRadius: 8)
+            context.addPath(path.cgPath)
+            context.fillPath()
+
+            // Table name
+            let nameAttrs: [NSAttributedString.Key: Any] = [
+                .font: UIFont.systemFont(ofSize: 16, weight: .semibold),
+                .foregroundColor: charcoalColor
+            ]
+            NSString(string: table.name).draw(at: CGPoint(x: x + 12, y: y + 10), withAttributes: nameAttrs)
+
+            // Seat info
+            let infoAttrs: [NSAttributedString.Key: Any] = [
+                .font: UIFont.systemFont(ofSize: 10),
+                .foregroundColor: warmColor
+            ]
+            NSString(string: "\(table.type.rawValue) · \(table.seats) seats").draw(at: CGPoint(x: x + 12, y: y + 30), withAttributes: infoAttrs)
+
+            // Guest names
+            let guestAttrs: [NSAttributedString.Key: Any] = [
+                .font: UIFont.systemFont(ofSize: 11),
+                .foregroundColor: charcoalColor
+            ]
+            let dietaryAttrs: [NSAttributedString.Key: Any] = [
+                .font: UIFont.systemFont(ofSize: 9),
+                .foregroundColor: goldColor
+            ]
+
+            var guestY = y + 50
+            for seatIdx in 0..<table.seats {
+                if guestY > y + 145 { break }
+                let guestId = table.assignments.first { $0.value == seatIdx }?.key
+                let guest = guestId.flatMap { gId in guests.first { $0.id == gId } }
+
+                let seatLabel = "\(seatIdx + 1). "
+                let guestName = guest?.displayName ?? "—"
+
+                NSString(string: seatLabel + guestName).draw(at: CGPoint(x: x + 14, y: guestY), withAttributes: guestAttrs)
+
+                if let dietary = guest?.dietary {
+                    NSString(string: dietary).draw(at: CGPoint(x: x + colWidth - 60, y: guestY + 1), withAttributes: dietaryAttrs)
+                }
+
+                guestY += 16
+            }
+        }
+    }
+
+    static func sharePDF(plan: SeatingPlan) {
+        guard let data = generateSeatingPDF(plan: plan) else { return }
+
+        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("\(plan.name) Seating.pdf")
+        try? data.write(to: tempURL)
+
+        let activityVC = UIActivityViewController(
+            activityItems: [tempURL],
+            applicationActivities: nil
+        )
+
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let rootVC = windowScene.windows.first?.rootViewController {
+            rootVC.present(activityVC, animated: true)
+        }
+    }
+}

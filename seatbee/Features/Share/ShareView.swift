@@ -221,7 +221,11 @@ struct ShareView: View {
 
     private func exportCard(icon: String, title: String) -> some View {
         Button {
-            sharePlan(via: title)
+            if title == "PDF", let plan = appState.activePlan {
+                PDFExportService.sharePDF(plan: plan)
+            } else {
+                sharePlan(via: title)
+            }
         } label: {
             VStack(spacing: 8) {
                 Image(systemName: icon)

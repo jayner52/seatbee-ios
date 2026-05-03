@@ -5,6 +5,9 @@ struct GuestsView: View {
     @State private var searchText = ""
     @State private var selectedFilter = "All"
     @State private var showAddGuest = false
+    @State private var showCSVImport = false
+    @State private var showCategories = false
+    @State private var showRules = false
     @State private var editingGuest: Guest?
 
     private var plan: SeatingPlan? { appState.activePlan }
@@ -45,6 +48,19 @@ struct GuestsView: View {
                             }
                         }
 
+                        // Action buttons
+                        HStack(spacing: 8) {
+                            SBButton(title: "Import", icon: "square.and.arrow.down", variant: .default, size: .small) {
+                                showCSVImport = true
+                            }
+                            SBButton(title: "Categories", icon: "tag", variant: .default, size: .small) {
+                                showCategories = true
+                            }
+                            SBButton(title: "Rules", icon: "list.bullet", variant: .default, size: .small) {
+                                showRules = true
+                            }
+                        }
+
                         // Filter chips
                         filterChips
 
@@ -63,6 +79,18 @@ struct GuestsView: View {
             .background(Color.sbIvory)
             .sheet(isPresented: $showAddGuest) {
                 GuestDetailSheet(guest: nil)
+                    .environment(appState)
+            }
+            .sheet(isPresented: $showCSVImport) {
+                CSVImportSheet()
+                    .environment(appState)
+            }
+            .sheet(isPresented: $showCategories) {
+                CategoriesSheet()
+                    .environment(appState)
+            }
+            .sheet(isPresented: $showRules) {
+                RulesView()
                     .environment(appState)
             }
             .sheet(item: $editingGuest) { guest in
