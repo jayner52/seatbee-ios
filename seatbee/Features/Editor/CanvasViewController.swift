@@ -64,7 +64,6 @@ class CanvasViewController: UIViewController, UIScrollViewDelegate {
 
         // Tap to deselect
         let tap = UITapGestureRecognizer(target: self, action: #selector(handleBackgroundTap(_:)))
-        tap.cancelsTouchesInViews = false
         contentView.addGestureRecognizer(tap)
 
         // Initial zoom
