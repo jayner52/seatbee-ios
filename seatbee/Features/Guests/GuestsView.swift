@@ -137,55 +137,46 @@ struct GuestsView: View {
     // MARK: - Main Content
 
     private var guestsContent: some View {
-                    VStack(alignment: .leading, spacing: SBSpacing.sectionGap) {
-                        // Stats row
-                        statsRow
-                            .animation(.seatbee, value: guests.count)
+        VStack(alignment: .leading, spacing: SBSpacing.sectionGap) {
+            statsRow
+                .animation(.seatbee, value: guests.count)
 
-                        // AI CTA
-                        if unseatedCount > 0 {
-                            SBButton(
-                                title: "AI seat the remaining \(unseatedCount)",
-                                icon: "sparkles",
-                                variant: .gold,
-                                fullWidth: true
-                            ) {
-                                appState.selectedTab = .ai
-                            }
-                        }
-
-                        // Action buttons
-                        HStack(spacing: 8) {
-                            SBButton(title: "Import", icon: "square.and.arrow.down", variant: .default, size: .small) {
-                                showCSVImport = true
-                            }
-                            SBButton(title: "Categories", icon: "tag", variant: .default, size: .small) {
-                                showCategories = true
-                            }
-                            SBButton(title: "Rules", icon: "list.bullet", variant: .default, size: .small) {
-                                showRules = true
-                            }
-                            SBButton(title: "Parties", icon: "person.3", variant: .default, size: .small) {
-                                showParties = true
-                            }
-                        }
-
-                        // Filter chips
-                        filterChips
-
-                        // Search
-                        searchField
-
-                        // Guest list
-                        guestList
-
-                        Spacer(minLength: 100)
-                    }
-                    .padding(.horizontal, SBSpacing.screenMargin)
-                    .padding(.top, SBSpacing.screenMargin)
+            if unseatedCount > 0 {
+                SBButton(
+                    title: "AI seat the remaining \(unseatedCount)",
+                    icon: "sparkles",
+                    variant: .gold,
+                    fullWidth: true
+                ) {
+                    appState.selectedTab = .ai
                 }
             }
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    SBButton(title: "Import", icon: "square.and.arrow.down", variant: .default, size: .small) {
+                        showCSVImport = true
+                    }
+                    SBButton(title: "Categories", icon: "tag", variant: .default, size: .small) {
+                        showCategories = true
+                    }
+                    SBButton(title: "Rules", icon: "list.bullet", variant: .default, size: .small) {
+                        showRules = true
+                    }
+                    SBButton(title: "Parties", icon: "person.3", variant: .default, size: .small) {
+                        showParties = true
+                    }
+                }
+            }
+
+            filterChips
+            searchField
+            guestList
+
+            Spacer(minLength: 100)
         }
+        .padding(.horizontal, SBSpacing.screenMargin)
+        .padding(.top, SBSpacing.screenMargin)
     }
 
     // MARK: - Stats
