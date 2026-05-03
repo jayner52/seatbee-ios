@@ -7,26 +7,24 @@ struct AppRouter: View {
         @Bindable var state = appState
 
         ZStack(alignment: .bottom) {
-            TabView(selection: $state.selectedTab) {
-                DashboardView()
-                    .tag(SBTab.plans)
-
-                GuestsView()
-                    .tag(SBTab.guests)
-
-                EditorView()
-                    .tag(SBTab.edit)
-
-                AIGenerateView()
-                    .tag(SBTab.ai)
-
-                ShareView()
-                    .tag(SBTab.share)
+            // Content tabs
+            Group {
+                switch state.selectedTab {
+                case .plans:
+                    DashboardView()
+                case .guests:
+                    GuestsView()
+                case .edit:
+                    EditorView()
+                case .ai:
+                    AIGenerateView()
+                case .share:
+                    ShareView()
+                }
             }
-            .tabViewStyle(.automatic)
-            .toolbar(.hidden, for: .tabBar)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            // Custom glassmorphic tab bar
+            // Custom tab bar pinned to bottom
             SBTabBar(selectedTab: $state.selectedTab)
         }
         .ignoresSafeArea(.keyboard)

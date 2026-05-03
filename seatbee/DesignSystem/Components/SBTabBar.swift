@@ -36,24 +36,25 @@ struct SBTabBar: View {
     @Binding var selectedTab: SBTab
 
     var body: some View {
-        HStack(spacing: 0) {
-            ForEach(SBTab.allCases, id: \.rawValue) { tab in
-                tabItem(tab)
-            }
-        }
-        .padding(.top, 10)
-        .padding(.bottom, 22)
-        .background(
+        VStack(spacing: 0) {
+            // Top separator
             Rectangle()
-                .fill(.ultraThinMaterial)
-                .overlay(
-                    Color.sbIvory.opacity(0.88)
-                )
-                .overlay(alignment: .top) {
-                    Rectangle()
-                        .fill(Color.sbLine)
-                        .frame(height: 0.5)
+                .fill(Color.sbLine)
+                .frame(height: 0.5)
+
+            // Tab items
+            HStack(spacing: 0) {
+                ForEach(SBTab.allCases, id: \.rawValue) { tab in
+                    tabItem(tab)
                 }
+            }
+            .padding(.top, 8)
+            .padding(.bottom, 6)
+        }
+        .background(
+            Color.sbIvory.opacity(0.92)
+                .background(.ultraThinMaterial)
+                .ignoresSafeArea(.container, edges: .bottom)
         )
     }
 
