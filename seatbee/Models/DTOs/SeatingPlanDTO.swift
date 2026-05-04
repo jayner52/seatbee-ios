@@ -47,7 +47,14 @@ struct SeatingPlanDTO: Codable {
             createdAt: created_at.flatMap { parseDate($0) },
             updatedAt: updated_at.flatMap { parseDate($0) },
             userId: user_id,
-            tier: tier
+            tier: tier,
+            // Passthrough preservation — keep raw arrays around so iOS save
+            // can write them back unchanged. See PARITY.md.
+            rawCategories: planData?.categories,
+            rawParties: planData?.parties,
+            rawGroups: planData?.groups,
+            rawFloorPlanImage: planData?.floorPlanImage,
+            rawFloorPlanOpacity: planData?.floorPlanOpacity
         )
     }
 
@@ -65,7 +72,10 @@ struct SeatingPlanDTO: Codable {
     }
 }
 
-// The `data` JSONB blob structure
+// The `data` JSONB blob structure.
+// MUST mirror what the web app persists into seating_plans.data (see web's
+// `state` keys). Adding fields here requires adding them to the web app shape
+// too. See PARITY.md.
 struct PlanDataDTO: Codable {
     let event: EventDataDTO?
     let guests: [GuestDTO]?
@@ -75,6 +85,9 @@ struct PlanDataDTO: Codable {
     let categories: [CategoryDTO]?
     let assignments: [String: AssignmentDTO]?
     let parties: [PartyDTO]?
+    let groups: [GroupDTO]?              // Web seating groups — preserved through round-trip
+    let floorPlanImage: String?          // Base64 floor plan image — preserved through round-trip
+    let floorPlanOpacity: Double?        // 0–1 floor plan opacity setting — preserved through round-trip
 }
 
 struct EventDataDTO: Codable {
@@ -121,12 +134,33 @@ struct CategoryDTO: Codable {
     let id: String?
     let name: String?
     let color: String?
+    // Web-parity fields preserved through round-trip. See PARITY.md.
+    let isSystem: Bool?
+    let affinityWeight: Int?
+    let seatColor: String?
 }
 
+// Web stores parties with field name `guestIds` (not `members` — that's groups).
+// iOS previously had `members` here, which silently dropped guestIds on round-trip
+// and is the root cause of the 2026-05-03 corruption incident. See PARITY.md.
 struct PartyDTO: Codable {
     let id: String?
     let name: String?
+    let guestIds: [String]?
+    let priority: Int?
+    let fallbackGroupId: String?
+    let color: String?
+}
+
+// Web seating groups — separate from parties. Members may reference guest IDs
+// or party IDs (parties are referenced by id prefixed with 'u' in some web code).
+struct GroupDTO: Codable {
+    let id: String?
+    let name: String?
     let members: [String]?
+    let color: String?
+    let priority: Int?
+    let fallbackGroupId: String?
 }
 
 struct TableDTO: Codable {
@@ -139,6 +173,12 @@ struct TableDTO: Codable {
     let rotation: Double?
     let locked: Bool?
     let color: String?
+    // Web-parity fields preserved through round-trip. See PARITY.md.
+    let width: Double?           // For rect/head tables
+    let height: Double?          // For rect/head tables
+    let diameter: Double?        // For round tables
+    let sweetShape: String?      // For sweetheart tables: HEART/OVAL/DIAMOND/etc.
+    let oneSide: Bool?           // For head tables: one-sided vs both-sided
 
     func toDomain() -> SeatTable {
         SeatTable(
@@ -151,7 +191,12 @@ struct TableDTO: Codable {
             rotation: rotation,
             assignments: [:], // Filled in by SeatingPlanDTO.toDomain()
             locked: locked,
-            color: color
+            color: color,
+            width: width,
+            height: height,
+            diameter: diameter,
+            sweetShape: sweetShape,
+            oneSide: oneSide
         )
     }
 }
@@ -172,6 +217,14 @@ struct GuestDTO: Codable {
     let plusOne: Bool?
     let party: String?
     let display: String?
+    // Web-parity fields preserved through round-trip. See PARITY.md.
+    let dietaryTags: [String]?   // Drives per-restriction emoji on web (vegan/nut/etc.)
+    let highChair: Bool?         // Child seating flag
+    let groupIds: [String]?      // Explicit group memberships
+    let isBride: Bool?           // Cached on web for fast lookup
+    let isGroom: Bool?           // Cached on web for fast lookup
+    let meal: String?            // Web flattens to string before persist
+    let createdAt: String?       // ISO timestamp
 
     func toDomain() -> Guest {
         let displayName = display ?? name ?? "\(firstName ?? "") \(lastName ?? "")".trimmingCharacters(in: .whitespaces)
@@ -189,7 +242,14 @@ struct GuestDTO: Codable {
             vip: vip ?? false,
             accessibility: accessibility,
             plusOne: plusOne,
-            party: party
+            party: party,
+            dietaryTags: dietaryTags,
+            highChair: highChair,
+            groupIds: groupIds,
+            isBride: isBride,
+            isGroom: isGroom,
+            meal: meal,
+            createdAt: createdAt
         )
     }
 }
@@ -245,6 +305,11 @@ struct ObjectDTO: Codable {
     let width: Double?
     let height: Double?
     let rotation: Double?
+    // Web-parity fields preserved through round-trip. See PARITY.md.
+    let color: String?           // Hex color of the venue object
+    let category: String?        // Web grouping (entertainment/food/services/etc.)
+    let icon: String?            // Web icon name
+    let isObstacle: Bool?        // Drives proximity-rule warnings on web
 
     func toDomain() -> RoomObject {
         RoomObject(
@@ -255,7 +320,11 @@ struct ObjectDTO: Codable {
             y: y ?? 0,
             width: width ?? 100,
             height: height ?? 100,
-            rotation: rotation
+            rotation: rotation,
+            color: color,
+            category: category,
+            icon: icon,
+            isObstacle: isObstacle
         )
     }
 }
