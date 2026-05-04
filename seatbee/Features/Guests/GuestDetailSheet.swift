@@ -199,18 +199,6 @@ struct GuestDetailSheet: View {
                             }
                             .tint(Color.sbGold)
                             .padding(.vertical, 8)
-
-                            Divider()
-
-                            Toggle(isOn: $plusOne) {
-                                HStack(spacing: 8) {
-                                    Image(systemName: "person.badge.plus")
-                                        .foregroundStyle(Color.sbWarm)
-                                    Text("Has +1").font(SBFont.body)
-                                }
-                            }
-                            .tint(Color.sbGold)
-                            .padding(.vertical, 8)
                         }
                     }
 
