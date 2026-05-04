@@ -53,13 +53,9 @@ struct EditPlanSheet: View {
                             .onChange(of: eventDate) { _, _ in hasDate = true }
                     }
 
-                    // Venue
+                    // Venue search
                     formSection("VENUE") {
-                        TextField("The Garden House", text: $venue)
-                            .font(SBFont.body)
-                            .padding(14)
-                            .background(Color.sbIvory2)
-                            .clipShape(RoundedRectangle(cornerRadius: SBRadius.button))
+                        SBVenueSearch(venueName: $venue)
                     }
 
                     Spacer(minLength: 40)
