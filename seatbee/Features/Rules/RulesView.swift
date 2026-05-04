@@ -114,28 +114,43 @@ struct RulesView: View {
 
     private func ruleIcon(_ type: SeatingRule.RuleType) -> String {
         switch type {
-        case .seatTogether: return "person.2.fill"
-        case .keepApart: return "arrow.left.and.right"
-        case .assignTable: return "tablecells"
-        case .seatNear: return "arrow.right.arrow.left"
+        case .mustTogether:     return "person.2.fill"
+        case .preferTogether:   return "person.2"
+        case .mustNot:          return "arrow.left.and.right"
+        case .mustTable:        return "tablecells"
+        case .nearTable:        return "arrow.right.arrow.left"
+        case .nearObject:       return "scope"
+        case .categoryTogether: return "tag"
+        case .vipPriority:      return "star.fill"
+        case .sideTogether:     return "rectangle.split.2x1"
+        case .seatAdjacent:     return "rectangle.connected.to.line.below"
+        case .unknown:          return "questionmark.circle"
         }
     }
 
     private func ruleLabel(_ type: SeatingRule.RuleType) -> String {
         switch type {
-        case .seatTogether: return "Seat Together"
-        case .keepApart: return "Keep Apart"
-        case .assignTable: return "Assign to Table"
-        case .seatNear: return "Seat Nearby"
+        case .mustTogether:        return "Seat Together"
+        case .preferTogether:      return "Prefer Together"
+        case .mustNot:             return "Keep Apart"
+        case .mustTable:           return "Assign to Table"
+        case .nearTable:           return "Seat Near Table"
+        case .nearObject:          return "Seat Near Object"
+        case .categoryTogether:    return "Category Together"
+        case .vipPriority:         return "VIP Priority"
+        case .sideTogether:        return "Same Side Together"
+        case .seatAdjacent:        return "Seat Adjacent"
+        case .unknown(let raw):    return "Unknown (\(raw))"
         }
     }
 
     private func ruleColor(_ type: SeatingRule.RuleType) -> Color {
         switch type {
-        case .seatTogether: return .sbSage
-        case .keepApart: return .sbError
-        case .assignTable: return .sbGold
-        case .seatNear: return .sbBlush
+        case .mustTogether, .preferTogether:                                              return .sbSage
+        case .mustNot:                                                                    return .sbError
+        case .mustTable, .vipPriority:                                                    return .sbGold
+        case .nearTable, .nearObject, .categoryTogether, .sideTogether, .seatAdjacent:    return .sbBlush
+        case .unknown:                                                                    return .sbBlush
         }
     }
 
@@ -162,7 +177,7 @@ struct AddRuleSheet: View {
     @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
 
-    @State private var ruleType: SeatingRule.RuleType = .seatTogether
+    @State private var ruleType: SeatingRule.RuleType = .mustTogether
     @State private var selectedGuestIds: Set<String> = []
     @State private var selectedTableId: String?
     @State private var weight: Double = 50
@@ -184,9 +199,9 @@ struct AddRuleSheet: View {
                     // Rule type
                     formSection("RULE TYPE") {
                         VStack(spacing: 8) {
-                            ruleTypeButton("Seat Together", type: .seatTogether, icon: "person.2.fill")
-                            ruleTypeButton("Keep Apart", type: .keepApart, icon: "arrow.left.and.right")
-                            ruleTypeButton("Assign to Table", type: .assignTable, icon: "tablecells")
+                            ruleTypeButton("Seat Together", type: .mustTogether, icon: "person.2.fill")
+                            ruleTypeButton("Keep Apart", type: .mustNot, icon: "arrow.left.and.right")
+                            ruleTypeButton("Assign to Table", type: .mustTable, icon: "tablecells")
                         }
                     }
 
@@ -233,8 +248,8 @@ struct AddRuleSheet: View {
                             .foregroundStyle(Color.sbWarm)
                     }
 
-                    // Table selection (for assignTable)
-                    if ruleType == .assignTable {
+                    // Table selection (for .mustTable rules)
+                    if ruleType == .mustTable {
                         formSection("ASSIGN TO TABLE") {
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 8) {
@@ -298,7 +313,7 @@ struct AddRuleSheet: View {
                     Button("Add") { addRule() }
                         .font(SBFont.bodySemibold)
                         .foregroundStyle(Color.sbGoldDk)
-                        .disabled(selectedGuestIds.count < 2 && ruleType != .assignTable)
+                        .disabled(selectedGuestIds.count < 2 && ruleType != .mustTable)
                 }
             }
         }
@@ -347,10 +362,18 @@ struct AddRuleSheet: View {
             id: UUID().uuidString,
             type: ruleType,
             guests: Array(selectedGuestIds),
-            tableId: ruleType == .assignTable ? selectedTableId : nil,
+            tableId: ruleType == .mustTable ? selectedTableId : nil,
             weight: Int(weight),
             hard: isHard,
-            enabled: true
+            enabled: true,
+            categoryId: nil,
+            objectId: nil,
+            sideValue: nil,
+            desc: nil,
+            auto: nil,
+            source: "manual",
+            partyId: nil,
+            groupId: nil
         )
 
         plan.rules.append(rule)

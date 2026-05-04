@@ -202,16 +202,36 @@ struct RuleDTO: Codable {
     let weight: Int?
     let hard: Bool?
     let enabled: Bool?
+    // Web-parity fields (see PARITY.md). Persisted on web's Rule shape; preserved on iOS round-trip.
+    let categoryId: String?
+    let objectId: String?
+    let sideValue: String?
+    let desc: String?
+    let auto: Bool?
+    let source: String?
+    let partyId: String?
+    let groupId: String?
 
     func toDomain() -> SeatingRule {
+        // No silent fallback. RuleType.parse() either returns a known case or
+        // .unknown(raw) which preserves the original string on the next save.
+        // See PARITY.md "Anti-patterns".
         SeatingRule(
             id: id,
-            type: SeatingRule.RuleType(rawValue: type ?? "seatTogether") ?? .seatTogether,
+            type: SeatingRule.RuleType.parse(type),
             guests: guests ?? [],
             tableId: tableId,
             weight: weight ?? 50,
             hard: hard ?? false,
-            enabled: enabled ?? true
+            enabled: enabled ?? true,
+            categoryId: categoryId,
+            objectId: objectId,
+            sideValue: sideValue,
+            desc: desc,
+            auto: auto,
+            source: source,
+            partyId: partyId,
+            groupId: groupId
         )
     }
 }
