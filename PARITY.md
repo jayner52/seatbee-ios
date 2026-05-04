@@ -217,6 +217,8 @@ Map of `guestId → { tableId, seatIndex }`. iOS deconstructs this on read (assi
 | 2026-05-03 | Venue objects render as black rectangles when `color` field is missing | Web direct-to-main commit `968a70d` (`VObj` falls back to `VENUE_OBJECTS` defaults) |
 | 2026-05-03 | Web rendering crashed on missing `parties[].guestIds`, `guests[].dietaryTags`, `guests[].groupIds` | Web direct-to-main commits `9fd3ac4`, `4cbbdb8`, `7c46fa0`, `bc1893b` (defensive normalizers + UnitCard local guard) |
 | 2026-05-04 | Web auto-sync overwrote iOS-canonical rule types with legacy `seatTogether` strings (state hydrated from old DB rows pre-iOS-migration; auto-sync wrote them back, fighting iOS) | Web direct-to-main commits `4328234` + `8ffa905` (rule-type translator at all 4 web load paths — initial localStorage hydrate, `loadPlanDirect`, polling reload, AND cloud-boot path that runs on hard-refresh) + iOS PR #5 (legacy→canonical mapping in `RuleType.parse`) |
+| 2026-05-04 | iOS canvas rendered every table as a 70×70 hardcoded circle regardless of `type` — rect/head/sweetheart all looked round | iOS PR (`jayne/ios-table-shape-parity`) — `CanvasTableView` switches on `type`, consumes `width`/`height`/`diameter`, renders sweetheart heart/oval/diamond variants, applies `rotation`, fills with `table.color`, lays out seats per shape (round=circular, rect/head=two-side or `oneSide`, sweetheart=2 at bottom) |
+| 2026-05-04 | iOS-created tables saved with `nil` dim fields — web rendered them at fallback geometry, not the user's intended size | iOS PR — `AddTableSheet` populates dims via new `TableDefaults` helper mirroring web's `TABLE_SIZES` (5ft round=75px, 6×2.5ft rect, 18×2.5ft head with `oneSide=true`, 4×3ft heart sweetheart). `TableDrawerView.changeTableType()` backfills missing dim fields without overwriting |
 
 ---
 
@@ -231,7 +233,8 @@ These are paper cuts in iOS UX that don't risk data loss. Listed in priority ord
 | MEDIUM | iOS Party model authoring (full Party object editing with priority/color/etc.) | Round-trip preserved via `rawParties`. iOS currently treats parties as `guest.party: String?` only — can read/preserve full objects, not author them. |
 | MEDIUM | `Guest.accessibility` type mismatch (web boolean vs iOS String?) | Both sides round-trip independently, but the type semantics differ. Decide which wins (probably web boolean since it's older). |
 | LOW | RoomObject icon/category/isObstacle UI on iOS | Round-trip preserved. iOS doesn't yet display the icon catalog or surface obstacle warnings. |
-| LOW | SeatTable sweetheart-shape / one-sided head table authoring on iOS | Round-trip preserved. iOS UI doesn't yet surface these variants. |
+| LOW | iOS table edit drawer missing parity controls | Web has shape picker (Round/Oval/Rectangle/Head buttons), seating layout toggle (One Side / Two Sides / All Sides / Banquet), W/H sliders in feet, "Make Square" button, and rotation slider with ±15° buttons. iOS only exposes seat count and a type dropdown. Rendering is correct as of 2026-05-04; authoring UI is the gap. |
+| LOW | `SeatTable.seatingLayout` field not on iOS | Web supports `seatingLayout: 'all' \| 'banquet'` for rect tables to drive 4-side or banquet seat layouts. iOS DTO/model doesn't have the field, so it's dropped on iOS save → web. Adding requires `Models/SeatingPlan.swift` change (high-risk file — coordinate with Shayan). |
 | LOW | `genResults` preservation | Intentional skip. Recomputable. |
 
 ---

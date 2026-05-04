@@ -339,7 +339,27 @@ struct TableDrawerView: View {
     private func changeTableType(_ type: SeatTable.TableType) {
         guard var plan = appState.activePlan,
               let idx = plan.tables.firstIndex(where: { $0.id == table.id }) else { return }
-        plan.tables[idx].type = type
+        var t = plan.tables[idx]
+        t.type = type
+        // Backfill the dim fields the new type needs, without overwriting existing values
+        // (so a user re-toggling type doesn't lose careful sizing).
+        let defaults = TableDefaults.dimensions(for: type)
+        switch type {
+        case .round:
+            if t.diameter == nil { t.diameter = defaults.diameter }
+        case .rect:
+            if t.width == nil { t.width = defaults.width }
+            if t.height == nil { t.height = defaults.height }
+        case .head:
+            if t.width == nil { t.width = defaults.width }
+            if t.height == nil { t.height = defaults.height }
+            if t.oneSide == nil { t.oneSide = defaults.oneSide }
+        case .sweetheart:
+            if t.width == nil { t.width = defaults.width }
+            if t.height == nil { t.height = defaults.height }
+            if t.sweetShape == nil { t.sweetShape = defaults.sweetShape }
+        }
+        plan.tables[idx] = t
         appState.activePlan = plan
         savePlan(plan)
         HapticEngine.selection()

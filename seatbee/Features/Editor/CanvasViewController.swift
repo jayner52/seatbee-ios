@@ -218,9 +218,11 @@ class CanvasTableView: UIView {
 
     private var table: SeatTable
     private var isItemSelected = false
-    private let sizeValue: CGFloat = 70
 
-    private let circleLayer = CAShapeLayer()
+    // Padding around the body for seats (~14pt outside) + selection ring + label slack.
+    private let padding: CGFloat = 28
+
+    private let shapeLayer = CAShapeLayer()
     private let selectionLayer = CAShapeLayer()
     private let label = UILabel()
     private var seatLayers: [CAShapeLayer] = []
@@ -228,7 +230,7 @@ class CanvasTableView: UIView {
     init(table: SeatTable, guests: [Guest], isSelected: Bool) {
         self.table = table
         self.isItemSelected = isSelected
-        super.init(frame: CGRect(x: 0, y: 0, width: sizeValue, height: sizeValue))
+        super.init(frame: .zero)
         setupView()
         update(table: table, guests: guests, isSelected: isSelected)
         setupGestures()
@@ -239,7 +241,6 @@ class CanvasTableView: UIView {
     private func setupView() {
         backgroundColor = .clear
 
-        // Selection ring
         selectionLayer.strokeColor = UIColor(red: 201/255, green: 169/255, blue: 97/255, alpha: 1).cgColor
         selectionLayer.fillColor = UIColor.clear.cgColor
         selectionLayer.lineWidth = 2
@@ -247,13 +248,10 @@ class CanvasTableView: UIView {
         selectionLayer.isHidden = true
         layer.addSublayer(selectionLayer)
 
-        // Table circle
-        circleLayer.fillColor = UIColor(red: 247/255, green: 231/255, blue: 206/255, alpha: 1).cgColor
-        circleLayer.strokeColor = UIColor(red: 45/255, green: 45/255, blue: 45/255, alpha: 0.15).cgColor
-        circleLayer.lineWidth = 1
-        layer.addSublayer(circleLayer)
+        shapeLayer.strokeColor = UIColor(red: 45/255, green: 45/255, blue: 45/255, alpha: 0.15).cgColor
+        shapeLayer.lineWidth = 1
+        layer.addSublayer(shapeLayer)
 
-        // Label
         label.textAlignment = .center
         label.font = UIFont.systemFont(ofSize: 10, weight: .medium)
         label.textColor = UIColor(red: 45/255, green: 45/255, blue: 45/255, alpha: 1)
@@ -264,36 +262,38 @@ class CanvasTableView: UIView {
         self.table = table
         self.isItemSelected = isSelected
 
-        let tableRadius = sizeValue * 0.26
-        let center = CGPoint(x: sizeValue/2, y: sizeValue/2)
+        let body = CanvasTableView.bodySize(for: table)
+        let savedCenter = self.center
+        frame.size = CGSize(width: body.width + padding * 2, height: body.height + padding * 2)
+        if savedCenter != .zero { self.center = savedCenter }
 
-        circleLayer.path = UIBezierPath(arcCenter: center, radius: tableRadius, startAngle: 0, endAngle: .pi * 2, clockwise: true).cgPath
+        let bodyCenter = CGPoint(x: padding + body.width/2, y: padding + body.height/2)
 
-        let selRadius = sizeValue * 0.42
-        selectionLayer.path = UIBezierPath(arcCenter: center, radius: selRadius, startAngle: 0, endAngle: .pi * 2, clockwise: true).cgPath
+        let bodyPath = CanvasTableView.shapePath(for: table, body: body, center: bodyCenter)
+        shapeLayer.path = bodyPath.cgPath
+        let fallbackFill = UIColor(red: 247/255, green: 231/255, blue: 206/255, alpha: 1)
+        shapeLayer.fillColor = (UIColor(hex: table.color ?? "") ?? fallbackFill).cgColor
+
+        let selPath = CanvasTableView.selectionPath(for: table, body: body, center: bodyCenter)
+        selectionLayer.path = selPath.cgPath
         selectionLayer.isHidden = !isSelected
 
         label.text = table.name
-        label.frame = CGRect(x: 0, y: sizeValue/2 - 6, width: sizeValue, height: 12)
+        label.frame = CGRect(x: padding, y: bodyCenter.y - 6, width: body.width, height: 12)
 
-        // Seat dots
         seatLayers.forEach { $0.removeFromSuperlayer() }
         seatLayers = []
 
-        let seatRadius = sizeValue * 0.38
-        let dotSize: CGFloat = sizeValue * 0.08
+        let dotSize: CGFloat = 8
         let gold = UIColor(red: 201/255, green: 169/255, blue: 97/255, alpha: 1)
         let empty = UIColor(red: 255/255, green: 254/255, blue: 249/255, alpha: 1)
         let emptyStroke = UIColor(red: 185/255, green: 179/255, blue: 166/255, alpha: 1)
 
-        for i in 0..<table.seats {
-            let angle = CGFloat(i) * (.pi * 2) / CGFloat(table.seats) - .pi / 2
-            let x = center.x + cos(angle) * seatRadius - dotSize/2
-            let y = center.y + sin(angle) * seatRadius - dotSize/2
-
+        let seatPositions = CanvasTableView.seatPositions(for: table, body: body, center: bodyCenter)
+        for (i, pos) in seatPositions.enumerated() {
             let dot = CAShapeLayer()
-            dot.path = UIBezierPath(ovalIn: CGRect(x: x, y: y, width: dotSize, height: dotSize)).cgPath
-
+            let r = CGRect(x: pos.x - dotSize/2, y: pos.y - dotSize/2, width: dotSize, height: dotSize)
+            dot.path = UIBezierPath(ovalIn: r).cgPath
             if i < table.filledCount {
                 dot.fillColor = gold.cgColor
                 dot.strokeColor = gold.cgColor
@@ -306,18 +306,135 @@ class CanvasTableView: UIView {
             seatLayers.append(dot)
         }
 
-        if isSelected {
-            transform = CGAffineTransform(scaleX: 1.06, y: 1.06)
-        } else {
-            transform = .identity
-        }
+        applyTransform(animated: false)
     }
 
     func setSelected(_ selected: Bool) {
         isItemSelected = selected
         selectionLayer.isHidden = !selected
         UIView.animate(withDuration: 0.2) {
-            self.transform = selected ? CGAffineTransform(scaleX: 1.06, y: 1.06) : .identity
+            self.applyTransform(animated: true)
+        }
+    }
+
+    private func applyTransform(animated: Bool) {
+        let rotation = CGFloat((table.rotation ?? 0) * .pi / 180)
+        let scale: CGFloat = isItemSelected ? 1.06 : 1.0
+        transform = CGAffineTransform(rotationAngle: rotation).scaledBy(x: scale, y: scale)
+    }
+
+    // MARK: - Shape geometry (mirrors web `Table` component in src/App.jsx)
+
+    private static func bodySize(for table: SeatTable) -> CGSize {
+        switch table.type {
+        case .round:
+            let d = CGFloat(table.diameter ?? 90)
+            return CGSize(width: d, height: d)
+        case .rect:
+            return CGSize(width: CGFloat(table.width ?? 100), height: CGFloat(table.height ?? 50))
+        case .head:
+            return CGSize(width: CGFloat(table.width ?? 280), height: CGFloat(table.height ?? 50))
+        case .sweetheart:
+            return CGSize(width: CGFloat(table.width ?? 100), height: CGFloat(table.height ?? 60))
+        }
+    }
+
+    private static func shapePath(for table: SeatTable, body: CGSize, center c: CGPoint) -> UIBezierPath {
+        switch table.type {
+        case .round:
+            return UIBezierPath(arcCenter: c, radius: body.width / 2,
+                                startAngle: 0, endAngle: .pi * 2, clockwise: true)
+        case .rect, .head:
+            let rect = CGRect(x: c.x - body.width/2, y: c.y - body.height/2,
+                              width: body.width, height: body.height)
+            return UIBezierPath(roundedRect: rect, cornerRadius: 6)
+        case .sweetheart:
+            return sweetheartPath(shape: table.sweetShape, body: body, center: c)
+        }
+    }
+
+    private static func selectionPath(for table: SeatTable, body: CGSize, center c: CGPoint) -> UIBezierPath {
+        switch table.type {
+        case .round:
+            return UIBezierPath(arcCenter: c, radius: body.width / 2 + 10,
+                                startAngle: 0, endAngle: .pi * 2, clockwise: true)
+        case .rect, .head:
+            let rect = CGRect(x: c.x - body.width/2 - 6, y: c.y - body.height/2 - 6,
+                              width: body.width + 12, height: body.height + 12)
+            return UIBezierPath(roundedRect: rect, cornerRadius: 10)
+        case .sweetheart:
+            let inflated = CGSize(width: body.width + 12, height: body.height + 12)
+            return sweetheartPath(shape: table.sweetShape, body: inflated, center: c)
+        }
+    }
+
+    private static func sweetheartPath(shape: String?, body: CGSize, center c: CGPoint) -> UIBezierPath {
+        let w = body.width
+        let h = body.height
+        switch (shape ?? "heart").lowercased() {
+        case "oval":
+            return UIBezierPath(ovalIn: CGRect(x: c.x - w/2, y: c.y - h/2, width: w, height: h))
+        case "diamond", "rect", "rectangle":
+            return UIBezierPath(roundedRect: CGRect(x: c.x - w/2, y: c.y - h/2, width: w, height: h), cornerRadius: 8)
+        default: // heart — matches web SweetheartShape quadratic-curve path
+            let path = UIBezierPath()
+            path.move(to: CGPoint(x: c.x - w/2, y: c.y))
+            path.addQuadCurve(to: CGPoint(x: c.x, y: c.y - h/2),
+                              controlPoint: CGPoint(x: c.x - w/2, y: c.y - h/2))
+            path.addQuadCurve(to: CGPoint(x: c.x + w/2, y: c.y),
+                              controlPoint: CGPoint(x: c.x + w/2, y: c.y - h/2))
+            path.addQuadCurve(to: CGPoint(x: c.x, y: c.y + h/2),
+                              controlPoint: CGPoint(x: c.x + w/2, y: c.y + h/3))
+            path.addQuadCurve(to: CGPoint(x: c.x - w/2, y: c.y),
+                              controlPoint: CGPoint(x: c.x - w/2, y: c.y + h/3))
+            path.close()
+            return path
+        }
+    }
+
+    private static func seatPositions(for table: SeatTable, body: CGSize, center c: CGPoint) -> [CGPoint] {
+        let n = max(0, table.seats)
+        guard n > 0 else { return [] }
+        let offset: CGFloat = 14
+
+        switch table.type {
+        case .round:
+            let r = body.width / 2
+            return (0..<n).map { i in
+                let ang = CGFloat(i) / CGFloat(n) * .pi * 2 - .pi / 2
+                return CGPoint(x: c.x + cos(ang) * (r + offset),
+                               y: c.y + sin(ang) * (r + offset))
+            }
+        case .sweetheart:
+            // Web hardcodes 2 seats at the bottom regardless of seat count.
+            let count = min(n, 2)
+            let y = c.y + body.height/2 + offset
+            if count == 1 { return [CGPoint(x: c.x, y: y)] }
+            return [
+                CGPoint(x: c.x - body.width/4, y: y),
+                CGPoint(x: c.x + body.width/4, y: y),
+            ]
+        case .rect, .head:
+            let w = body.width
+            let h = body.height
+            if table.oneSide == true {
+                let sp = w / CGFloat(n + 1)
+                return (0..<n).map { i in
+                    CGPoint(x: c.x - w/2 + sp * CGFloat(i + 1), y: c.y - h/2 - offset)
+                }
+            }
+            // Default two-side: top + bottom edges, with top getting the extra when odd.
+            let top = (n + 1) / 2
+            let bot = n - top
+            let sp = w / CGFloat(max(top, bot) + 1)
+            var seats: [CGPoint] = []
+            for i in 0..<top {
+                seats.append(CGPoint(x: c.x - w/2 + sp * CGFloat(i + 1), y: c.y - h/2 - offset))
+            }
+            for i in 0..<bot {
+                seats.append(CGPoint(x: c.x - w/2 + sp * CGFloat(i + 1), y: c.y + h/2 + offset))
+            }
+            return seats
         }
     }
 
