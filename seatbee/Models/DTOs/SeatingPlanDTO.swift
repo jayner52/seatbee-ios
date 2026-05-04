@@ -130,6 +130,14 @@ struct AssignmentDTO: Codable {
         }
     }
 
+    // Web stores assignments as a flat {guestId: "tableId"} string map.
+    // Encode as a single string so iOS round-trip matches that shape and
+    // web's `assignments[g.id] === tableId` comparison works.
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(tableId ?? "")
+    }
+
     private enum CodingKeys: String, CodingKey {
         case tableId, seatIndex
     }
