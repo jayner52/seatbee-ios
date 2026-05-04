@@ -24,10 +24,16 @@ enum DietaryTag {
     }
 }
 
+enum GuestSortMode: String, CaseIterable {
+    case byTable = "By Table"
+    case alphabetical = "A–Z"
+}
+
 struct GuestsView: View {
     @Environment(AppState.self) private var appState
     @State private var searchText = ""
     @State private var selectedFilter = "All"
+    @State private var sortMode: GuestSortMode = .byTable
     @State private var showAddGuest = false
     @State private var showCSVImport = false
     @State private var showCategories = false
@@ -194,6 +200,7 @@ struct GuestsView: View {
             }
 
             filterChips
+            sortToggle
             searchField
             guestList
 
@@ -236,6 +243,33 @@ struct GuestsView: View {
         }
     }
 
+    // MARK: - Sort toggle
+
+    private var sortToggle: some View {
+        HStack(spacing: 6) {
+            ForEach(GuestSortMode.allCases, id: \.self) { mode in
+                Button {
+                    withAnimation(.seatbee) { sortMode = mode }
+                    HapticEngine.selection()
+                } label: {
+                    let active = sortMode == mode
+                    HStack(spacing: 4) {
+                        Image(systemName: mode == .byTable ? "rectangle.3.group" : "textformat.abc")
+                            .font(.system(size: 11, weight: .semibold))
+                        Text(mode.rawValue).font(SBFont.inter(12, weight: .semibold))
+                    }
+                    .foregroundStyle(active ? Color.sbGoldDk : Color.sbWarm)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(active ? Color.sbChampagne : Color.sbIvory2)
+                    .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+            Spacer()
+        }
+    }
+
     // MARK: - Search
 
     private var searchField: some View {
@@ -254,23 +288,179 @@ struct GuestsView: View {
 
     // MARK: - Guest List
 
+    @ViewBuilder
     private var guestList: some View {
-        LazyVStack(spacing: 0) {
-            ForEach(filteredGuests) { guest in
-                guestRow(guest)
-                    .swipeActions(edge: .trailing) {
-                        Button(role: .destructive) {
-                            deleteGuest(guest)
-                        } label: {
-                            Label("Delete", systemImage: "trash")
-                        }
-                    }
-                if guest.id != filteredGuests.last?.id {
-                    Divider()
-                        .foregroundStyle(Color.sbLine)
+        switch sortMode {
+        case .alphabetical:
+            alphabeticalList
+        case .byTable:
+            byTableList
+        }
+    }
+
+    private var alphabeticalList: some View {
+        let sorted = filteredGuests.sorted {
+            $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending
+        }
+        return LazyVStack(spacing: 0) {
+            ForEach(sorted) { guest in
+                guestRowWithSwipe(guest)
+                if guest.id != sorted.last?.id {
+                    Divider().foregroundStyle(Color.sbLine)
                 }
             }
         }
+    }
+
+    private var byTableList: some View {
+        let sections = guestSections
+        return LazyVStack(spacing: 16) {
+            ForEach(sections, id: \.id) { section in
+                VStack(spacing: 0) {
+                    sectionHeader(section)
+                    ForEach(section.guests) { guest in
+                        guestRowWithSwipe(guest)
+                        if guest.id != section.guests.last?.id {
+                            Divider().foregroundStyle(Color.sbLine)
+                        }
+                    }
+                }
+                .padding(.horizontal, section.isUnseated ? 12 : 0)
+                .padding(.vertical, section.isUnseated ? 8 : 0)
+                .background(section.isUnseated ? Color.sbGold.opacity(0.06) : Color.clear)
+                .overlay(
+                    Group {
+                        if section.isUnseated {
+                            RoundedRectangle(cornerRadius: SBRadius.small)
+                                .strokeBorder(Color.sbGold.opacity(0.25), lineWidth: 1)
+                        }
+                    }
+                )
+                .clipShape(RoundedRectangle(cornerRadius: SBRadius.small))
+            }
+        }
+    }
+
+    private func guestRowWithSwipe(_ guest: Guest) -> some View {
+        guestRow(guest)
+            .swipeActions(edge: .trailing) {
+                Button(role: .destructive) {
+                    deleteGuest(guest)
+                } label: {
+                    Label("Delete", systemImage: "trash")
+                }
+            }
+    }
+
+    private func sectionHeader(_ section: GuestSection) -> some View {
+        HStack(spacing: 8) {
+            if section.isUnseated {
+                Text("NEEDS SEATING")
+                    .font(SBFont.capsLabel)
+                    .foregroundStyle(Color.sbGoldDk)
+            } else {
+                if let color = section.colorHex.flatMap({ Color(hex: $0) }) {
+                    Circle().fill(color).frame(width: 8, height: 8)
+                }
+                Text(section.title.uppercased())
+                    .font(SBFont.capsLabel)
+                    .foregroundStyle(Color.sbCharcoal)
+                Text("(\(section.guests.count)/\(section.capacity ?? section.guests.count))")
+                    .font(SBFont.small)
+                    .foregroundStyle(Color.sbWarm)
+                if let cap = section.capacity, section.guests.count >= cap {
+                    Text("FULL")
+                        .font(SBFont.inter(8, weight: .bold))
+                        .foregroundStyle(Color.sbSage)
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 2)
+                        .background(Color.sbSage.opacity(0.2))
+                        .clipShape(RoundedRectangle(cornerRadius: 3))
+                }
+            }
+            Spacer()
+            Text("\(section.guests.count)")
+                .font(SBFont.bodySmallBold)
+                .foregroundStyle(Color.sbWarm)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(Color.sbIvory2)
+                .clipShape(Capsule())
+        }
+        .padding(.vertical, 6)
+        .padding(.horizontal, section.isUnseated ? 0 : 4)
+    }
+
+    // Web parity (src/App.jsx:7632): per-table groups, head/sweet first then
+    // alpha-numeric by name; alpha-by-displayName within each group;
+    // unseated guests in their own "NEEDS SEATING" section at the top
+    // (insertion order, matches web's `unassigned` ordering).
+    private struct GuestSection {
+        let id: String
+        let title: String
+        let guests: [Guest]
+        let isUnseated: Bool
+        let capacity: Int?
+        let colorHex: String?
+    }
+
+    private var guestSections: [GuestSection] {
+        guard let plan else { return [] }
+        let assignmentByGuest: [String: SeatTable] = {
+            var dict: [String: SeatTable] = [:]
+            for table in plan.tables {
+                for guestId in table.assignments.keys {
+                    dict[guestId] = table
+                }
+            }
+            return dict
+        }()
+
+        var sections: [GuestSection] = []
+
+        // Unseated section (no rsvp filter — show even declined so users see them)
+        let unseated = filteredGuests.filter { assignmentByGuest[$0.id] == nil }
+        if !unseated.isEmpty {
+            sections.append(.init(
+                id: "__unseated",
+                title: "Needs Seating",
+                guests: unseated,
+                isUnseated: true,
+                capacity: nil,
+                colorHex: nil
+            ))
+        }
+
+        // Per-table groups, mirroring web's sort:
+        // head/sweet first, then alpha-numeric by table name.
+        let sortedTables = plan.tables.sorted { a, b in
+            func priority(_ t: SeatTable) -> Int {
+                switch t.type {
+                case .head, .sweetheart: return 0
+                default: return 1
+                }
+            }
+            let pa = priority(a), pb = priority(b)
+            if pa != pb { return pa < pb }
+            return a.name.localizedStandardCompare(b.name) == .orderedAscending
+        }
+
+        for table in sortedTables {
+            let tableGuests = filteredGuests
+                .filter { assignmentByGuest[$0.id]?.id == table.id }
+                .sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
+            guard !tableGuests.isEmpty else { continue }
+            sections.append(.init(
+                id: table.id,
+                title: table.name,
+                guests: tableGuests,
+                isUnseated: false,
+                capacity: table.seats,
+                colorHex: table.color
+            ))
+        }
+
+        return sections
     }
 
     private func guestRow(_ guest: Guest) -> some View {
