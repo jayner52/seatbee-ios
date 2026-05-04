@@ -30,8 +30,10 @@ enum PreviewData {
         tables: sampleTables,
         guests: sampleGuests,
         rules: [
-            SeatingRule(id: "r1", type: .seatTogether, guests: ["g1", "g2"], weight: 100, hard: true, enabled: true),
-            SeatingRule(id: "r2", type: .keepApart, guests: ["g3", "g4"], weight: 80, hard: false, enabled: true),
+            SeatingRule(id: "r1", type: .mustTogether, guests: ["g1", "g2"], weight: 100, hard: true, enabled: true,
+                        categoryId: nil, objectId: nil, sideValue: nil, desc: nil, auto: nil, source: "manual", partyId: nil, groupId: nil),
+            SeatingRule(id: "r2", type: .mustNot, guests: ["g3", "g4"], weight: 80, hard: false, enabled: true,
+                        categoryId: nil, objectId: nil, sideValue: nil, desc: nil, auto: nil, source: "manual", partyId: nil, groupId: nil),
         ],
         objects: [],
         createdAt: Date(),

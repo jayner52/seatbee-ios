@@ -103,12 +103,81 @@ struct SeatingRule: Identifiable, Codable {
     var weight: Int
     var hard: Bool
     var enabled: Bool
+    // Web-parity fields (see PARITY.md) — present on web's Rule shape; iOS preserves them on round-trip
+    var categoryId: String?     // for .categoryTogether
+    var objectId: String?       // for .nearObject
+    var sideValue: String?      // "bride" | "groom" for .sideTogether
+    var desc: String?           // human-readable description from web
+    var auto: Bool?             // auto-generated rule (from parties/onboarding/AI)
+    var source: String?         // "party" | "group" | "ai" | "manual"
+    var partyId: String?        // source party id for auto rules
+    var groupId: String?        // source group id
 
-    enum RuleType: String, Codable {
-        case seatTogether
-        case keepApart
-        case assignTable
-        case seatNear
+    // Canonical rule types — rawValues match the web app's evaluator strings exactly
+    // (see /Users/jayneingram/Desktop/Seating Plan App/src/App.jsx:4798 onwards).
+    // `.unknown(raw)` preserves any future/unknown type from web on round-trip rather
+    // than silently coercing it. PARITY.md anti-pattern: "Silent enum fallback on read".
+    enum RuleType: Codable, Equatable, Hashable {
+        case mustTogether
+        case preferTogether
+        case mustNot
+        case mustTable
+        case nearTable
+        case nearObject
+        case categoryTogether
+        case vipPriority
+        case sideTogether
+        case seatAdjacent
+        case unknown(String)
+
+        var rawValue: String {
+            switch self {
+            case .mustTogether: return "must_together"
+            case .preferTogether: return "prefer_together"
+            case .mustNot: return "must_not"
+            case .mustTable: return "must_table"
+            case .nearTable: return "near_table"
+            case .nearObject: return "near_object"
+            case .categoryTogether: return "category_together"
+            case .vipPriority: return "vip_priority"
+            case .sideTogether: return "side_together"
+            case .seatAdjacent: return "seat_adjacent"
+            case .unknown(let raw): return raw
+            }
+        }
+
+        static func parse(_ raw: String?) -> RuleType {
+            guard let raw = raw else {
+                print("[Seatbee] ⚠️ Rule has nil type — preserving as .unknown(\"\")")
+                return .unknown("")
+            }
+            switch raw {
+            case "must_together":     return .mustTogether
+            case "prefer_together":   return .preferTogether
+            case "must_not":          return .mustNot
+            case "must_table":        return .mustTable
+            case "near_table":        return .nearTable
+            case "near_object":       return .nearObject
+            case "category_together": return .categoryTogether
+            case "vip_priority":      return .vipPriority
+            case "side_together":     return .sideTogether
+            case "seat_adjacent":     return .seatAdjacent
+            default:
+                print("[Seatbee] ⚠️ Unknown rule type: '\(raw)' — preserving raw on round-trip. See PARITY.md.")
+                return .unknown(raw)
+            }
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.singleValueContainer()
+            let raw = try container.decode(String.self)
+            self = RuleType.parse(raw)
+        }
+
+        func encode(to encoder: Encoder) throws {
+            var container = encoder.singleValueContainer()
+            try container.encode(rawValue)
+        }
     }
 }
 
@@ -188,7 +257,15 @@ extension SeatingPlan {
                     tableId: rule.tableId,
                     weight: rule.weight,
                     hard: rule.hard,
-                    enabled: rule.enabled
+                    enabled: rule.enabled,
+                    categoryId: rule.categoryId,
+                    objectId: rule.objectId,
+                    sideValue: rule.sideValue,
+                    desc: rule.desc,
+                    auto: rule.auto,
+                    source: rule.source,
+                    partyId: rule.partyId,
+                    groupId: rule.groupId
                 )
             },
             objects: objects.map { obj in
