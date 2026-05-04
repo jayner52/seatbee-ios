@@ -283,7 +283,7 @@ struct GuestsView: View {
                         SBChip(text: "+1", variant: .default)
                     }
                     if guest.dietary != nil {
-                        SBChip(text: "Diet", variant: .default)
+                        SBChip(text: "🍽️", variant: .default)
                     }
                 }
 
