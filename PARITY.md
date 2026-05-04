@@ -4,23 +4,67 @@
 
 This rule applies equally to **Jayne's Claude** (working from `~/Desktop/Seating Plan App` or `~/Desktop/seatbee-ios`) and **Shayan's Claude** (working from his clones of the same two repos). Identical content lives in both repos as `PARITY.md` at the root.
 
+Last major update: **2026-05-03** — the day we built the proper round-trip-safe architecture.
+
 ---
 
 ## Why this exists
 
-The Seatbee web app and the Seatbee iOS app share the same Supabase backend (`puckyaxybgxipoqdrekt`). The entire plan state — guests, tables, rules, room objects, parties, categories — is persisted to a JSONB `data` column on the `seating_plans` table. Both apps read and write that same shape.
+The Seatbee web app and the Seatbee iOS app share the same Supabase backend (`puckyaxybgxipoqdrekt`). The entire plan state — guests, tables, rules, room objects, parties, groups, categories — is persisted to a JSONB `data` column on the `seating_plans` table. Both apps read and write that same shape.
 
 When the two apps disagree on the shape — a different enum value, a missing field, a renamed property — opening a plan on one app and saving it can silently corrupt the data when the other app reads it back.
 
 ### The 2026-05-03 incident
 
-Shayan's iOS Sprint 2 introduced a `RuleType` enum with 4 camelCase values (`seatTogether`, `keepApart`, `assignTable`, `seatNear`). The web app's rules engine has always used 10 snake_case values (`must_together`, `prefer_together`, `must_not`, `must_table`, `near_table`, `near_object`, `category_together`, `vip_priority`, `side_together`, `seat_adjacent`). Zero overlap.
+**Day-of summary.** Jayne opened a plan in the iOS simulator that had been authored on web. After interacting with the canvas (moving a table), the iOS app auto-saved. On next web load: every rule showed as "Unknown rule," every party showed as empty, the web app crashed on the rules page entirely.
 
-iOS used a silent `?? .seatTogether` fallback on read. So when iOS opened Jayne's test plan, every rule type became `seatTogether`. On next iOS save, the JSONB blob was overwritten — every rule's `type` field in the database was now `seatTogether`. The web evaluator returned "Unknown rule" for all 55 rules.
+**Two underlying bugs were involved:**
 
-**This is the failure mode this doc exists to prevent.**
+1. **`SeatingRule.RuleType` enum mismatch.** iOS had 4 camelCase values (`seatTogether`, `keepApart`, `assignTable`, `seatNear`); web's evaluator expected 10 snake_case values (`must_together`, `prefer_together`, `must_not`, `must_table`, `near_table`, `near_object`, `category_together`, `vip_priority`, `side_together`, `seat_adjacent`). Zero overlap. iOS used a silent `?? .seatTogether` fallback on read, so any rule whose type iOS didn't recognize was coerced to `seatTogether` and re-saved with that string.
 
-User data in production was safe (RLS scopes iOS access to the dev's own plans), but the failure was silent — there was no error log, no warning, no PR review catch.
+2. **`PartyDTO` field name mismatch.** Web stores parties with field `guestIds: [String]`. iOS's `PartyDTO` defined the field as `members: [String]?`. **Same concept, different name.** When iOS decoded a web party with `{id, name, guestIds, priority, color}`, Swift Codable looked for `members`, found none, and silently set every party's iOS-side `members` to nil. On save, iOS wrote `{id, name}` — no member list at all. Web's renderer then crashed trying to call `.forEach` on `undefined`.
+
+**The deeper architectural lesson.** Multiple iOS DTOs were *partial decoders* — they only knew about a subset of the fields the web app persists. When iOS read JSONB into one of these partial DTOs, every field the DTO didn't know about was silently dropped during decode. Then when iOS saved, only the known fields made it back. Result: every iOS save was a lossy compression.
+
+**What the resolution looks like.** Each iOS DTO now mirrors the full web shape, even fields iOS doesn't display. Domain models (`Guest`, `SeatTable`, `RoomObject`, `SeatingPlan`) gained matching passthrough fields with `= nil` defaults. The DTO read populates them; the DTO write reads them back. iOS now *preserves* every web field on round-trip, regardless of whether iOS UI renders it.
+
+User data in production was never at risk — RLS scopes iOS to the authenticated dev's own plans, and the iOS app isn't on the App Store — but the round-trip safety story now extends past the dev sandbox: any future user who eventually runs iOS will have the same lossless round-trip.
+
+---
+
+## How iOS↔Web round-trip works (architecture, post-fix)
+
+### Shared backend
+
+- One Supabase project: `puckyaxybgxipoqdrekt`
+- Plan data lives in `seating_plans.data` (JSONB column)
+- Both apps authenticate via Supabase auth (web uses `@supabase/supabase-js`, iOS uses Supabase Swift SDK directly)
+- RLS on `seating_plans` (set up via earlier migrations and migration 033 for collab) scopes each authenticated user to plans where `user_id = auth.uid()` or where they are an explicit collaborator
+- iOS isn't on the App Store yet — only Jayne and Shayan can run it via Xcode simulator
+- Web is in production at `seatbee.app`
+
+### Plan data shape (top-level keys in JSONB)
+
+`event`, `guests`, `tables`, `rules`, `objects`, `categories`, `assignments`, `parties`, `groups`, `floorPlanImage`, `floorPlanOpacity`. Plus optional `genResults` (recomputable, intentionally not preserved).
+
+Each entity has a defined schema — see "Field reference" below.
+
+### iOS round-trip flow (post-fix)
+
+1. **Read.** `DatabaseService.fetchPlans` queries Supabase → array of `SeatingPlanDTO` → `toDomain()` builds a `SeatingPlan`. The DTO struct includes every field the web persists. Fields iOS doesn't model in its domain layer (categories, parties, groups, floorPlanImage) are stored as raw arrays on `SeatingPlan` (`rawCategories`, `rawParties`, `rawGroups`, `rawFloorPlanImage`, `rawFloorPlanOpacity`).
+2. **Edit in memory.** User moves a table, edits a rule, adds a guest — domain mutations. The raw passthrough arrays are never modified during normal iOS use, so they survive untouched.
+3. **Write.** `SeatingPlan.toPlanData()` serializes the full domain model into a `PlanDataDTO`. Modeled fields come from the domain object; unmodeled fields come from the raw arrays. `DatabaseService.savePlanData` writes this back to Supabase.
+4. **Web reads.** Existing rendering works because every field is still present.
+
+### Defensive layers (belt + suspenders)
+
+Even after the proper fix, three defensive mechanisms remain in place to make future drift detectable and survivable:
+
+- **iOS `RuleType.parse()`** — preserves unknown rule type strings via `.unknown(raw)` instead of silent coercion. Logs a warning. Round-trip preserves the raw string unchanged.
+- **Web `console.warn` on unknown rule type** — `src/App.jsx:5036`-area logs the offending `r.type` so the next drift incident is diagnosable in seconds.
+- **Web defensive normalizers** — `src/App.jsx` (3 state-ingress points: localStorage hydration, `loadPlanDirect`, cloud-sync `setRaw`) coalesce missing array fields to `[]` and translate `party.members` → `party.guestIds` if any older legacy data slips through. UnitCard rendering also coalesces locally as final-mile protection.
+
+These layers exist not because the proper fix is incomplete, but because the proper fix can only protect the data going forward. Any plan still in a degraded state (e.g., from earlier iOS saves) needs the web defensive layer to render without crashing.
 
 ---
 
@@ -49,10 +93,82 @@ A field is shared if it is persisted to Supabase `seating_plans.data` (JSONB). S
 | SeatTable | `state.tables[]` | `Models/SeatingPlan.swift` `SeatTable` struct |
 | SeatingRule | `state.rules[]` | `Models/SeatingPlan.swift` `SeatingRule` struct |
 | RoomObject (venue object) | `state.objects[]` | `Models/SeatingPlan.swift` `RoomObject` struct |
-| Category | `state.categories[]` | `Models/DTOs/SeatingPlanDTO.swift` `CategoryDTO` (no domain model yet) |
-| Party | `state.parties[]` (when present) | `Features/Guests/PartiesSheet.swift` (no Party model yet) |
+| Category | `state.categories[]` | `Models/DTOs/SeatingPlanDTO.swift` `CategoryDTO` (no domain model — preserved via `SeatingPlan.rawCategories`) |
+| Party | `state.parties[]` | `Models/DTOs/SeatingPlanDTO.swift` `PartyDTO` (no domain model — preserved via `SeatingPlan.rawParties`) |
+| Group | `state.groups[]` | `Models/DTOs/SeatingPlanDTO.swift` `GroupDTO` (no domain model — preserved via `SeatingPlan.rawGroups`) |
 
 Internal-only fields (UI state, ephemeral selection, drag offsets, panel toggles) are NOT shared. If it never round-trips to Supabase, it's safe to differ.
+
+---
+
+## Field reference (canonical schema)
+
+These are the field shapes each entity must use on **both sides**. iOS DTOs and web `state.*` shapes both conform to this.
+
+### `event` (EventData)
+
+`name`, `date`, `venue`, `eventType`, `roomWidth`, `roomHeight`, `roomShape`
+
+### Guest
+
+Core: `id`, `name`, `firstName`, `lastName`, `email`, `categories` (array of category-IDs), `dietary` (free text), `notes`, `rsvp` (`yes`/`no`/`pending`/`unknown`), `side` (`bride`/`groom`/`both`/`none`), `vip`, `accessibility`, `plusOne`, `party` (party ID/name string), `display`
+
+Web-parity (preserved on iOS round-trip): `dietaryTags` (array of strings — drives per-restriction emoji on web), `highChair` (boolean), `groupIds` (array), `isBride` (boolean, cached), `isGroom` (boolean, cached), `meal` (string), `createdAt` (ISO timestamp)
+
+### SeatTable
+
+Core: `id`, `name`, `type` (`round`/`rect`/`head`/`sweetheart`), `seats`, `x`, `y`, `rotation`, `assignments` (handled separately, see below), `locked`, `color`
+
+Web-parity (preserved on iOS round-trip): `width`, `height` (rect/head), `diameter` (round), `sweetShape` (`HEART`/`OVAL`/`DIAMOND` for sweetheart variants), `oneSide` (boolean for head table)
+
+### SeatingRule
+
+Core: `id`, `type`, `guests` (array of guest IDs), `tableId`, `weight`, `hard`, `enabled`
+
+Web-parity (preserved on iOS round-trip): `categoryId`, `objectId`, `sideValue`, `desc`, `auto`, `source`, `partyId`, `groupId`
+
+**`type` enum values (case-sensitive match):**
+`must_together`, `prefer_together`, `must_not`, `must_table`, `near_table`, `near_object`, `category_together`, `vip_priority`, `side_together`, `seat_adjacent`
+
+iOS encodes/decodes via the `RuleType` enum which has matching `rawValue` strings. Unknown types preserve the raw string via `.unknown(String)`.
+
+### RoomObject (venue object)
+
+Core: `id`, `type`, `name`, `x`, `y`, `width`, `height`, `rotation`
+
+Web-parity (preserved on iOS round-trip): `color`, `category` (e.g. "entertainment"/"food"/"services"), `icon` (icon name), `isObstacle` (boolean)
+
+When `color` is missing on read, web `VObj` derives a fallback from the `VENUE_OBJECTS` definitions table. Don't rely on this at write time — always set the canonical color on save.
+
+### Category
+
+`id`, `name`, `color` (hex), `isSystem` (boolean — true for predefined categories like Wedding Party / Bride / Groom), `affinityWeight` (int 0-100 — drives seating algorithm bias), `seatColor` (hex, optional)
+
+iOS doesn't yet author categories — it preserves the raw array via `SeatingPlan.rawCategories` and writes it back unchanged on save.
+
+### Party
+
+`id`, `name`, **`guestIds`** (array of strings — note: NOT `members`; that field name was the cause of the 2026-05-03 incident), `priority` (int 50-100), `fallbackGroupId` (string, optional), `color` (hex)
+
+iOS doesn't yet author parties as full objects — Guest has a `party: String?` reference. The Party array round-trips via `SeatingPlan.rawParties`.
+
+### Group
+
+`id`, `name`, `members` (array of strings — these can be guest IDs, or party IDs prefixed with `u`), `color`, `priority`, `fallbackGroupId`
+
+Note: Groups use `members`, parties use `guestIds`. They are different concepts. Don't conflate.
+
+iOS doesn't model Group at all in the domain layer — preserved via `SeatingPlan.rawGroups`.
+
+### `assignments`
+
+Map of `guestId → { tableId, seatIndex }`. iOS deconstructs this on read (assigning each guest to their table) and reconstructs it on save.
+
+### Plan-level passthrough
+
+`floorPlanImage` (base64 string), `floorPlanOpacity` (number, 0-1) — preserved on iOS via `rawFloorPlanImage` / `rawFloorPlanOpacity`.
+
+`genResults` is intentionally not preserved — it's recomputable from "Generate Seating" and writing stale results is worse than recomputing.
 
 ---
 
@@ -61,12 +177,12 @@ Internal-only fields (UI state, ephemeral selection, drag offsets, panel toggles
 1. **Read this file fully** before editing.
 2. **Identify whether your change affects a shared shape.** When in doubt, ask: does this end up in `seating_plans.data`? If yes → shared.
 3. **Update both apps in the same PR cycle.** If you can't (the other dev needs to do it), open a tracking issue or send a Telegram heads-up with the field shape and the deadline.
-4. **Add defensive logging on read.** When reading enum values from the persisted blob, log unknown values to console:
-   - Web: `console.warn('[seatbee] Unknown rule type:', r.type, 'rule:', r)`
-   - iOS: `print("[Seatbee] Unknown rule type: \(rawType)")`
-5. **Never use silent `?? defaultValue` for unknown enums.** Use an explicit `.unknown(String)` case that preserves the original, OR throw, OR log loudly. Never coerce silently.
+4. **Add defensive logging on read** when reading enum values from the persisted blob:
+   - Web: `console.warn('[seatbee] Unknown <thing> type:', value, 'context:', obj)`
+   - iOS: `print("[Seatbee] ⚠️ Unknown <thing> type: \(rawValue) — preserving raw")`
+5. **Never use silent `?? defaultValue` for unknown enums.** Use an explicit `.unknown(String)` case that preserves the original (see `SeatingRule.RuleType` for the canonical pattern), OR throw, OR log loudly. Never coerce silently.
 6. **Verify round-trip locally.** Web edit → save → iOS read → iOS save → web read. The shape should be identical at every hop.
-7. **Update this file's "Known parity gaps" section** when introducing or resolving drift.
+7. **Update this file's "Outstanding gaps" or "Resolved" section** when introducing or resolving drift.
 
 ---
 
@@ -76,54 +192,46 @@ Internal-only fields (UI state, ephemeral selection, drag offsets, panel toggles
 - ❌ Adding a new field to one side and "we'll do iOS/web later"
 - ❌ Renaming an enum case without updating both repos in lockstep
 - ❌ Trusting that fields round-trip just because the build compiles
-- ❌ Storing the same concept under different field names on each side
+- ❌ Storing the same concept under different field names on each side (the 2026-05-03 `members` vs `guestIds` mistake)
 - ❌ Letting the build pass with TODOs that say "wire up to other app later"
 - ❌ Reading old data with a less-permissive shape (e.g. iOS only knows 4 of web's 10 rule types) without explicitly preserving the rest
 
 ---
 
-## Known parity gaps (as of 2026-05-03)
+## Resolved gaps
 
-These are the gaps identified in the 2026-05-03 audit. Severity is ranked by data-corruption risk on round-trip.
+| Date | Gap | Closed by |
+|---|---|---|
+| 2026-05-03 | `RuleType` enum mismatch (iOS 4 camelCase vs web 10 snake_case) | iOS PR #3 (`jayne/rules-parity`) |
+| 2026-05-03 | `RuleDTO` missing fields (`categoryId`, `objectId`, `sideValue`, `desc`, `auto`, `source`, `partyId`, `groupId`) | iOS PR #3 |
+| 2026-05-03 | iOS `RuleType` silent `?? .seatTogether` fallback on unknown read | iOS PR #3 (replaced with `.unknown(raw)` preservation) |
+| 2026-05-03 | `PartyDTO` field name (`members` → `guestIds`) | iOS PR #4 (`jayne/full-dto-parity`) |
+| 2026-05-03 | `PartyDTO` missing fields (`priority`, `fallbackGroupId`, `color`) | iOS PR #4 |
+| 2026-05-03 | `CategoryDTO` missing fields (`isSystem`, `affinityWeight`, `seatColor`) | iOS PR #4 |
+| 2026-05-03 | `GuestDTO` missing fields (`dietaryTags`, `highChair`, `groupIds`, `isBride`, `isGroom`, `meal`, `createdAt`) | iOS PR #4 |
+| 2026-05-03 | `TableDTO` missing fields (`width`, `height`, `diameter`, `sweetShape`, `oneSide`) | iOS PR #4 |
+| 2026-05-03 | `ObjectDTO` missing fields (`color`, `category`, `icon`, `isObstacle`) | iOS PR #4 |
+| 2026-05-03 | `PlanDataDTO` missing `groups`, `floorPlanImage`, `floorPlanOpacity` | iOS PR #4 |
+| 2026-05-03 | iOS `toPlanData` hardcoded `categories: nil`, `parties: nil` (wiped arrays on every save) | iOS PR #4 (now writes from raw passthrough fields) |
+| 2026-05-03 | Web rule evaluator silent on unknown types | Web direct-to-main commit `1423fdd` (now `console.warn`s) |
+| 2026-05-03 | Venue objects render as black rectangles when `color` field is missing | Web direct-to-main commit `968a70d` (`VObj` falls back to `VENUE_OBJECTS` defaults) |
+| 2026-05-03 | Web rendering crashed on missing `parties[].guestIds`, `guests[].dietaryTags`, `guests[].groupIds` | Web direct-to-main commits `9fd3ac4`, `4cbbdb8`, `7c46fa0`, `bc1893b` (defensive normalizers + UnitCard local guard) |
 
-### CRITICAL — data corruption on round-trip
+---
 
-| Gap | Web | iOS | Fix scope |
-|---|---|---|---|
-| `SeatingRule.type` enum mismatch | 10 snake_case values | 4 camelCase values | iOS rename + expand; web defensive log |
-| Missing iOS rule fields | `categoryId`, `objectId`, `sideValue`, `desc`, `auto`, `source`, `partyId`, `groupId` | None of these exist on iOS Rule struct | iOS `Models/SeatingPlan.swift` |
+## Outstanding gaps (UX-only — data integrity is now closed)
 
-Web file references: `src/App.jsx:4798` (rule evaluator entry), `src/App.jsx:5036` (default branch returning "Unknown rule").
-iOS file references: `seatbee/Models/SeatingPlan.swift:107-112` (RuleType enum), `seatbee/Models/DTOs/SeatingPlanDTO.swift:209` (silent fallback).
+These are paper cuts in iOS UX that don't risk data loss. Listed in priority order.
 
-### HIGH — UX broken or silent data loss
-
-| Gap | Web | iOS | Fix scope |
-|---|---|---|---|
-| `Guest.dietaryTags: [String]` | Drives per-restriction emoji | Field missing entirely (only `dietary: String?`) | iOS Guest struct + DTO + Guests UI |
-| Category model | Full `{id, name, color, isSystem, affinityWeight}` objects | Only `[String]` of IDs on guest, no Category model | iOS new model + DTO mapping + Guests UI |
-| `Guest.accessibility` type | `boolean?` (web) | `String?` (iOS) | Decide canonical type — web wins by precedent |
-
-### MEDIUM — partial features
-
-| Gap | Web | iOS | Fix scope |
-|---|---|---|---|
-| Party model | Full Party object with `members`, `priority`, `fallbackGroupId`, `color` | Only `guest.party: String?` | iOS new model + UI |
-| `Guest.highChair`, `Guest.groupIds` | Present | Missing on iOS | iOS Guest struct |
-| Plan soft-delete `deletedAt` | Present (uses migration 028) | DTO reads but no domain model field | iOS Plan struct + DTO |
-
-### LOW — less-frequent fields
-
-| Gap | Web | iOS | Fix scope |
-|---|---|---|---|
-| `RoomObject` extras: `color`, `category`, `icon`, `isObstacle` | Present | Missing | iOS RoomObject struct |
-| `SeatTable` extras: `diameter` (round), `sweetShape` (sweetheart variant), `oneSide` (head table) | Present | Missing | iOS SeatTable struct |
-| Plan variants: `isVariant`, `parentEventId`, `variantNumber` | Present (migration 027) | Missing | iOS Plan struct |
-| Plan `roomShape` | Present | Missing | iOS Plan struct |
-
-### Resolved
-
-(none yet — populate as PRs land)
+| Priority | Gap | Notes |
+|---|---|---|
+| HIGH | iOS Category UX (shows IDs not names) | Round-trip is preserved via `rawCategories`. iOS UI just needs to look up `category.name` from `rawCategories` instead of rendering the raw ID. |
+| HIGH | iOS structured dietary emoji rendering (🌿 vegan, 🥜 nut allergy, etc.) | `dietaryTags` now round-trips. iOS UI currently shows generic 🍽️ chip. Needs the per-tag emoji map and chip-per-tag rendering. |
+| MEDIUM | iOS Party model authoring (full Party object editing with priority/color/etc.) | Round-trip preserved via `rawParties`. iOS currently treats parties as `guest.party: String?` only — can read/preserve full objects, not author them. |
+| MEDIUM | `Guest.accessibility` type mismatch (web boolean vs iOS String?) | Both sides round-trip independently, but the type semantics differ. Decide which wins (probably web boolean since it's older). |
+| LOW | RoomObject icon/category/isObstacle UI on iOS | Round-trip preserved. iOS doesn't yet display the icon catalog or surface obstacle warnings. |
+| LOW | SeatTable sweetheart-shape / one-sided head table authoring on iOS | Round-trip preserved. iOS UI doesn't yet surface these variants. |
+| LOW | `genResults` preservation | Intentional skip. Recomputable. |
 
 ---
 
@@ -135,7 +243,7 @@ Apply this before approving any PR that touches a shared shape:
 - [ ] Are enum values exactly matching (case-sensitive)?
 - [ ] No silent `?? defaultValue` fallbacks for enum reads?
 - [ ] Round-trip tested locally (or explicitly waived in the PR description)?
-- [ ] `Known parity gaps` table in this file updated?
+- [ ] `Resolved` / `Outstanding` tables in this file updated?
 - [ ] Any new fields documented in both DTOs?
 
 ---
