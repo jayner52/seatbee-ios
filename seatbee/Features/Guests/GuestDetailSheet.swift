@@ -9,14 +9,18 @@ struct GuestDetailSheet: View {
 
     @State private var name = ""
     @State private var email = ""
+    @State private var meal = ""
     @State private var dietary = ""
     @State private var notes = ""
     @State private var side: Guest.GuestSide = .none
     @State private var rsvp: Guest.RSVPStatus = .unknown
     @State private var vip = false
     @State private var plusOne = false
+    @State private var isChild = false
+    @State private var highChair = false
     @State private var accessibility = ""
     @State private var selectedCategories: Set<String> = []
+    @State private var selectedDietaryTags: Set<String> = []
     @State private var showDeleteConfirm = false
 
     private var isEditing: Bool { guest != nil }
@@ -53,25 +57,25 @@ struct GuestDetailSheet: View {
                         }
                     }
 
-                    // Categories
+                    // Categories — pull from the plan's canonical category list
+                    // (web stores categories as IDs; iOS preserves the raw
+                    // category objects via SeatingPlan.rawCategories). Fall
+                    // back to whatever's already on guests if no canonical
+                    // list exists.
                     formSection("CATEGORIES") {
-                        let categories = appState.activePlan?.guests
-                            .flatMap { $0.categories }
-                            .reduce(into: Set<String>()) { $0.insert($1) }
-                            ?? []
-
+                        let categories = canonicalCategories()
                         FlowLayout(spacing: 8) {
-                            ForEach(Array(categories).sorted(), id: \.self) { cat in
+                            ForEach(categories, id: \.id) { cat in
                                 Button {
-                                    if selectedCategories.contains(cat) {
-                                        selectedCategories.remove(cat)
+                                    if selectedCategories.contains(cat.id) {
+                                        selectedCategories.remove(cat.id)
                                     } else {
-                                        selectedCategories.insert(cat)
+                                        selectedCategories.insert(cat.id)
                                     }
                                 } label: {
                                     SBChip(
-                                        text: cat,
-                                        variant: selectedCategories.contains(cat) ? .gold : .default
+                                        text: cat.name,
+                                        variant: selectedCategories.contains(cat.id) ? .gold : .default
                                     )
                                 }
                                 .buttonStyle(.plain)
@@ -79,8 +83,50 @@ struct GuestDetailSheet: View {
                         }
                     }
 
-                    // Details
-                    formSection("DETAILS") {
+                    // Meal
+                    formSection("MEAL") {
+                        TextField("e.g. Beef, Fish, Vegetarian", text: $meal)
+                            .font(SBFont.body)
+                            .padding(14)
+                            .background(Color.sbIvory2)
+                            .clipShape(RoundedRectangle(cornerRadius: SBRadius.button))
+                    }
+
+                    // Dietary & Allergies (chips + free-text fallback)
+                    formSection("DIETARY & ALLERGIES") {
+                        VStack(alignment: .leading, spacing: 10) {
+                            FlowLayout(spacing: 8) {
+                                ForEach(DietaryTag.all, id: \.id) { tag in
+                                    Button {
+                                        if selectedDietaryTags.contains(tag.id) {
+                                            selectedDietaryTags.remove(tag.id)
+                                        } else {
+                                            selectedDietaryTags.insert(tag.id)
+                                        }
+                                        HapticEngine.selection()
+                                    } label: {
+                                        Text("\(tag.emoji) \(tag.label)")
+                                            .font(SBFont.bodySmall)
+                                            .foregroundStyle(selectedDietaryTags.contains(tag.id) ? Color.white : Color.sbCharcoal)
+                                            .padding(.horizontal, 12)
+                                            .padding(.vertical, 6)
+                                            .background(selectedDietaryTags.contains(tag.id) ? Color.sbCharcoal : Color.sbIvory2)
+                                            .clipShape(Capsule())
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+
+                            TextField("Other restriction or allergy note…", text: $dietary)
+                                .font(SBFont.body)
+                                .padding(12)
+                                .background(Color.sbIvory2)
+                                .clipShape(RoundedRectangle(cornerRadius: SBRadius.small))
+                        }
+                    }
+
+                    // Contact / Notes
+                    formSection("CONTACT & NOTES") {
                         VStack(spacing: 12) {
                             HStack {
                                 Image(systemName: "envelope")
@@ -90,17 +136,6 @@ struct GuestDetailSheet: View {
                                     .font(SBFont.body)
                                     .keyboardType(.emailAddress)
                                     .textInputAutocapitalization(.never)
-                            }
-                            .padding(12)
-                            .background(Color.sbIvory2)
-                            .clipShape(RoundedRectangle(cornerRadius: SBRadius.small))
-
-                            HStack {
-                                Image(systemName: "leaf")
-                                    .foregroundStyle(Color.sbWarm)
-                                    .frame(width: 24)
-                                TextField("Dietary needs", text: $dietary)
-                                    .font(SBFont.body)
                             }
                             .padding(12)
                             .background(Color.sbIvory2)
@@ -137,8 +172,29 @@ struct GuestDetailSheet: View {
                                 HStack(spacing: 8) {
                                     Image(systemName: "star.fill")
                                         .foregroundStyle(Color.sbGold)
-                                    Text("VIP Guest")
-                                        .font(SBFont.body)
+                                    Text("VIP Guest").font(SBFont.body)
+                                }
+                            }
+                            .tint(Color.sbGold)
+                            .padding(.vertical, 8)
+
+                            Divider()
+
+                            Toggle(isOn: $isChild) {
+                                HStack(spacing: 8) {
+                                    Text("🧒")
+                                    Text("Child").font(SBFont.body)
+                                }
+                            }
+                            .tint(Color.sbGold)
+                            .padding(.vertical, 8)
+
+                            Divider()
+
+                            Toggle(isOn: $highChair) {
+                                HStack(spacing: 8) {
+                                    Text("🪑")
+                                    Text("High Chair (Baby)").font(SBFont.body)
                                 }
                             }
                             .tint(Color.sbGold)
@@ -150,8 +206,7 @@ struct GuestDetailSheet: View {
                                 HStack(spacing: 8) {
                                     Image(systemName: "person.badge.plus")
                                         .foregroundStyle(Color.sbWarm)
-                                    Text("Has +1")
-                                        .font(SBFont.body)
+                                    Text("Has +1").font(SBFont.body)
                                 }
                             }
                             .tint(Color.sbGold)
@@ -259,20 +314,42 @@ struct GuestDetailSheet: View {
         .buttonStyle(.plain)
     }
 
+    // MARK: - Categories source
+
+    private func canonicalCategories() -> [(id: String, name: String)] {
+        // Prefer the canonical list preserved on the plan via rawCategories
+        // (matches what web authors). Fall back to ad-hoc strings on guests
+        // for plans that have no rawCategories yet.
+        if let raw = appState.activePlan?.rawCategories, !raw.isEmpty {
+            return raw.compactMap { entry in
+                guard let id = entry["id"]?.value as? String else { return nil }
+                let name = (entry["name"]?.value as? String) ?? id
+                return (id, name)
+            }
+        }
+        let allStrings = appState.activePlan?.guests.flatMap(\.categories) ?? []
+        let unique = Array(Set(allStrings)).sorted()
+        return unique.map { (id: $0, name: $0) }
+    }
+
     // MARK: - Actions
 
     private func loadGuest() {
         guard let guest else { return }
         name = guest.displayName
         email = guest.email ?? ""
+        meal = guest.meal ?? ""
         dietary = guest.dietary ?? ""
         notes = guest.notes ?? ""
         side = guest.side
         rsvp = guest.rsvp
         vip = guest.vip
         plusOne = guest.plusOne ?? false
+        isChild = guest.isChild ?? false
+        highChair = guest.highChair ?? false
         accessibility = guest.accessibility ?? ""
         selectedCategories = Set(guest.categories)
+        selectedDietaryTags = Set(guest.dietaryTags ?? [])
     }
 
     private func saveGuest() {
@@ -283,8 +360,13 @@ struct GuestDetailSheet: View {
         let firstName = String(parts.first ?? "")
         let lastName = parts.count > 1 ? String(parts.last ?? "") : nil
 
+        // Preserve fields iOS doesn't author here (display, isBride/Groom
+        // cached flags, groupIds, guestCreatedAt) by reading from the
+        // existing guest if we have one.
+        let existing = guest
+
         let updatedGuest = Guest(
-            id: guest?.id ?? UUID().uuidString,
+            id: existing?.id ?? UUID().uuidString,
             name: trimmedName,
             firstName: firstName,
             lastName: lastName,
@@ -297,7 +379,16 @@ struct GuestDetailSheet: View {
             vip: vip,
             accessibility: accessibility.isEmpty ? nil : accessibility,
             plusOne: plusOne,
-            party: guest?.party
+            party: existing?.party,
+            display: existing?.display,
+            dietaryTags: selectedDietaryTags.isEmpty ? nil : Array(selectedDietaryTags),
+            highChair: highChair ? true : (existing?.highChair == false ? false : nil),
+            isChild: isChild ? true : (existing?.isChild == false ? false : nil),
+            groupIds: existing?.groupIds,
+            isBride: existing?.isBride,
+            isGroom: existing?.isGroom,
+            meal: meal.isEmpty ? nil : meal,
+            guestCreatedAt: existing?.guestCreatedAt
         )
 
         guard var plan = appState.activePlan else { return }

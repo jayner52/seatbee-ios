@@ -1,5 +1,29 @@
 import SwiftUI
 
+// Web parity (src/App.jsx:3378-3386 + 12107-12117). The 8 canonical dietary
+// tags shared between iOS and web. iOS stores selected tag IDs in
+// `Guest.dietaryTags`; web does the same. Emoji + label match web exactly.
+enum DietaryTag {
+    static let all: [(id: String, label: String, emoji: String)] = [
+        ("vegetarian",        "Vegetarian",        "🌿"),
+        ("vegan",             "Vegan",             "🌱"),
+        ("halal",             "Halal",             "☪️"),
+        ("gluten-free",       "Gluten-Free",       "🌾"),
+        ("dairy-free",        "Dairy-Free",        "🥛"),
+        ("nut-allergy",       "Nut Allergy",       "🥜"),
+        ("shellfish-allergy", "Shellfish Allergy", "🦐"),
+        ("kosher",            "Kosher",            "✡️"),
+    ]
+
+    static func emoji(for id: String) -> String? {
+        all.first { $0.id == id }?.emoji
+    }
+
+    static func label(for id: String) -> String? {
+        all.first { $0.id == id }?.label
+    }
+}
+
 struct GuestsView: View {
     @Environment(AppState.self) private var appState
     @State private var searchText = ""
@@ -261,12 +285,10 @@ struct GuestsView: View {
                         .font(SBFont.bodySmallBold)
                         .foregroundStyle(Color.sbCharcoal)
 
-                    HStack(spacing: 4) {
-                        if !guest.categories.isEmpty {
-                            Text(guest.categories.first ?? "")
-                                .font(SBFont.small)
-                                .foregroundStyle(Color.sbWarm)
-                        }
+                    if let categoryLabel = primaryCategoryLabel(for: guest) {
+                        Text(categoryLabel)
+                            .font(SBFont.small)
+                            .foregroundStyle(Color.sbWarm)
                     }
                 }
 
@@ -277,14 +299,27 @@ struct GuestsView: View {
                     .fill(rsvpColor(guest.rsvp))
                     .frame(width: 8, height: 8)
 
-                // Chips
+                // Per-guest indicators (web parity).
                 HStack(spacing: 4) {
+                    if guest.vip {
+                        Text("VIP")
+                            .font(SBFont.inter(8, weight: .bold))
+                            .foregroundStyle(Color.sbGoldDk)
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 2)
+                            .background(Color.sbGold.opacity(0.2))
+                            .clipShape(RoundedRectangle(cornerRadius: 3))
+                    }
+                    if guest.isChild == true {
+                        Text("🧒").font(.system(size: 12))
+                    }
+                    if guest.highChair == true {
+                        Text("🪑").font(.system(size: 12))
+                    }
                     if guest.plusOne == true {
                         SBChip(text: "+1", variant: .default)
                     }
-                    if guest.dietary != nil {
-                        SBChip(text: "🍽️", variant: .default)
-                    }
+                    dietaryEmojis(for: guest)
                 }
 
                 // Table assignment
@@ -293,6 +328,46 @@ struct GuestsView: View {
             .padding(.vertical, 10)
         }
         .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private func dietaryEmojis(for guest: Guest) -> some View {
+        // Web parity (src/App.jsx:12107-12117): one emoji per tag in
+        // dietaryTags[]; if no tags but `dietary` free text exists, fall
+        // back to a single 🍽 chip so the row still signals "has dietary
+        // info." If neither, show nothing — no generic emoji on every row.
+        if let tags = guest.dietaryTags, !tags.isEmpty {
+            HStack(spacing: 2) {
+                ForEach(tags, id: \.self) { tag in
+                    if let emoji = DietaryTag.emoji(for: tag) {
+                        Text(emoji).font(.system(size: 12))
+                    }
+                }
+            }
+        } else if let dietary = guest.dietary, !dietary.isEmpty {
+            Text("🍽").font(.system(size: 11))
+                .foregroundStyle(Color.sbWarm.opacity(0.6))
+        }
+    }
+
+    // Web stores categories as IDs; iOS preserves the raw category objects
+    // via `SeatingPlan.rawCategories` (array of [String: AnyCodable]). Look
+    // up the first category's name for display so we don't render raw IDs
+    // like "y0b4xyih6". Falls back to the raw string if no match.
+    private func primaryCategoryLabel(for guest: Guest) -> String? {
+        guard let first = guest.categories.first, !first.isEmpty else { return nil }
+        return categoryName(forId: first) ?? first
+    }
+
+    private func categoryName(forId id: String) -> String? {
+        guard let raw = plan?.rawCategories else { return nil }
+        for entry in raw {
+            if let entryId = entry["id"]?.value as? String, entryId == id,
+               let name = entry["name"]?.value as? String, !name.isEmpty {
+                return name
+            }
+        }
+        return nil
     }
 
     private func navigateToGuest(_ guest: Guest) {
@@ -353,7 +428,10 @@ struct GuestsView: View {
         case "+1s":
             result = result.filter { $0.plusOne == true }
         case "Dietary":
-            result = result.filter { $0.dietary != nil }
+            result = result.filter { g in
+                (g.dietaryTags?.isEmpty == false) ||
+                (g.dietary?.isEmpty == false)
+            }
         default:
             break
         }

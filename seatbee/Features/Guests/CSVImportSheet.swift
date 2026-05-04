@@ -200,14 +200,59 @@ struct CSVImportSheet: View {
             detectedPlatform = "Generic CSV"
         }
 
-        // Parse header columns
+        // Parse header columns. Web's guestCsvParser.js (FIELD_SYNONYMS)
+        // uses partial-match against a wider synonym list — mirror that
+        // here so iOS recognizes the same column headers web does.
         let headerCols = parseCSVRow(lines[0])
-        let nameIdx = headerCols.firstIndex { $0.lowercased().contains("name") } ?? 0
-        let emailIdx = headerCols.firstIndex { $0.lowercased().contains("email") }
-        let sideIdx = headerCols.firstIndex { $0.lowercased().contains("side") }
-        let dietaryIdx = headerCols.firstIndex { $0.lowercased().contains("diet") || $0.lowercased().contains("meal") }
-        let rsvpIdx = headerCols.firstIndex { $0.lowercased().contains("rsvp") || $0.lowercased().contains("attending") }
-        let categoryIdx = headerCols.firstIndex { $0.lowercased().contains("tag") || $0.lowercased().contains("group") || $0.lowercased().contains("category") }
+        func find(_ needles: [String]) -> Int? {
+            headerCols.firstIndex { col in
+                let lc = col.lowercased()
+                return needles.contains { lc.contains($0) }
+            }
+        }
+        let nameIdx = find(["name", "guest"]) ?? 0
+        let emailIdx = find(["email", "e-mail", "e mail"])
+        let sideIdx = find(["side"])
+        let mealIdx = find(["meal", "entree", "entrée", "dinner choice", "food choice", "dinner selection"])
+        // The dietary column drops "meal" matching here so a separate meal
+        // column is parsed cleanly — web does the same split.
+        let dietaryIdx = find(["dietary", "allergies", "allergy", "restrictions"])
+        let rsvpIdx = find(["rsvp", "attending", "attendance", "response"])
+        let categoryIdx = find(["tag", "categor", "groups"])
+        let partyIdx = find(["party", "household"])
+        let vipIdx = find(["vip"])
+        let childIdx = find(["child", "kid", "minor", "youth"])
+        let highChairIdx = find(["high chair", "highchair", "high-chair"])
+        let notesIdx = find(["note", "comment", "message"])
+
+        func col(_ idx: Int?, _ row: [String]) -> String? {
+            guard let idx, row.count > idx else { return nil }
+            let v = row[idx].trimmingCharacters(in: .whitespaces)
+            return v.isEmpty ? nil : v
+        }
+        func boolCol(_ idx: Int?, _ row: [String]) -> Bool {
+            guard let raw = col(idx, row)?.lowercased() else { return false }
+            return ["yes", "y", "true", "1", "✓", "✔", "x", "star"].contains(raw)
+        }
+        // Web parity (src/lib/guestCsvParser.js inferDietaryTags): infer
+        // structured tags from the dietary free-text column using
+        // case-insensitive keyword matching.
+        func inferDietaryTags(from text: String?) -> [String] {
+            guard let text, !text.isEmpty else { return [] }
+            let dl = text.lowercased()
+            var tags: [String] = []
+            if dl.contains("vegan") { tags.append("vegan") }
+            else if dl.contains("vegetarian") { tags.append("vegetarian") }
+            if dl.contains("halal") { tags.append("halal") }
+            if dl.contains("kosher") { tags.append("kosher") }
+            if dl.contains("gluten") { tags.append("gluten-free") }
+            if dl.contains("dairy") || dl.contains("lactose") { tags.append("dairy-free") }
+            if dl.contains("nut") || dl.contains("peanut") { tags.append("nut-allergy") }
+            if dl.contains("shellfish") || dl.contains("shrimp") || dl.contains("prawn") || dl.contains("lobster") || dl.contains("crab") {
+                tags.append("shellfish-allergy")
+            }
+            return tags
+        }
 
         var guests: [Guest] = []
 
@@ -219,42 +264,54 @@ struct CSVImportSheet: View {
             guard !name.isEmpty else { continue }
 
             let parts = name.split(separator: " ", maxSplits: 1)
-            let side: Guest.GuestSide
-            if let sideIdx, cols.count > sideIdx {
-                let sideStr = cols[sideIdx].lowercased().trimmingCharacters(in: .whitespaces)
-                if sideStr.contains("bride") { side = .bride }
-                else if sideStr.contains("groom") { side = .groom }
-                else { side = .none }
-            } else { side = .none }
 
-            let rsvp: Guest.RSVPStatus
-            if let rsvpIdx, cols.count > rsvpIdx {
-                let r = cols[rsvpIdx].lowercased().trimmingCharacters(in: .whitespaces)
-                if r.contains("yes") || r.contains("accept") || r.contains("attending") { rsvp = .yes }
-                else if r.contains("no") || r.contains("decline") { rsvp = .no }
-                else { rsvp = .pending }
-            } else { rsvp = .unknown }
+            let side: Guest.GuestSide = {
+                guard let s = col(sideIdx, cols)?.lowercased() else { return .none }
+                if s.contains("bride") { return .bride }
+                if s.contains("groom") { return .groom }
+                if s.contains("both")  { return .both }
+                return .none
+            }()
 
-            let categories: [String]
-            if let categoryIdx, cols.count > categoryIdx {
-                categories = cols[categoryIdx].split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
-            } else { categories = [] }
+            let rsvp: Guest.RSVPStatus = {
+                guard let r = col(rsvpIdx, cols)?.lowercased() else { return .unknown }
+                if r.contains("yes") || r.contains("accept") || r.contains("attending") { return .yes }
+                if r.contains("no") || r.contains("decline") { return .no }
+                return .pending
+            }()
+
+            let categories = col(categoryIdx, cols)?
+                .split(separator: ",")
+                .map { String($0).trimmingCharacters(in: .whitespaces) }
+                .filter { !$0.isEmpty } ?? []
+
+            let dietaryText = col(dietaryIdx, cols)
+            let inferredTags = inferDietaryTags(from: dietaryText)
 
             guests.append(Guest(
                 id: UUID().uuidString,
                 name: name,
                 firstName: String(parts.first ?? ""),
                 lastName: parts.count > 1 ? String(parts.last ?? "") : nil,
-                email: emailIdx.flatMap { cols.count > $0 ? cols[$0].trimmingCharacters(in: .whitespaces) : nil },
+                email: col(emailIdx, cols),
                 categories: categories,
-                dietary: dietaryIdx.flatMap { cols.count > $0 ? cols[$0].trimmingCharacters(in: .whitespaces) : nil }?.nilIfEmpty,
-                notes: nil,
+                dietary: dietaryText,
+                notes: col(notesIdx, cols),
                 rsvp: rsvp,
                 side: side,
-                vip: false,
+                vip: boolCol(vipIdx, cols),
                 accessibility: nil,
                 plusOne: nil,
-                party: nil
+                party: col(partyIdx, cols),
+                display: nil,
+                dietaryTags: inferredTags.isEmpty ? nil : inferredTags,
+                highChair: highChairIdx == nil ? nil : boolCol(highChairIdx, cols),
+                isChild: childIdx == nil ? nil : boolCol(childIdx, cols),
+                groupIds: nil,
+                isBride: nil,
+                isGroom: nil,
+                meal: col(mealIdx, cols),
+                guestCreatedAt: nil
             ))
         }
 

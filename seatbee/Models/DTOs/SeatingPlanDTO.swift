@@ -236,6 +236,7 @@ struct GuestDTO: Codable {
     // Web-parity fields
     let dietaryTags: [String]?
     let highChair: Bool?
+    let isChild: Bool?
     let groupIds: [String]?
     let isBride: Bool?
     let isGroom: Bool?
@@ -262,6 +263,7 @@ struct GuestDTO: Codable {
             display: display,
             dietaryTags: dietaryTags,
             highChair: highChair,
+            isChild: isChild,
             groupIds: groupIds,
             isBride: isBride,
             isGroom: isGroom,

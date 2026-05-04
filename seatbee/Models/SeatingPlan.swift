@@ -89,6 +89,7 @@ struct Guest: Identifiable, Codable {
     var display: String?
     var dietaryTags: [String]?   // per-restriction tags for emoji rendering
     var highChair: Bool?
+    var isChild: Bool?           // web persists this as a separate boolean (NOT a category)
     var groupIds: [String]?
     var isBride: Bool?           // cached flag
     var isGroom: Bool?           // cached flag
@@ -309,8 +310,9 @@ extension SeatingPlan {
                     rsvp: g.rsvp.rawValue, side: g.side.rawValue, vip: g.vip,
                     accessibility: g.accessibility, plusOne: g.plusOne, party: g.party,
                     display: g.display ?? g.displayName,
-                    dietaryTags: g.dietaryTags, highChair: g.highChair, groupIds: g.groupIds,
-                    isBride: g.isBride, isGroom: g.isGroom, meal: g.meal, createdAt: g.guestCreatedAt
+                    dietaryTags: g.dietaryTags, highChair: g.highChair, isChild: g.isChild,
+                    groupIds: g.groupIds, isBride: g.isBride, isGroom: g.isGroom,
+                    meal: g.meal, createdAt: g.guestCreatedAt
                 )
             },
             tables: tables.map { t in
