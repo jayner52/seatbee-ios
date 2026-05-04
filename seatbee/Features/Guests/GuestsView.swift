@@ -475,11 +475,7 @@ struct GuestsView: View {
                         .font(SBFont.bodySmallBold)
                         .foregroundStyle(Color.sbCharcoal)
 
-                    if let categoryLabel = primaryCategoryLabel(for: guest) {
-                        Text(categoryLabel)
-                            .font(SBFont.small)
-                            .foregroundStyle(Color.sbWarm)
-                    }
+                    categoryChips(for: guest)
                 }
 
                 Spacer()
@@ -540,37 +536,68 @@ struct GuestsView: View {
         }
     }
 
-    // Web stores categories as IDs; iOS preserves the raw category objects
-    // via `SeatingPlan.rawCategories` (array of [String: AnyCodable]). Look
-    // up the first category's name for display so we don't render raw IDs
-    // like "y0b4xyih6". Falls back to the raw string if no match.
-    // Pick a human-readable category label for the row. Web stores
-    // categories as random IDs (e.g. "a5gb6pp2n") and looks up the name
-    // in rawCategories. Some plans have orphan IDs — guest references
-    // a category that was later deleted from the canonical list. In
-    // that case fall back to the next category that DOES resolve, or
-    // any plain-text category (no digits — random IDs always contain
-    // digits, real names rarely do). If nothing qualifies, hide the
-    // subtitle rather than show a raw ID.
-    private func primaryCategoryLabel(for guest: Guest) -> String? {
+    // Resolve a guest's categories into displayable chips. Web stores
+    // category IDs (random alphanumeric like "a5gb6pp2n"); iOS preserves
+    // the canonical list via `rawCategories`. Drop orphan IDs (no entry
+    // in rawCategories AND value contains digits — web's genId() output);
+    // keep entries that resolve to a name OR are plain-text strings (iOS-
+    // CSV style). Render up to 2 chips inline; if more, show "+N".
+    private func resolvedCategories(for guest: Guest) -> [(label: String, color: Color?)] {
+        var out: [(String, Color?)] = []
         for cat in guest.categories where !cat.isEmpty {
-            if let name = categoryName(forId: cat), !name.isEmpty { return name }
+            if let entry = categoryEntry(forId: cat) {
+                let name = (entry["name"]?.value as? String) ?? cat
+                let color = (entry["color"]?.value as? String).flatMap { Color(hex: $0) }
+                out.append((name, color))
+            } else if !cat.contains(where: { $0.isNumber }) {
+                out.append((cat, nil))
+            }
         }
-        for cat in guest.categories where !cat.isEmpty {
-            if !cat.contains(where: { $0.isNumber }) { return cat }
+        return out
+    }
+
+    @ViewBuilder
+    private func categoryChips(for guest: Guest) -> some View {
+        let cats = resolvedCategories(for: guest)
+        if !cats.isEmpty {
+            let visible = Array(cats.prefix(2))
+            let overflow = cats.count - visible.count
+            HStack(spacing: 4) {
+                ForEach(Array(visible.enumerated()), id: \.offset) { _, item in
+                    Text(item.label)
+                        .font(SBFont.inter(9, weight: .semibold))
+                        .foregroundStyle(item.color.map { foregroundForChip($0) } ?? Color.sbWarm)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background((item.color ?? Color.sbIvory2).opacity(item.color == nil ? 1 : 0.25))
+                        .clipShape(RoundedRectangle(cornerRadius: 4))
+                }
+                if overflow > 0 {
+                    Text("+\(overflow)")
+                        .font(SBFont.inter(9, weight: .semibold))
+                        .foregroundStyle(Color.sbWarm)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.sbIvory2)
+                        .clipShape(RoundedRectangle(cornerRadius: 4))
+                }
+            }
         }
-        return nil
+    }
+
+    // Tinted-chip foreground: dark colors get rendered text (sage/blue)
+    // become readable, light colors fall back to charcoal.
+    private func foregroundForChip(_ color: Color) -> Color {
+        Color.sbCharcoal
     }
 
     private func categoryName(forId id: String) -> String? {
+        (categoryEntry(forId: id)?["name"]?.value as? String).flatMap { $0.isEmpty ? nil : $0 }
+    }
+
+    private func categoryEntry(forId id: String) -> [String: AnyCodable]? {
         guard let raw = plan?.rawCategories else { return nil }
-        for entry in raw {
-            if let entryId = entry["id"]?.value as? String, entryId == id,
-               let name = entry["name"]?.value as? String, !name.isEmpty {
-                return name
-            }
-        }
-        return nil
+        return raw.first { ($0["id"]?.value as? String) == id }
     }
 
     private func navigateToGuest(_ guest: Guest) {
