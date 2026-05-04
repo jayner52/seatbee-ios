@@ -169,22 +169,14 @@ struct OnboardingView: View {
                     .onChange(of: weddingDate) { _, _ in hasSetDate = true }
             }
 
-            // Venue
+            // Venue search
             VStack(alignment: .leading, spacing: 8) {
                 Text("WHERE? (OPTIONAL)")
                     .font(SBFont.capsLabel)
                     .foregroundStyle(Color.sbWarm)
                     .letterSpacing(1.5)
 
-                TextField("The Garden House", text: $venueName)
-                    .font(SBFont.body)
-                    .padding(14)
-                    .background(Color.sbIvory2)
-                    .clipShape(RoundedRectangle(cornerRadius: SBRadius.button))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: SBRadius.button)
-                            .strokeBorder(Color.sbLine2, lineWidth: 1)
-                    )
+                SBVenueSearch(venueName: $venueName)
             }
 
             Spacer(minLength: 40)

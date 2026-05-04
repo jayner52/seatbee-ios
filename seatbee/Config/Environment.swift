@@ -6,4 +6,5 @@ enum AppConfig {
     static let aiAPIBaseURL = "https://seatbee.app/api/ai"
     static let appScheme = "seatbee"
     static let universalLinkDomain = "seatbee.app"
+    static let googlePlacesAPIKey = "" // Add your Google Places API key here
 }
