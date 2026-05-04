@@ -8,7 +8,10 @@ struct TableDrawerView: View {
     @State private var showRenameAlert = false
     @State private var renameText = ""
 
-    private let tabs = ["Seats", "Notes", "Tags"]
+    private let tabs = ["Seats", "Layout", "Notes", "Tags"]
+
+    // Web parity (src/App.jsx): SCALE = 15 px / foot.
+    private let pxPerFoot: Double = 15
 
     var body: some View {
         VStack(spacing: 0) {
@@ -105,6 +108,8 @@ struct TableDrawerView: View {
                 switch selectedTab {
                 case "Seats":
                     seatsContent
+                case "Layout":
+                    layoutContent
                 case "Notes":
                     notesContent
                 case "Tags":
@@ -270,6 +275,231 @@ struct TableDrawerView: View {
         }
     }
 
+    // MARK: - Layout Tab Content (web parity)
+
+    private var layoutContent: some View {
+        VStack(alignment: .leading, spacing: SBSpacing.lg) {
+            shapeSection
+            if table.type == .sweetheart {
+                sweetheartShapeSection
+            }
+            if table.type == .rect || table.type == .head {
+                seatingLayoutSection
+            }
+            sizeSection
+            rotationSection
+        }
+        .padding(.horizontal, SBSpacing.cardPadding)
+        .padding(.bottom, SBSpacing.lg)
+    }
+
+    private var shapeSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            sectionLabel("SHAPE")
+            HStack(spacing: 8) {
+                shapeButton("Round", type: .round)
+                shapeButton("Rect", type: .rect)
+                shapeButton("Head", type: .head)
+                shapeButton("Sweet", type: .sweetheart)
+            }
+        }
+    }
+
+    private func shapeButton(_ label: String, type: SeatTable.TableType) -> some View {
+        let active = table.type == type
+        return Button {
+            changeTableType(type)
+        } label: {
+            Text(label)
+                .font(SBFont.bodySemibold)
+                .foregroundStyle(active ? Color.white : Color.sbCharcoal)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+                .background(active ? Color.sbGold : Color.sbIvory2)
+                .clipShape(RoundedRectangle(cornerRadius: SBRadius.small))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var sweetheartShapeSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            sectionLabel("SWEETHEART STYLE")
+            HStack(spacing: 8) {
+                sweetShapeButton("Heart", value: "heart")
+                sweetShapeButton("Oval", value: "oval")
+                sweetShapeButton("Rect", value: "rect")
+            }
+        }
+    }
+
+    private func sweetShapeButton(_ label: String, value: String) -> some View {
+        let active = (table.sweetShape ?? "heart").lowercased() == value
+        return Button {
+            mutateTable { $0.sweetShape = value }
+        } label: {
+            Text(label)
+                .font(SBFont.bodySemibold)
+                .foregroundStyle(active ? Color.white : Color.sbCharcoal)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+                .background(active ? Color.sbGold : Color.sbIvory2)
+                .clipShape(RoundedRectangle(cornerRadius: SBRadius.small))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var seatingLayoutSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            sectionLabel("SEATING LAYOUT")
+            HStack(spacing: 8) {
+                seatingLayoutButton("One Side", oneSide: true)
+                seatingLayoutButton("Two Sides", oneSide: false)
+            }
+            // All Sides / Banquet require the `seatingLayout` field which iOS
+            // doesn't model yet. See PARITY.md outstanding gaps.
+        }
+    }
+
+    private func seatingLayoutButton(_ label: String, oneSide: Bool) -> some View {
+        let active = (table.oneSide ?? false) == oneSide
+        return Button {
+            mutateTable { $0.oneSide = oneSide }
+        } label: {
+            Text(label)
+                .font(SBFont.bodySemibold)
+                .foregroundStyle(active ? Color.white : Color.sbCharcoal)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+                .background(active ? Color.sbGold : Color.sbIvory2)
+                .clipShape(RoundedRectangle(cornerRadius: SBRadius.small))
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private var sizeSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            sectionLabel("SIZE")
+            switch table.type {
+            case .round:
+                sizeSlider(label: "D",
+                           value: bindingNoSave(get: { Double(table.diameter ?? 90) },
+                                                set: { v in mutateTable(save: false) { $0.diameter = v } }),
+                           range: 60...200, step: 5)
+            case .rect, .head, .sweetheart:
+                sizeSlider(label: "W",
+                           value: bindingNoSave(get: { Double(table.width ?? 100) },
+                                                set: { v in mutateTable(save: false) { $0.width = v } }),
+                           range: 60...2000, step: 10)
+                sizeSlider(label: "H",
+                           value: bindingNoSave(get: { Double(table.height ?? 50) },
+                                                set: { v in mutateTable(save: false) { $0.height = v } }),
+                           range: 30...150, step: 5)
+                if table.type == .rect {
+                    Button {
+                        let size = max(table.width ?? 100, table.height ?? 50)
+                        mutateTable { $0.width = size; $0.height = size }
+                    } label: {
+                        Text("Make Square")
+                            .font(SBFont.bodySemibold)
+                            .foregroundStyle(Color.sbCharcoal)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                            .background(Color.sbIvory2)
+                            .clipShape(RoundedRectangle(cornerRadius: SBRadius.small))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    private func sizeSlider(label: String, value: Binding<Double>, range: ClosedRange<Double>, step: Double) -> some View {
+        HStack(spacing: 12) {
+            Text(label)
+                .font(SBFont.bodySemibold)
+                .foregroundStyle(Color.sbWarm)
+                .frame(width: 18, alignment: .leading)
+            Slider(value: value, in: range, step: step,
+                   onEditingChanged: { editing in
+                       if !editing, let plan = appState.activePlan { savePlan(plan) }
+                   })
+            .tint(Color.sbGold)
+            Text("\((value.wrappedValue / pxPerFoot).formatted(.number.precision(.fractionLength(1)))) ft")
+                .font(SBFont.bodySmall)
+                .foregroundStyle(Color.sbCharcoal)
+                .frame(width: 56, alignment: .trailing)
+                .monospacedDigit()
+        }
+    }
+
+    private var rotationSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                sectionLabel("ROTATION")
+                Spacer()
+                Text("\(Int(table.rotation ?? 0))°")
+                    .font(SBFont.bodySemibold)
+                    .foregroundStyle(Color.sbCharcoal)
+                    .monospacedDigit()
+            }
+            HStack(spacing: 8) {
+                rotationStepButton("−15°") { adjustRotation(by: -15) }
+                Slider(value: bindingNoSave(get: { table.rotation ?? 0 },
+                                            set: { v in mutateTable(save: false) { $0.rotation = v } }),
+                       in: 0...360, step: 5,
+                       onEditingChanged: { editing in
+                           if !editing, let plan = appState.activePlan { savePlan(plan) }
+                       })
+                .tint(Color.sbGold)
+                rotationStepButton("+15°") { adjustRotation(by: 15) }
+            }
+        }
+    }
+
+    private func rotationStepButton(_ label: String, action: @escaping () -> Void) -> some View {
+        Button {
+            action()
+            HapticEngine.selection()
+        } label: {
+            Text(label)
+                .font(SBFont.bodySemibold)
+                .foregroundStyle(Color.sbCharcoal)
+                .padding(.vertical, 8)
+                .padding(.horizontal, 12)
+                .background(Color.sbIvory2)
+                .clipShape(RoundedRectangle(cornerRadius: SBRadius.small))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func sectionLabel(_ text: String) -> some View {
+        Text(text)
+            .font(SBFont.capsLabel)
+            .foregroundStyle(Color.sbWarm)
+    }
+
+    // MARK: - Mutation helpers
+
+    private func mutateTable(save: Bool = true, _ change: (inout SeatTable) -> Void) {
+        guard var plan = appState.activePlan,
+              let idx = plan.tables.firstIndex(where: { $0.id == table.id }) else { return }
+        change(&plan.tables[idx])
+        appState.activePlan = plan
+        if save { savePlan(plan) }
+    }
+
+    private func bindingNoSave(get: @escaping () -> Double, set: @escaping (Double) -> Void) -> Binding<Double> {
+        Binding(get: get, set: set)
+    }
+
+    private func adjustRotation(by delta: Double) {
+        let current = table.rotation ?? 0
+        let next = ((current + delta).truncatingRemainder(dividingBy: 360) + 360)
+            .truncatingRemainder(dividingBy: 360)
+        mutateTable { $0.rotation = next }
+    }
+
     // MARK: - Actions
 
     private func renameTable() {
@@ -326,38 +556,64 @@ struct TableDrawerView: View {
     private func changeSeatCount(_ delta: Int) {
         guard var plan = appState.activePlan,
               let idx = plan.tables.firstIndex(where: { $0.id == table.id }) else { return }
-        let minSeats = table.type == .sweetheart ? 2 : 2
-        let maxSeats = table.type == .sweetheart ? 2 : (table.type == .round ? 16 : 20)
-        let newCount = max(minSeats, min(maxSeats, table.seats + delta))
-        guard newCount != table.seats else { return }
-        plan.tables[idx].seats = newCount
+        var t = plan.tables[idx]
+        // Web parity: min 2; max 12 round, 200 rect/head, 2 sweetheart.
+        let maxSeats: Int = {
+            switch t.type {
+            case .sweetheart: return 2
+            case .round:      return 12
+            case .rect, .head: return 200
+            }
+        }()
+        let newCount = max(2, min(maxSeats, t.seats + delta))
+        guard newCount != t.seats else { return }
+        t.seats = newCount
+
+        // Web parity: when growing seats on rect/head, expand width to keep
+        // ~1.5 ft (22.5 px at 15 px/ft) per person per side.
+        if delta > 0, t.type == .rect || t.type == .head {
+            let seatsPerSide: Int = (t.oneSide == true) ? newCount : Int(ceil(Double(newCount) / 2.0))
+            let minWidth = Double(seatsPerSide) * 22.5
+            t.width = max(t.width ?? 100, min(2000, minWidth))
+        }
+
+        plan.tables[idx] = t
         appState.activePlan = plan
         savePlan(plan)
         HapticEngine.selection()
     }
 
+    // Web parity: src/App.jsx SHAPE button onClick handlers preserve dimensions
+    // across type changes (e.g. round→rect uses diameter as new width) and
+    // clear fields that don't apply to the new type. HEAD also defaults
+    // oneSide=true if previously unset.
     private func changeTableType(_ type: SeatTable.TableType) {
         guard var plan = appState.activePlan,
               let idx = plan.tables.firstIndex(where: { $0.id == table.id }) else { return }
         var t = plan.tables[idx]
         t.type = type
-        // Backfill the dim fields the new type needs, without overwriting existing values
-        // (so a user re-toggling type doesn't lose careful sizing).
-        let defaults = TableDefaults.dimensions(for: type)
         switch type {
         case .round:
-            if t.diameter == nil { t.diameter = defaults.diameter }
+            t.diameter = t.width ?? t.diameter ?? 90
+            t.width = nil
+            t.height = nil
+            t.oneSide = nil
         case .rect:
-            if t.width == nil { t.width = defaults.width }
-            if t.height == nil { t.height = defaults.height }
+            t.width = t.diameter ?? t.width ?? 100
+            t.height = t.height ?? 50
+            t.diameter = nil
+            t.oneSide = nil
         case .head:
-            if t.width == nil { t.width = defaults.width }
-            if t.height == nil { t.height = defaults.height }
-            if t.oneSide == nil { t.oneSide = defaults.oneSide }
+            t.width = t.diameter ?? t.width ?? 280
+            t.height = t.height ?? 50
+            t.diameter = nil
+            if t.oneSide == nil { t.oneSide = true }
         case .sweetheart:
-            if t.width == nil { t.width = defaults.width }
-            if t.height == nil { t.height = defaults.height }
-            if t.sweetShape == nil { t.sweetShape = defaults.sweetShape }
+            t.width = t.width ?? 60
+            t.height = t.height ?? 45
+            t.diameter = nil
+            t.oneSide = nil
+            if t.sweetShape == nil { t.sweetShape = "heart" }
         }
         plan.tables[idx] = t
         appState.activePlan = plan
