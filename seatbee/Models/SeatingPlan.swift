@@ -16,6 +16,14 @@ struct SeatingPlan: Identifiable, Codable {
     var updatedAt: Date?
     var userId: String?
     var tier: String?
+    // Passthrough preservation. iOS doesn't yet model these fully, but reads
+    // them in on load and writes them back unchanged on save so iOS save can
+    // never wipe data the web app authored. See PARITY.md.
+    var rawCategories: [CategoryDTO]? = nil
+    var rawParties: [PartyDTO]? = nil
+    var rawGroups: [GroupDTO]? = nil
+    var rawFloorPlanImage: String? = nil
+    var rawFloorPlanOpacity: Double? = nil
 
     enum EventType: String, Codable, CaseIterable {
         case wedding
@@ -36,6 +44,12 @@ struct SeatTable: Identifiable, Codable {
     var assignments: [String: Int] // guestId -> seatIndex
     var locked: Bool?
     var color: String?
+    // Web-parity passthrough fields preserved on round-trip. See PARITY.md.
+    var width: Double? = nil
+    var height: Double? = nil
+    var diameter: Double? = nil
+    var sweetShape: String? = nil
+    var oneSide: Bool? = nil
 
     enum TableType: String, Codable, CaseIterable {
         case round
@@ -64,6 +78,14 @@ struct Guest: Identifiable, Codable {
     var accessibility: String?
     var plusOne: Bool?
     var party: String?
+    // Web-parity passthrough fields preserved on round-trip. See PARITY.md.
+    var dietaryTags: [String]? = nil    // Drives per-restriction emoji on web
+    var highChair: Bool? = nil          // Child seating flag
+    var groupIds: [String]? = nil       // Explicit group memberships
+    var isBride: Bool? = nil
+    var isGroom: Bool? = nil
+    var meal: String? = nil             // Web flattens objects to strings before persist
+    var createdAt: String? = nil
 
     enum RSVPStatus: String, Codable {
         case yes
@@ -190,6 +212,11 @@ struct RoomObject: Identifiable, Codable {
     var width: Double
     var height: Double
     var rotation: Double?
+    // Web-parity passthrough fields preserved on round-trip. See PARITY.md.
+    var color: String? = nil
+    var category: String? = nil
+    var icon: String? = nil
+    var isObstacle: Bool? = nil
 }
 
 // MARK: - Reverse Mapping (Domain → DTO for saving to Supabase)
@@ -233,7 +260,14 @@ extension SeatingPlan {
                     accessibility: guest.accessibility,
                     plusOne: guest.plusOne,
                     party: guest.party,
-                    display: guest.displayName
+                    display: guest.displayName,
+                    dietaryTags: guest.dietaryTags,
+                    highChair: guest.highChair,
+                    groupIds: guest.groupIds,
+                    isBride: guest.isBride,
+                    isGroom: guest.isGroom,
+                    meal: guest.meal,
+                    createdAt: guest.createdAt
                 )
             },
             tables: tables.map { table in
@@ -246,7 +280,12 @@ extension SeatingPlan {
                     y: table.y,
                     rotation: table.rotation,
                     locked: table.locked,
-                    color: table.color
+                    color: table.color,
+                    width: table.width,
+                    height: table.height,
+                    diameter: table.diameter,
+                    sweetShape: table.sweetShape,
+                    oneSide: table.oneSide
                 )
             },
             rules: rules.map { rule in
@@ -277,12 +316,22 @@ extension SeatingPlan {
                     y: obj.y,
                     width: obj.width,
                     height: obj.height,
-                    rotation: obj.rotation
+                    rotation: obj.rotation,
+                    color: obj.color,
+                    category: obj.category,
+                    icon: obj.icon,
+                    isObstacle: obj.isObstacle
                 )
             },
-            categories: nil,
+            // Passthrough preservation — write back the raw arrays iOS read on
+            // load so iOS save can never wipe data the web app authored. See
+            // PARITY.md.
+            categories: rawCategories,
             assignments: assignmentsMap.isEmpty ? nil : assignmentsMap,
-            parties: nil
+            parties: rawParties,
+            groups: rawGroups,
+            floorPlanImage: rawFloorPlanImage,
+            floorPlanOpacity: rawFloorPlanOpacity
         )
     }
 }
