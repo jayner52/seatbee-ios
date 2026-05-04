@@ -478,7 +478,7 @@ class CanvasObjectView: UIView {
     private var object: RoomObject
     private var isItemSelected = false
 
-    private let iconLabel = UILabel()
+    private let iconView = UIImageView()
     private let nameLabel = UILabel()
 
     init(object: RoomObject, isSelected: Bool) {
@@ -496,9 +496,8 @@ class CanvasObjectView: UIView {
         layer.cornerRadius = 8
         clipsToBounds = true
 
-        iconLabel.textAlignment = .center
-        iconLabel.font = UIFont.systemFont(ofSize: 18)
-        addSubview(iconLabel)
+        iconView.contentMode = .scaleAspectFit
+        addSubview(iconView)
 
         nameLabel.textAlignment = .center
         nameLabel.font = UIFont.systemFont(ofSize: 9, weight: .medium)
@@ -517,9 +516,18 @@ class CanvasObjectView: UIView {
         let isDark = colorHex == "#2D2D2D"
         let textColor: UIColor = isDark ? .white : UIColor(red: 45/255, green: 45/255, blue: 45/255, alpha: 0.7)
 
-        iconLabel.text = def?.icon ?? "?"
-        iconLabel.textColor = textColor
-        iconLabel.frame = CGRect(x: 0, y: bounds.height/2 - 16, width: bounds.width, height: 20)
+        let symbolName = def?.icon ?? "questionmark.circle"
+        let config = UIImage.SymbolConfiguration(pointSize: 18, weight: .regular)
+        iconView.image = UIImage(systemName: symbolName, withConfiguration: config)?
+            .withRenderingMode(.alwaysTemplate)
+        iconView.tintColor = textColor
+        let iconSize: CGFloat = 24
+        iconView.frame = CGRect(
+            x: (bounds.width - iconSize) / 2,
+            y: bounds.height/2 - iconSize - 2,
+            width: iconSize,
+            height: iconSize
+        )
 
         nameLabel.text = object.name
         nameLabel.textColor = isDark ? .white : UIColor(red: 45/255, green: 45/255, blue: 45/255, alpha: 1)
