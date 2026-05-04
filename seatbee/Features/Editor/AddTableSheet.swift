@@ -82,6 +82,7 @@ struct AddTableSheet: View {
         guard var plan = appState.activePlan else { return }
 
         let tableCount = plan.tables.count
+        let dims = TableDefaults.dimensions(for: type)
         let newTable = SeatTable(
             id: UUID().uuidString,
             name: "\(name) \(tableCount + 1)",
@@ -92,7 +93,12 @@ struct AddTableSheet: View {
             rotation: 0,
             assignments: [:],
             locked: false,
-            color: type == .sweetheart || type == .head ? "#C9A961" : "#9CAF88"
+            color: type == .sweetheart || type == .head ? "#C9A961" : "#9CAF88",
+            width: dims.width,
+            height: dims.height,
+            diameter: dims.diameter,
+            sweetShape: dims.sweetShape,
+            oneSide: dims.oneSide
         )
 
         plan.tables.append(newTable)
@@ -104,6 +110,32 @@ struct AddTableSheet: View {
         }
 
         dismiss()
+    }
+}
+
+// MARK: - Web-parity table dimensions
+// Mirrors web `TABLE_SIZES` in src/App.jsx (15px per foot). See PARITY.md.
+
+enum TableDefaults {
+    struct Dimensions {
+        var width: Double?
+        var height: Double?
+        var diameter: Double?
+        var sweetShape: String?
+        var oneSide: Bool?
+    }
+
+    static func dimensions(for type: SeatTable.TableType) -> Dimensions {
+        switch type {
+        case .round:
+            return Dimensions(diameter: 75)            // 5ft
+        case .rect:
+            return Dimensions(width: 90, height: 37.5) // 6ft × 2.5ft
+        case .head:
+            return Dimensions(width: 270, height: 37.5, oneSide: true) // 18ft × 2.5ft
+        case .sweetheart:
+            return Dimensions(width: 60, height: 45, sweetShape: "heart") // 4ft × 3ft
+        }
     }
 }
 
