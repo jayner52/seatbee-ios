@@ -544,9 +544,22 @@ struct GuestsView: View {
     // via `SeatingPlan.rawCategories` (array of [String: AnyCodable]). Look
     // up the first category's name for display so we don't render raw IDs
     // like "y0b4xyih6". Falls back to the raw string if no match.
+    // Pick a human-readable category label for the row. Web stores
+    // categories as random IDs (e.g. "a5gb6pp2n") and looks up the name
+    // in rawCategories. Some plans have orphan IDs — guest references
+    // a category that was later deleted from the canonical list. In
+    // that case fall back to the next category that DOES resolve, or
+    // any plain-text category (no digits — random IDs always contain
+    // digits, real names rarely do). If nothing qualifies, hide the
+    // subtitle rather than show a raw ID.
     private func primaryCategoryLabel(for guest: Guest) -> String? {
-        guard let first = guest.categories.first, !first.isEmpty else { return nil }
-        return categoryName(forId: first) ?? first
+        for cat in guest.categories where !cat.isEmpty {
+            if let name = categoryName(forId: cat), !name.isEmpty { return name }
+        }
+        for cat in guest.categories where !cat.isEmpty {
+            if !cat.contains(where: { $0.isNumber }) { return cat }
+        }
+        return nil
     }
 
     private func categoryName(forId id: String) -> String? {
