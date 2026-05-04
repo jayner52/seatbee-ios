@@ -216,6 +216,7 @@ Map of `guestId → { tableId, seatIndex }`. iOS deconstructs this on read (assi
 | 2026-05-03 | Web rule evaluator silent on unknown types | Web direct-to-main commit `1423fdd` (now `console.warn`s) |
 | 2026-05-03 | Venue objects render as black rectangles when `color` field is missing | Web direct-to-main commit `968a70d` (`VObj` falls back to `VENUE_OBJECTS` defaults) |
 | 2026-05-03 | Web rendering crashed on missing `parties[].guestIds`, `guests[].dietaryTags`, `guests[].groupIds` | Web direct-to-main commits `9fd3ac4`, `4cbbdb8`, `7c46fa0`, `bc1893b` (defensive normalizers + UnitCard local guard) |
+| 2026-05-04 | Web auto-sync overwrote iOS-canonical rule types with legacy `seatTogether` strings (state hydrated from old DB rows pre-iOS-migration; auto-sync wrote them back, fighting iOS) | Web direct-to-main commits `4328234` + `8ffa905` (rule-type translator at all 4 web load paths — initial localStorage hydrate, `loadPlanDirect`, polling reload, AND cloud-boot path that runs on hard-refresh) + iOS PR #5 (legacy→canonical mapping in `RuleType.parse`) |
 
 ---
 
