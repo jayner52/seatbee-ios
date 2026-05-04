@@ -152,6 +152,7 @@ struct SeatingRule: Identifiable, Codable {
                 return .unknown("")
             }
             switch raw {
+            // Canonical web snake_case values
             case "must_together":     return .mustTogether
             case "prefer_together":   return .preferTogether
             case "must_not":          return .mustNot
@@ -162,6 +163,11 @@ struct SeatingRule: Identifiable, Codable {
             case "vip_priority":      return .vipPriority
             case "side_together":     return .sideTogether
             case "seat_adjacent":     return .seatAdjacent
+            // Legacy iOS camelCase values — migrate to canonical on read
+            case "seatTogether":      return .mustTogether
+            case "keepApart":         return .mustNot
+            case "assignTable":       return .mustTable
+            case "seatNear":          return .nearTable
             default:
                 print("[Seatbee] ⚠️ Unknown rule type: '\(raw)' — preserving raw on round-trip. See PARITY.md.")
                 return .unknown(raw)
