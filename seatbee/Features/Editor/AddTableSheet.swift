@@ -92,7 +92,7 @@ struct AddTableSheet: View {
             rotation: 0,
             assignments: [:],
             locked: false,
-            color: nil
+            color: type == .sweetheart || type == .head ? "#C9A961" : "#9CAF88"
         )
 
         plan.tables.append(newTable)

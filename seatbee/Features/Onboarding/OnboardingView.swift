@@ -388,7 +388,11 @@ struct OnboardingView: View {
                             notes: guest.notes, rsvp: guest.rsvp.rawValue,
                             side: guest.side.rawValue, vip: guest.vip,
                             accessibility: guest.accessibility, plusOne: guest.plusOne,
-                            party: guest.party, display: guest.displayName
+                            party: guest.party, display: guest.displayName,
+                            dietaryTags: guest.dietaryTags, highChair: guest.highChair,
+                            groupIds: guest.groupIds, isBride: guest.isBride,
+                            isGroom: guest.isGroom, meal: guest.meal,
+                            createdAt: guest.guestCreatedAt
                         )
                     }
                     : nil

@@ -302,7 +302,12 @@ struct TableDrawerView: View {
             rotation: table.rotation,
             assignments: [:],
             locked: false,
-            color: table.color
+            color: table.color,
+            width: table.width,
+            height: table.height,
+            diameter: table.diameter,
+            sweetShape: table.sweetShape,
+            oneSide: table.oneSide
         )
         plan.tables.append(newTable)
         appState.activePlan = plan
@@ -371,7 +376,7 @@ struct TableDrawerView: View {
 #Preview {
     TableDrawerView(table: SeatTable(
         id: "1", name: "Table 5", type: .round, seats: 8,
-        x: 100, y: 100, assignments: [:]
+        x: 100, y: 100, assignments: [:], color: "#9CAF88"
     ))
     .environment(AppState())
 }
