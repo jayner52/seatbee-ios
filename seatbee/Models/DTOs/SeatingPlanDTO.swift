@@ -24,11 +24,43 @@ struct SeatingPlanDTO: Codable {
         // Build assignments map: guestId -> {tableId, seatIndex}
         let assignmentMap = d?.assignments ?? [:]
 
-        // Build tables with assignments embedded
+        // Build tables with assignments embedded.
+        //
+        // Web persists assignments as flat strings ({guestId: "tableId"}, no
+        // seat position) — see PR #10 + AssignmentDTO.encode. iOS used to
+        // fall back to seatIndex=0 for those, which collided every web-
+        // assigned guest at the same table onto seat 0; only the first one
+        // was visible in the iOS seat list.
+        //
+        // Resolution: split into two passes per table. First, honour any
+        // explicit seatIndex values that came from older iOS-shape data.
+        // Then, fill the remaining (nil-seatIndex) guests into the next
+        // free seat in guest-list order — so the iOS list mirrors the
+        // order web shows.
         var domainTables = (d?.tables ?? []).map { $0.toDomain() }
-        for (guestId, assignment) in assignmentMap {
-            if let tableIndex = domainTables.firstIndex(where: { $0.id == assignment.tableId }) {
-                domainTables[tableIndex].assignments[guestId] = assignment.seatIndex ?? 0
+
+        var entriesByTable: [String: [(guestId: String, seatIndex: Int?)]] = [:]
+        for guest in (d?.guests ?? []) {
+            guard let assignment = assignmentMap[guest.id],
+                  let tableId = assignment.tableId, !tableId.isEmpty else { continue }
+            entriesByTable[tableId, default: []].append((guest.id, assignment.seatIndex))
+        }
+
+        for (tableId, entries) in entriesByTable {
+            guard let tableIndex = domainTables.firstIndex(where: { $0.id == tableId }) else { continue }
+            var usedSeats = Set<Int>()
+            for entry in entries {
+                if let idx = entry.seatIndex {
+                    domainTables[tableIndex].assignments[entry.guestId] = idx
+                    usedSeats.insert(idx)
+                }
+            }
+            var nextFree = 0
+            for entry in entries where entry.seatIndex == nil {
+                while usedSeats.contains(nextFree) { nextFree += 1 }
+                domainTables[tableIndex].assignments[entry.guestId] = nextFree
+                usedSeats.insert(nextFree)
+                nextFree += 1
             }
         }
 
