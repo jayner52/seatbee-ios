@@ -44,7 +44,7 @@ struct GuestsView: View {
     private var plan: SeatingPlan? { appState.activePlan }
     private var guests: [Guest] { plan?.guests ?? [] }
 
-    private let filters = ["All", "Unseated", "Family", "Friends", "+1s", "Dietary"]
+    private let filters = ["All", "Unseated", "Family", "Friends", "Dietary"]
 
     var body: some View {
         NavigationStack {
@@ -502,9 +502,6 @@ struct GuestsView: View {
                     if guest.highChair == true {
                         Text("🪑").font(.system(size: 12))
                     }
-                    if guest.plusOne == true {
-                        SBChip(text: "+1", variant: .default)
-                    }
                     dietaryEmojis(for: guest)
                 }
 
@@ -655,8 +652,6 @@ struct GuestsView: View {
             result = result.filter { $0.categories.contains("family") || $0.categories.contains("Family") }
         case "Friends":
             result = result.filter { $0.categories.contains("friends") || $0.categories.contains("Friends") }
-        case "+1s":
-            result = result.filter { $0.plusOne == true }
         case "Dietary":
             result = result.filter { g in
                 (g.dietaryTags?.isEmpty == false) ||
