@@ -92,7 +92,9 @@ struct VenueObjectsSheet: View {
             y: 200 + Double.random(in: -50...50),
             width: def.width,
             height: def.height,
-            rotation: 0
+            rotation: 0,
+            color: def.color,
+            icon: def.icon
         )
         plan.objects.append(obj)
         appState.activePlan = plan
