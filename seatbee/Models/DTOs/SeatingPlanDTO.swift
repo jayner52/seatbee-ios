@@ -1,8 +1,8 @@
 import Foundation
 
-// The web app stores everything inside a single `data` JSONB column.
-// Schema: seating_plans(id, user_id, name, data, event_date, event_type,
-//         event_venue_name, seated_guest_count, created_at, updated_at, deleted_at)
+// DTOs matching Supabase seating_plans schema exactly.
+// See PARITY.md for the canonical field reference.
+// RULE: every field the web persists must be present here, even if iOS doesn't render it.
 
 struct SeatingPlanDTO: Codable {
     let id: String
@@ -19,13 +19,13 @@ struct SeatingPlanDTO: Codable {
     let deleted_at: String?
 
     func toDomain() -> SeatingPlan {
-        let planData = data
+        let d = data
 
-        // Parse assignments from data.assignments (guestId -> {tableId, seatIndex})
-        let assignmentMap = planData?.assignments ?? [:]
+        // Build assignments map: guestId -> {tableId, seatIndex}
+        let assignmentMap = d?.assignments ?? [:]
 
-        // Build tables with their assignments embedded
-        var domainTables = (planData?.tables ?? []).map { $0.toDomain() }
+        // Build tables with assignments embedded
+        var domainTables = (d?.tables ?? []).map { $0.toDomain() }
         for (guestId, assignment) in assignmentMap {
             if let tableIndex = domainTables.firstIndex(where: { $0.id == assignment.tableId }) {
                 domainTables[tableIndex].assignments[guestId] = assignment.seatIndex ?? 0
@@ -36,46 +36,57 @@ struct SeatingPlanDTO: Codable {
             id: id,
             name: name,
             eventDate: event_date.flatMap { parseDate($0) },
-            venue: event_venue_name ?? planData?.event?.venue,
-            eventType: SeatingPlan.EventType(rawValue: event_type ?? planData?.event?.eventType ?? "wedding") ?? .wedding,
+            venue: event_venue_name ?? d?.event?.venue,
+            eventType: SeatingPlan.EventType(rawValue: event_type ?? d?.event?.eventType ?? "wedding") ?? .wedding,
             tables: domainTables,
-            guests: (planData?.guests ?? []).map { $0.toDomain() },
-            rules: (planData?.rules ?? []).map { $0.toDomain() },
-            objects: (planData?.objects ?? []).map { $0.toDomain() },
-            roomWidth: planData?.event?.roomWidth,
-            roomHeight: planData?.event?.roomHeight,
+            guests: (d?.guests ?? []).map { $0.toDomain() },
+            rules: (d?.rules ?? []).map { $0.toDomain() },
+            objects: (d?.objects ?? []).map { $0.toDomain() },
+            roomWidth: d?.event?.roomWidth,
+            roomHeight: d?.event?.roomHeight,
             createdAt: created_at.flatMap { parseDate($0) },
             updatedAt: updated_at.flatMap { parseDate($0) },
             userId: user_id,
-            tier: tier
+            tier: tier,
+            // Raw passthrough — preserved unchanged on round-trip
+            rawCategories: d?.categories,
+            rawParties: d?.parties,
+            rawGroups: d?.groups,
+            rawFloorPlanImage: d?.floorPlanImage,
+            rawFloorPlanOpacity: d?.floorPlanOpacity,
+            rawSeatOrders: d?.seatOrders
         )
     }
 
     private func parseDate(_ string: String) -> Date? {
-        // Try ISO8601 first
         let iso = ISO8601DateFormatter()
         if let date = iso.date(from: string) { return date }
-        // Try with fractional seconds
         iso.formatOptions.insert(.withFractionalSeconds)
         if let date = iso.date(from: string) { return date }
-        // Try simple date format (YYYY-MM-DD)
         let simple = DateFormatter()
         simple.dateFormat = "yyyy-MM-dd"
         return simple.date(from: string)
     }
 }
 
-// The `data` JSONB blob structure
+// MARK: - PlanDataDTO (the `data` JSONB blob)
+
 struct PlanDataDTO: Codable {
     let event: EventDataDTO?
     let guests: [GuestDTO]?
     let tables: [TableDTO]?
     let rules: [RuleDTO]?
     let objects: [ObjectDTO]?
-    let categories: [CategoryDTO]?
+    let categories: [[String: AnyCodable]]?  // raw passthrough
     let assignments: [String: AssignmentDTO]?
-    let parties: [PartyDTO]?
+    let parties: [[String: AnyCodable]]?     // raw passthrough
+    let groups: [[String: AnyCodable]]?      // raw passthrough
+    let floorPlanImage: AnyCodable?          // raw passthrough (can be string URL or null)
+    let floorPlanOpacity: Double?
+    let seatOrders: [String: AnyCodable]?    // raw passthrough
 }
+
+// MARK: - EventDataDTO
 
 struct EventDataDTO: Codable {
     let name: String?
@@ -85,19 +96,26 @@ struct EventDataDTO: Codable {
     let roomWidth: Double?
     let roomHeight: Double?
     let roomShape: String?
+    // Web-parity passthrough
+    let measurementUnit: String?
+    let customRoomPoints: AnyCodable?
+    let roomFlipH: Bool?
+    let roomFlipV: Bool?
+    let roomZones: AnyCodable?
+    let hasSweetheartTable: Bool?
 }
+
+// MARK: - AssignmentDTO
 
 struct AssignmentDTO: Codable {
     let tableId: String?
     let seatIndex: Int?
 
-    // Direct initializer for creating from domain model
     init(tableId: String?, seatIndex: Int?) {
         self.tableId = tableId
         self.seatIndex = seatIndex
     }
 
-    // Handle both {tableId, seatIndex} and direct tableId string from JSON
     init(from decoder: Decoder) throws {
         if let container = try? decoder.container(keyedBy: CodingKeys.self) {
             tableId = try container.decodeIfPresent(String.self, forKey: .tableId)
@@ -117,17 +135,7 @@ struct AssignmentDTO: Codable {
     }
 }
 
-struct CategoryDTO: Codable {
-    let id: String?
-    let name: String?
-    let color: String?
-}
-
-struct PartyDTO: Codable {
-    let id: String?
-    let name: String?
-    let members: [String]?
-}
+// MARK: - TableDTO
 
 struct TableDTO: Codable {
     let id: String
@@ -139,6 +147,12 @@ struct TableDTO: Codable {
     let rotation: Double?
     let locked: Bool?
     let color: String?
+    // Web-parity fields
+    let width: Double?
+    let height: Double?
+    let diameter: Double?
+    let sweetShape: String?
+    let oneSide: Bool?
 
     func toDomain() -> SeatTable {
         SeatTable(
@@ -149,12 +163,19 @@ struct TableDTO: Codable {
             x: x ?? 0,
             y: y ?? 0,
             rotation: rotation,
-            assignments: [:], // Filled in by SeatingPlanDTO.toDomain()
+            assignments: [:], // filled by SeatingPlanDTO.toDomain()
             locked: locked,
-            color: color
+            color: color,
+            width: width,
+            height: height,
+            diameter: diameter,
+            sweetShape: sweetShape,
+            oneSide: oneSide
         )
     }
 }
+
+// MARK: - GuestDTO
 
 struct GuestDTO: Codable {
     let id: String
@@ -172,6 +193,14 @@ struct GuestDTO: Codable {
     let plusOne: Bool?
     let party: String?
     let display: String?
+    // Web-parity fields
+    let dietaryTags: [String]?
+    let highChair: Bool?
+    let groupIds: [String]?
+    let isBride: Bool?
+    let isGroom: Bool?
+    let meal: String?
+    let createdAt: String?
 
     func toDomain() -> Guest {
         let displayName = display ?? name ?? "\(firstName ?? "") \(lastName ?? "")".trimmingCharacters(in: .whitespaces)
@@ -189,10 +218,20 @@ struct GuestDTO: Codable {
             vip: vip ?? false,
             accessibility: accessibility,
             plusOne: plusOne,
-            party: party
+            party: party,
+            display: display,
+            dietaryTags: dietaryTags,
+            highChair: highChair,
+            groupIds: groupIds,
+            isBride: isBride,
+            isGroom: isGroom,
+            meal: meal,
+            guestCreatedAt: createdAt
         )
     }
 }
+
+// MARK: - RuleDTO
 
 struct RuleDTO: Codable {
     let id: String
@@ -202,7 +241,6 @@ struct RuleDTO: Codable {
     let weight: Int?
     let hard: Bool?
     let enabled: Bool?
-    // Web-parity fields (see PARITY.md). Persisted on web's Rule shape; preserved on iOS round-trip.
     let categoryId: String?
     let objectId: String?
     let sideValue: String?
@@ -213,9 +251,6 @@ struct RuleDTO: Codable {
     let groupId: String?
 
     func toDomain() -> SeatingRule {
-        // No silent fallback. RuleType.parse() either returns a known case or
-        // .unknown(raw) which preserves the original string on the next save.
-        // See PARITY.md "Anti-patterns".
         SeatingRule(
             id: id,
             type: SeatingRule.RuleType.parse(type),
@@ -236,6 +271,8 @@ struct RuleDTO: Codable {
     }
 }
 
+// MARK: - ObjectDTO
+
 struct ObjectDTO: Codable {
     let id: String
     let type: String?
@@ -245,6 +282,10 @@ struct ObjectDTO: Codable {
     let width: Double?
     let height: Double?
     let rotation: Double?
+    let color: String?
+    let category: String?
+    let icon: String?
+    let isObstacle: Bool?
 
     func toDomain() -> RoomObject {
         RoomObject(
@@ -255,12 +296,17 @@ struct ObjectDTO: Codable {
             y: y ?? 0,
             width: width ?? 100,
             height: height ?? 100,
-            rotation: rotation
+            rotation: rotation,
+            color: color,
+            category: category,
+            icon: icon,
+            isObstacle: isObstacle
         )
     }
 }
 
-// AI API response/request DTOs
+// MARK: - AI DTOs
+
 struct AIRequestBody: Codable {
     let action: String
     let systemPrompt: String

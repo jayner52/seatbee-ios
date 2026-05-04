@@ -1,5 +1,8 @@
 import Foundation
 
+// MARK: - SeatingPlan (top-level domain model)
+// See PARITY.md for the canonical field reference.
+
 struct SeatingPlan: Identifiable, Codable {
     let id: String
     var name: String
@@ -17,6 +20,14 @@ struct SeatingPlan: Identifiable, Codable {
     var userId: String?
     var tier: String?
 
+    // Raw passthrough: entities iOS doesn't model but must preserve on round-trip
+    var rawCategories: [[String: AnyCodable]]?
+    var rawParties: [[String: AnyCodable]]?
+    var rawGroups: [[String: AnyCodable]]?
+    var rawFloorPlanImage: AnyCodable?
+    var rawFloorPlanOpacity: Double?
+    var rawSeatOrders: [String: AnyCodable]?
+
     enum EventType: String, Codable, CaseIterable {
         case wedding
         case corporate
@@ -24,6 +35,8 @@ struct SeatingPlan: Identifiable, Codable {
         case custom
     }
 }
+
+// MARK: - SeatTable
 
 struct SeatTable: Identifiable, Codable {
     let id: String
@@ -36,6 +49,12 @@ struct SeatTable: Identifiable, Codable {
     var assignments: [String: Int] // guestId -> seatIndex
     var locked: Bool?
     var color: String?
+    // Web-parity fields (preserved on round-trip)
+    var width: Double?      // rect/head table width in px
+    var height: Double?     // rect/head table height in px
+    var diameter: Double?   // round table diameter in px
+    var sweetShape: String? // "heart"/"oval"/"diamond" for sweetheart
+    var oneSide: Bool?      // head table one-side-only seating
 
     enum TableType: String, Codable, CaseIterable {
         case round
@@ -48,6 +67,8 @@ struct SeatTable: Identifiable, Codable {
         assignments.count
     }
 }
+
+// MARK: - Guest
 
 struct Guest: Identifiable, Codable {
     let id: String
@@ -64,6 +85,15 @@ struct Guest: Identifiable, Codable {
     var accessibility: String?
     var plusOne: Bool?
     var party: String?
+    // Web-parity fields (preserved on round-trip)
+    var display: String?
+    var dietaryTags: [String]?   // per-restriction tags for emoji rendering
+    var highChair: Bool?
+    var groupIds: [String]?
+    var isBride: Bool?           // cached flag
+    var isGroom: Bool?           // cached flag
+    var meal: String?
+    var guestCreatedAt: String?  // "createdAt" in web — renamed to avoid conflict with plan-level
 
     enum RSVPStatus: String, Codable {
         case yes
@@ -80,6 +110,7 @@ struct Guest: Identifiable, Codable {
     }
 
     var displayName: String {
+        if let d = display, !d.isEmpty { return d }
         if let first = firstName, let last = lastName {
             return "\(first) \(last)"
         }
@@ -95,28 +126,26 @@ struct Guest: Identifiable, Codable {
     }
 }
 
+// MARK: - SeatingRule
+
 struct SeatingRule: Identifiable, Codable {
     let id: String
     var type: RuleType
-    var guests: [String] // guestIds
+    var guests: [String]
     var tableId: String?
     var weight: Int
     var hard: Bool
     var enabled: Bool
-    // Web-parity fields (see PARITY.md) — present on web's Rule shape; iOS preserves them on round-trip
-    var categoryId: String?     // for .categoryTogether
-    var objectId: String?       // for .nearObject
-    var sideValue: String?      // "bride" | "groom" for .sideTogether
-    var desc: String?           // human-readable description from web
-    var auto: Bool?             // auto-generated rule (from parties/onboarding/AI)
-    var source: String?         // "party" | "group" | "ai" | "manual"
-    var partyId: String?        // source party id for auto rules
-    var groupId: String?        // source group id
+    // Web-parity fields
+    var categoryId: String?
+    var objectId: String?
+    var sideValue: String?
+    var desc: String?
+    var auto: Bool?
+    var source: String?
+    var partyId: String?
+    var groupId: String?
 
-    // Canonical rule types — rawValues match the web app's evaluator strings exactly
-    // (see /Users/jayneingram/Desktop/Seating Plan App/src/App.jsx:4798 onwards).
-    // `.unknown(raw)` preserves any future/unknown type from web on round-trip rather
-    // than silently coercing it. PARITY.md anti-pattern: "Silent enum fallback on read".
     enum RuleType: Codable, Equatable, Hashable {
         case mustTogether
         case preferTogether
@@ -163,13 +192,13 @@ struct SeatingRule: Identifiable, Codable {
             case "vip_priority":      return .vipPriority
             case "side_together":     return .sideTogether
             case "seat_adjacent":     return .seatAdjacent
-            // Legacy iOS camelCase values — migrate to canonical on read
+            // Legacy iOS camelCase — migrate on read
             case "seatTogether":      return .mustTogether
             case "keepApart":         return .mustNot
             case "assignTable":       return .mustTable
             case "seatNear":          return .nearTable
             default:
-                print("[Seatbee] ⚠️ Unknown rule type: '\(raw)' — preserving raw on round-trip. See PARITY.md.")
+                print("[Seatbee] ⚠️ Unknown rule type: '\(raw)' — preserving raw on round-trip.")
                 return .unknown(raw)
             }
         }
@@ -187,6 +216,8 @@ struct SeatingRule: Identifiable, Codable {
     }
 }
 
+// MARK: - RoomObject
+
 struct RoomObject: Identifiable, Codable {
     let id: String
     var type: String
@@ -196,13 +227,55 @@ struct RoomObject: Identifiable, Codable {
     var width: Double
     var height: Double
     var rotation: Double?
+    // Web-parity fields
+    var color: String?
+    var category: String?    // e.g. "entertainment", "food"
+    var icon: String?        // icon name from web
+    var isObstacle: Bool?
+}
+
+// MARK: - AnyCodable (type-erased JSON value for passthrough)
+
+struct AnyCodable: Codable {
+    let value: Any
+
+    init(_ value: Any) {
+        self.value = value
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if let bool = try? container.decode(Bool.self) { value = bool }
+        else if let int = try? container.decode(Int.self) { value = int }
+        else if let double = try? container.decode(Double.self) { value = double }
+        else if let string = try? container.decode(String.self) { value = string }
+        else if let array = try? container.decode([AnyCodable].self) { value = array.map(\.value) }
+        else if let dict = try? container.decode([String: AnyCodable].self) { value = dict.mapValues(\.value) }
+        else if container.decodeNil() { value = NSNull() }
+        else { value = NSNull() }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch value {
+        case let bool as Bool: try container.encode(bool)
+        case let int as Int: try container.encode(int)
+        case let double as Double: try container.encode(double)
+        case let string as String: try container.encode(string)
+        case let array as [Any]:
+            try container.encode(array.map { AnyCodable($0) })
+        case let dict as [String: Any]:
+            try container.encode(dict.mapValues { AnyCodable($0) })
+        default:
+            try container.encodeNil()
+        }
+    }
 }
 
 // MARK: - Reverse Mapping (Domain → DTO for saving to Supabase)
 
 extension SeatingPlan {
     func toPlanData() -> PlanDataDTO {
-        // Build assignments map: guestId -> AssignmentDTO
         var assignmentsMap: [String: AssignmentDTO] = [:]
         for table in tables {
             for (guestId, seatIndex) in table.assignments {
@@ -221,74 +294,55 @@ extension SeatingPlan {
                 eventType: eventType.rawValue,
                 roomWidth: roomWidth,
                 roomHeight: roomHeight,
-                roomShape: nil
+                roomShape: nil,
+                measurementUnit: nil,
+                customRoomPoints: nil,
+                roomFlipH: nil,
+                roomFlipV: nil,
+                roomZones: nil,
+                hasSweetheartTable: nil
             ),
-            guests: guests.map { guest in
+            guests: guests.map { g in
                 GuestDTO(
-                    id: guest.id,
-                    name: guest.name,
-                    firstName: guest.firstName,
-                    lastName: guest.lastName,
-                    email: guest.email,
-                    categories: guest.categories,
-                    dietary: guest.dietary,
-                    notes: guest.notes,
-                    rsvp: guest.rsvp.rawValue,
-                    side: guest.side.rawValue,
-                    vip: guest.vip,
-                    accessibility: guest.accessibility,
-                    plusOne: guest.plusOne,
-                    party: guest.party,
-                    display: guest.displayName
+                    id: g.id, name: g.name, firstName: g.firstName, lastName: g.lastName,
+                    email: g.email, categories: g.categories, dietary: g.dietary, notes: g.notes,
+                    rsvp: g.rsvp.rawValue, side: g.side.rawValue, vip: g.vip,
+                    accessibility: g.accessibility, plusOne: g.plusOne, party: g.party,
+                    display: g.display ?? g.displayName,
+                    dietaryTags: g.dietaryTags, highChair: g.highChair, groupIds: g.groupIds,
+                    isBride: g.isBride, isGroom: g.isGroom, meal: g.meal, createdAt: g.guestCreatedAt
                 )
             },
-            tables: tables.map { table in
+            tables: tables.map { t in
                 TableDTO(
-                    id: table.id,
-                    name: table.name,
-                    type: table.type.rawValue,
-                    seats: table.seats,
-                    x: table.x,
-                    y: table.y,
-                    rotation: table.rotation,
-                    locked: table.locked,
-                    color: table.color
+                    id: t.id, name: t.name, type: t.type.rawValue, seats: t.seats,
+                    x: t.x, y: t.y, rotation: t.rotation, locked: t.locked, color: t.color,
+                    width: t.width, height: t.height, diameter: t.diameter,
+                    sweetShape: t.sweetShape, oneSide: t.oneSide
                 )
             },
-            rules: rules.map { rule in
+            rules: rules.map { r in
                 RuleDTO(
-                    id: rule.id,
-                    type: rule.type.rawValue,
-                    guests: rule.guests,
-                    tableId: rule.tableId,
-                    weight: rule.weight,
-                    hard: rule.hard,
-                    enabled: rule.enabled,
-                    categoryId: rule.categoryId,
-                    objectId: rule.objectId,
-                    sideValue: rule.sideValue,
-                    desc: rule.desc,
-                    auto: rule.auto,
-                    source: rule.source,
-                    partyId: rule.partyId,
-                    groupId: rule.groupId
+                    id: r.id, type: r.type.rawValue, guests: r.guests, tableId: r.tableId,
+                    weight: r.weight, hard: r.hard, enabled: r.enabled,
+                    categoryId: r.categoryId, objectId: r.objectId, sideValue: r.sideValue,
+                    desc: r.desc, auto: r.auto, source: r.source, partyId: r.partyId, groupId: r.groupId
                 )
             },
-            objects: objects.map { obj in
+            objects: objects.map { o in
                 ObjectDTO(
-                    id: obj.id,
-                    type: obj.type,
-                    name: obj.name,
-                    x: obj.x,
-                    y: obj.y,
-                    width: obj.width,
-                    height: obj.height,
-                    rotation: obj.rotation
+                    id: o.id, type: o.type, name: o.name, x: o.x, y: o.y,
+                    width: o.width, height: o.height, rotation: o.rotation,
+                    color: o.color, category: o.category, icon: o.icon, isObstacle: o.isObstacle
                 )
             },
-            categories: nil,
+            categories: rawCategories,
             assignments: assignmentsMap.isEmpty ? nil : assignmentsMap,
-            parties: nil
+            parties: rawParties,
+            groups: rawGroups,
+            floorPlanImage: rawFloorPlanImage,
+            floorPlanOpacity: rawFloorPlanOpacity,
+            seatOrders: rawSeatOrders
         )
     }
 }
