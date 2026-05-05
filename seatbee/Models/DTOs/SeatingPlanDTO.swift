@@ -93,7 +93,8 @@ struct SeatingPlanDTO: Codable {
             rawGroups: d?.groups,
             rawFloorPlanImage: d?.floorPlanImage,
             rawFloorPlanOpacity: d?.floorPlanOpacity,
-            rawSeatOrders: d?.seatOrders
+            rawSeatOrders: d?.seatOrders,
+            rawGuestQR: d?.guestQR
         )
     }
 
@@ -123,6 +124,7 @@ struct PlanDataDTO: Codable {
     let floorPlanImage: AnyCodable?          // raw passthrough (can be string URL or null)
     let floorPlanOpacity: Double?
     let seatOrders: [String: AnyCodable]?    // raw passthrough
+    let guestQR: AnyCodable?                 // raw passthrough — see SeatingPlan.guestQR* helpers
 }
 
 // MARK: - EventDataDTO

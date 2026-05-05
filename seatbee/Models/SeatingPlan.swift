@@ -39,6 +39,10 @@ struct SeatingPlan: Identifiable, Codable {
     var rawFloorPlanImage: AnyCodable?
     var rawFloorPlanOpacity: Double?
     var rawSeatOrders: [String: AnyCodable]?
+    // Web's guestQR config blob ({linkToken, enabled, qrStyle, icebreakers, ...}).
+    // iOS reads linkToken + enabled to render the QR; everything else round-trips
+    // unchanged so web-side styling / icebreakers survive an iOS save.
+    var rawGuestQR: AnyCodable?
 
     enum EventType: String, Codable, CaseIterable {
         case wedding
@@ -542,7 +546,25 @@ extension SeatingPlan {
             groups: rawGroups,
             floorPlanImage: rawFloorPlanImage,
             floorPlanOpacity: rawFloorPlanOpacity,
-            seatOrders: rawSeatOrders
+            seatOrders: rawSeatOrders,
+            guestQR: rawGuestQR
         )
+    }
+}
+
+// MARK: - Guest QR helpers
+
+extension SeatingPlan {
+    /// The token web mints on the `/api/guest` endpoint. Used to build the
+    /// scannable URL `seatbee.app/g/<token>`. Nil when guest QR has never
+    /// been enabled for this plan.
+    var guestQRToken: String? {
+        (rawGuestQR?.value as? [String: Any])?["linkToken"] as? String
+    }
+
+    /// Whether guests can currently access the plan via the QR. Web defaults
+    /// to false until the user explicitly toggles on.
+    var guestQREnabled: Bool {
+        ((rawGuestQR?.value as? [String: Any])?["enabled"] as? Bool) ?? false
     }
 }

@@ -1,10 +1,18 @@
 import SwiftUI
+import CoreImage.CIFilterBuiltins
 
 struct ShareView: View {
     @Environment(AppState.self) private var appState
     @State private var selectedRole = "Viewer"
     @State private var requireSignIn = false
     @State private var linkCopied = false
+
+    // Guest QR section state
+    @State private var qrExpanded = false
+    @State private var qrEnabled = false
+    @State private var qrToken: String?
+    @State private var qrSyncing = false
+    @State private var qrError: String?
 
     private let roles = ["Viewer", "Commenter", "Editor"]
 
@@ -50,6 +58,11 @@ struct ShareView: View {
 
                         // Social row
                         socialRow
+
+                        // Guest QR (expandable, web parity)
+                        if let plan = appState.activePlan {
+                            guestQRSection(plan: plan)
+                        }
 
                         // Export row
                         exportSection
@@ -226,6 +239,8 @@ struct ShareView: View {
                     exportCard(icon: "doc.text", title: "PDF")
                     exportCard(icon: "rectangle.stack", title: "Printable cards")
                     exportCard(icon: "photo", title: "Social image")
+                    exportCard(icon: "person.2", title: "Guest CSV")
+                    exportCard(icon: "square.grid.3x2", title: "Tables CSV")
                 }
             }
         }
@@ -244,6 +259,228 @@ struct ShareView: View {
         }
     }
 
+    // MARK: - Guest QR section
+    //
+    // Web parity (src/App.jsx GuestQRPanel ~48046). iOS provides a slim
+    // version: enable / disable, view + share / save the QR. Visual style
+    // (custom colors, logo overlay) is intentionally left to web.
+
+    private func guestQRSection(plan: SeatingPlan) -> some View {
+        SBCard(backgroundColor: .sbIvory2) {
+            VStack(alignment: .leading, spacing: 12) {
+                // Header — always visible. Toggle is the primary control.
+                HStack(spacing: 12) {
+                    Button {
+                        withAnimation(.seatbee) { qrExpanded.toggle() }
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: qrExpanded ? "chevron.down" : "chevron.right")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(Color.sbWarm)
+                            Text("Guest QR Code")
+                                .font(SBFont.bodySemibold)
+                                .foregroundStyle(Color.sbCharcoal)
+                        }
+                    }
+                    .buttonStyle(.plain)
+
+                    Spacer()
+
+                    if qrSyncing {
+                        ProgressView().scaleEffect(0.8)
+                    }
+                    Toggle("", isOn: Binding(
+                        get: { qrEnabled },
+                        set: { newValue in
+                            qrEnabled = newValue
+                            Task { await saveQRConfig(planId: plan.id, enabled: newValue) }
+                        }
+                    ))
+                    .labelsHidden()
+                    .tint(.sbGold)
+                    .disabled(qrSyncing)
+                }
+
+                if qrExpanded {
+                    if qrEnabled, let token = qrToken {
+                        let url = "https://seatbee.app/g/\(token)"
+                        HStack(alignment: .top, spacing: 14) {
+                            if let qrImage = UIImage.qrCode(from: url, size: 110) {
+                                Image(uiImage: qrImage)
+                                    .resizable()
+                                    .interpolation(.none) // crisp pixels
+                                    .frame(width: 110, height: 110)
+                                    .background(Color.white)
+                                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 10)
+                                            .strokeBorder(Color.sbLine, lineWidth: 1)
+                                    )
+                            }
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text(url)
+                                    .font(SBFont.caption)
+                                    .foregroundStyle(Color.sbWarm)
+                                    .lineLimit(2)
+                                    .truncationMode(.middle)
+                                HStack(spacing: 8) {
+                                    qrActionButton(icon: "square.and.arrow.up", label: "Share") {
+                                        shareQR(url: url)
+                                    }
+                                    qrActionButton(icon: "square.and.arrow.down", label: "Save") {
+                                        saveQRToPhotos(url: url)
+                                    }
+                                }
+                            }
+                        }
+                        Button {
+                            openWebPlan(planId: plan.id)
+                        } label: {
+                            HStack(spacing: 4) {
+                                Text("Customize design on web")
+                                Image(systemName: "arrow.up.right.square")
+                            }
+                            .font(SBFont.caption)
+                            .foregroundStyle(Color.sbGoldDk)
+                        }
+                        .buttonStyle(.plain)
+                    } else if qrEnabled && qrToken == nil {
+                        Text("Enabling…")
+                            .font(SBFont.caption)
+                            .foregroundStyle(Color.sbWarm)
+                    } else {
+                        Text("Turn on to generate a QR code that guests can scan to see their table assignment.")
+                            .font(SBFont.caption)
+                            .foregroundStyle(Color.sbWarm)
+                    }
+
+                    if let err = qrError {
+                        Text(err)
+                            .font(SBFont.caption)
+                            .foregroundStyle(Color.sbError)
+                    }
+                }
+            }
+        }
+        .onAppear { syncQRStateFromPlan(plan) }
+        .onChange(of: appState.activePlan?.id) { _, _ in
+            if let p = appState.activePlan { syncQRStateFromPlan(p) }
+        }
+    }
+
+    private func qrActionButton(icon: String, label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.system(size: 11, weight: .semibold))
+                Text(label)
+                    .font(SBFont.inter(11, weight: .semibold))
+            }
+            .foregroundStyle(Color.sbGoldDk)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(Color.sbChampagne)
+            .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - QR state + API
+
+    /// Read current values out of the active plan's `rawGuestQR` blob into
+    /// local @State so the toggle reflects the plan's actual state when the
+    /// user lands on the Share tab. No network call here.
+    private func syncQRStateFromPlan(_ plan: SeatingPlan) {
+        qrEnabled = plan.guestQREnabled
+        qrToken = plan.guestQRToken
+    }
+
+    /// POST to the same `/api/guest` endpoint web uses. Returns the token
+    /// either freshly minted (first enable) or the existing one. iOS stores
+    /// the response back into the plan's `rawGuestQR` so subsequent saves
+    /// preserve it for web.
+    private func saveQRConfig(planId: String, enabled: Bool) async {
+        qrError = nil
+        qrSyncing = true
+        defer { qrSyncing = false }
+
+        guard let url = URL(string: "https://seatbee.app/api/guest") else {
+            qrError = "Couldn't reach the QR service."
+            return
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if let token = await AuthService().accessToken {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+
+        let body: [String: Any] = [
+            "action": "save-config",
+            "planId": planId,
+            "config": ["enabled": enabled],
+        ]
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+                qrError = "QR save failed. Try again."
+                return
+            }
+            let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+            let newToken = (json?["token"] as? String) ?? qrToken
+            qrToken = newToken
+            persistQRStateToPlan(enabled: enabled, token: newToken)
+        } catch {
+            qrError = "Network error: \(error.localizedDescription)"
+        }
+    }
+
+    /// Mirror the new state into `rawGuestQR` so the next plan save persists
+    /// it. Preserves any extra fields the web has authored (qrStyle, etc.).
+    private func persistQRStateToPlan(enabled: Bool, token: String?) {
+        guard var plan = appState.activePlan else { return }
+        var dict = (plan.rawGuestQR?.value as? [String: Any]) ?? [:]
+        dict["enabled"] = enabled
+        if let t = token { dict["linkToken"] = t }
+        plan.rawGuestQR = AnyCodable(dict)
+        appState.activePlan = plan
+        Task { try? await appState.database.savePlanData(plan: plan) }
+    }
+
+    private func shareQR(url: String) {
+        guard let img = UIImage.qrCode(from: url, size: 600),
+              let png = img.pngData() else { return }
+        let tmp = FileManager.default.temporaryDirectory
+            .appendingPathComponent("Seatbee Guest QR.png")
+        try? png.write(to: tmp)
+        let activityVC = UIActivityViewController(
+            activityItems: [tmp, URL(string: url)!],
+            applicationActivities: nil
+        )
+        if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let root = scene.windows.first?.rootViewController {
+            root.present(activityVC, animated: true)
+        }
+    }
+
+    private func saveQRToPhotos(url: String) {
+        guard let img = UIImage.qrCode(from: url, size: 600) else { return }
+        // No Info.plist photo permission is required for UIImageWriteToSavedPhotosAlbum
+        // when the user has granted Photos access via the activity sheet flow,
+        // but iOS still expects NSPhotoLibraryAddUsageDescription. If missing,
+        // the call no-ops silently — surface a hint via haptic + share fallback.
+        UIImageWriteToSavedPhotosAlbum(img, nil, nil, nil)
+        HapticEngine.success()
+    }
+
+    private func openWebPlan(planId: String) {
+        if let url = URL(string: "https://seatbee.app/plan/\(planId)") {
+            UIApplication.shared.open(url)
+        }
+    }
+
     private func exportCard(icon: String, title: String) -> some View {
         Button {
             if let plan = appState.activePlan {
@@ -254,6 +491,10 @@ struct ShareView: View {
                     PDFExportService.sharePlaceCards(plan: plan)
                 case "Social image":
                     PDFExportService.shareSocialImage(plan: plan)
+                case "Guest CSV":
+                    PDFExportService.shareGuestListCSV(plan: plan)
+                case "Tables CSV":
+                    PDFExportService.shareTablesCSV(plan: plan)
                 default:
                     sharePlan(via: title)
                 }
@@ -282,4 +523,29 @@ struct ShareView: View {
 #Preview {
     ShareView()
         .environment(AppState())
+}
+
+// MARK: - QR code generator (Core Image)
+//
+// Web parity (`qr-code-styling` library, errorCorrectionLevel: 'H'). iOS
+// uses CIFilter.qrCodeGenerator with the same correction level (H = up to
+// 30% recovery, robust at small print sizes). No third-party deps.
+
+extension UIImage {
+    static func qrCode(from string: String, size: CGFloat = 240) -> UIImage? {
+        guard let data = string.data(using: .utf8) else { return nil }
+        let filter = CIFilter.qrCodeGenerator()
+        filter.message = data
+        filter.correctionLevel = "H"
+        guard let ciImage = filter.outputImage else { return nil }
+
+        // Default CI output is ~25–35pt; scale up to the requested size.
+        let scaleX = size / ciImage.extent.width
+        let scaleY = size / ciImage.extent.height
+        let scaled = ciImage.transformed(by: CGAffineTransform(scaleX: scaleX, y: scaleY))
+
+        let context = CIContext(options: nil)
+        guard let cgImage = context.createCGImage(scaled, from: scaled.extent) else { return nil }
+        return UIImage(cgImage: cgImage)
+    }
 }

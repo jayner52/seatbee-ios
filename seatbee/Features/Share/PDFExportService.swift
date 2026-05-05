@@ -368,6 +368,140 @@ final class PDFExportService {
         shareFile(tempURL)
     }
 
+    // MARK: - CSV exports (web parity)
+    //
+    // Mirrors web's `expGuestCSV` and `expTableCSV`. Same column order and
+    // semantics so a CSV produced on iOS opens cleanly in the same spreadsheet
+    // template a web user would use.
+
+    static func shareGuestListCSV(plan: SeatingPlan) {
+        let csv = generateGuestCSV(plan: plan)
+        let url = writeTempFile(csv, name: "\(safeFilename(plan.name)) Guests.csv")
+        shareFile(url)
+    }
+
+    static func shareTablesCSV(plan: SeatingPlan) {
+        let csv = generateTablesCSV(plan: plan)
+        let url = writeTempFile(csv, name: "\(safeFilename(plan.name)) Tables.csv")
+        shareFile(url)
+    }
+
+    private static func generateGuestCSV(plan: SeatingPlan) -> String {
+        // Build a guest → (table, seat) lookup so we don't scan tables N times.
+        var seatByGuest: [String: (table: SeatTable, seat: Int)] = [:]
+        for table in plan.tables {
+            for (guestId, seatIndex) in table.assignments {
+                seatByGuest[guestId] = (table, seatIndex)
+            }
+        }
+
+        let header = [
+            "Name", "Email", "Side", "Table", "Seat",
+            "RSVP", "Meal", "Dietary", "Categories",
+            "VIP", "Child", "High Chair", "Notes"
+        ]
+        var rows: [[String]] = [header]
+        for g in plan.guests {
+            let assignment = seatByGuest[g.id]
+            let categoryNames = g.categories.compactMap { id -> String? in
+                guard let raw = plan.rawCategories else { return id }
+                let entry = raw.first { ($0["id"]?.value as? String) == id }
+                return (entry?["name"]?.value as? String) ?? id
+            }.joined(separator: "; ")
+
+            rows.append([
+                g.displayName,
+                g.email ?? "",
+                g.side.rawValue,
+                assignment?.table.name ?? "",
+                assignment.map { String($0.seat + 1) } ?? "",
+                g.rsvp.rawValue,
+                g.meal ?? "",
+                g.dietary ?? "",
+                categoryNames,
+                g.vip ? "yes" : "",
+                (g.isChild == true) ? "yes" : "",
+                (g.highChair == true) ? "yes" : "",
+                g.notes ?? "",
+            ])
+        }
+        return csvString(rows)
+    }
+
+    private static func generateTablesCSV(plan: SeatingPlan) -> String {
+        let header = [
+            "Table", "Type", "Capacity", "Seated", "Locked",
+            "Guests", "Meal breakdown", "Dietary needs", "High chairs"
+        ]
+        var rows: [[String]] = [header]
+
+        let guestsById = Dictionary(uniqueKeysWithValues: plan.guests.map { ($0.id, $0) })
+
+        for table in plan.tables {
+            let tableGuests = table.assignments.keys.compactMap { guestsById[$0] }
+            let names = tableGuests.map { $0.displayName }.joined(separator: "; ")
+
+            // Meal counts (web parity: `Beef: 3, Chicken: 2`).
+            var mealCounts: [String: Int] = [:]
+            for g in tableGuests {
+                if let m = g.meal, !m.isEmpty {
+                    mealCounts[m, default: 0] += 1
+                }
+            }
+            let mealBreakdown = mealCounts
+                .sorted { $0.key < $1.key }
+                .map { "\($0.key): \($0.value)" }
+                .joined(separator: ", ")
+
+            // Dietary needs — count guests with non-empty dietary or any tag.
+            let dietaryCount = tableGuests.filter {
+                !($0.dietary ?? "").isEmpty || !(($0.dietaryTags ?? []).isEmpty)
+            }.count
+
+            let highChairCount = tableGuests.filter { $0.highChair == true }.count
+
+            rows.append([
+                table.name,
+                table.type.rawValue,
+                String(table.seats),
+                String(table.assignments.count),
+                (table.locked == true) ? "yes" : "",
+                names,
+                mealBreakdown,
+                dietaryCount > 0 ? String(dietaryCount) : "",
+                highChairCount > 0 ? String(highChairCount) : "",
+            ])
+        }
+        return csvString(rows)
+    }
+
+    /// RFC 4180 CSV — wrap any field containing `,`, `"`, or newline in
+    /// double quotes; double-up internal `"`. Matches Excel/Numbers parsing.
+    private static func csvString(_ rows: [[String]]) -> String {
+        rows.map { row in
+            row.map { cell in
+                if cell.contains(",") || cell.contains("\"") || cell.contains("\n") {
+                    let escaped = cell.replacingOccurrences(of: "\"", with: "\"\"")
+                    return "\"\(escaped)\""
+                }
+                return cell
+            }
+            .joined(separator: ",")
+        }
+        .joined(separator: "\r\n")
+    }
+
+    private static func writeTempFile(_ contents: String, name: String) -> URL {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(name)
+        try? contents.write(to: url, atomically: true, encoding: .utf8)
+        return url
+    }
+
+    private static func safeFilename(_ name: String) -> String {
+        let invalid = CharacterSet(charactersIn: "/\\?%*|\"<>:")
+        return name.components(separatedBy: invalid).joined(separator: "-")
+    }
+
     // MARK: - Share Helper
 
     private static func shareFile(_ url: URL) {
