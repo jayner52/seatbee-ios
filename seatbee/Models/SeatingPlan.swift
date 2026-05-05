@@ -141,6 +141,8 @@ struct SeatingRule: Identifiable, Codable {
     var categoryId: String?
     var objectId: String?
     var sideValue: String?
+    var sideA: [String]? = nil   // Keep Apart "Side A" guest IDs (web parity)
+    var sideB: [String]? = nil   // Keep Apart "Side B" guest IDs (web parity)
     var desc: String?
     var auto: Bool?
     var source: String?
@@ -328,6 +330,7 @@ extension SeatingPlan {
                     id: r.id, type: r.type.rawValue, guests: r.guests, tableId: r.tableId,
                     weight: r.weight, hard: r.hard, enabled: r.enabled,
                     categoryId: r.categoryId, objectId: r.objectId, sideValue: r.sideValue,
+                    sideA: r.sideA, sideB: r.sideB,
                     desc: r.desc, auto: r.auto, source: r.source, partyId: r.partyId, groupId: r.groupId
                 )
             },

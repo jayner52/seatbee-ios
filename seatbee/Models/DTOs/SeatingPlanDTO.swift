@@ -286,6 +286,8 @@ struct RuleDTO: Codable {
     let categoryId: String?
     let objectId: String?
     let sideValue: String?
+    let sideA: [String]?
+    let sideB: [String]?
     let desc: String?
     let auto: Bool?
     let source: String?
@@ -304,6 +306,8 @@ struct RuleDTO: Codable {
             categoryId: categoryId,
             objectId: objectId,
             sideValue: sideValue,
+            sideA: sideA,
+            sideB: sideB,
             desc: desc,
             auto: auto,
             source: source,
