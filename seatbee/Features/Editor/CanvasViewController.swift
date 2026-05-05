@@ -263,6 +263,37 @@ class CanvasViewController: UIViewController, UIScrollViewDelegate {
         path.addQuadCurve(to: end, controlPoint: control)
     }
 
+    // MARK: - Fit-to-content
+    //
+    // Compute the bounding rect of all visible content (room outline +
+    // tables + objects) in contentView coords, then ask the scrollView to
+    // zoom to it with a small padding margin. Falls back to the full
+    // canvas if there's nothing to fit.
+    func fitToContent(animated: Bool = true) {
+        guard scrollView.bounds.width > 0 && scrollView.bounds.height > 0 else { return }
+        let bounds = contentBounds()
+        guard !bounds.isNull, bounds.width > 0, bounds.height > 0 else { return }
+
+        let padding: CGFloat = 40
+        let padded = bounds.insetBy(dx: -padding, dy: -padding)
+        scrollView.zoom(to: padded, animated: animated)
+    }
+
+    private func contentBounds() -> CGRect {
+        var rect = CGRect.null
+
+        if let roomPath = roomOutlineLayer.path {
+            rect = rect.union(roomPath.boundingBox)
+        }
+        for v in tableViews.values {
+            rect = rect.union(v.frame)
+        }
+        for v in objectViews.values {
+            rect = rect.union(v.frame)
+        }
+        return rect
+    }
+
     private func decodeBase64Image(_ s: String) -> UIImage? {
         // Web stores floorPlanImage as either a "data:image/...;base64,..."
         // URL or a raw base64 string.
@@ -810,6 +841,9 @@ struct CanvasViewRepresentable: UIViewControllerRepresentable {
     var floorPlanBase64: String?
     var floorPlanOpacity: Double?
 
+    // Increment to trigger a fit-to-content zoom on next updateUIViewController.
+    var fitToken: Int = 0
+
     var onSelectTable: (String) -> Void
     var onSelectObject: (String) -> Void
     var onDeselectAll: () -> Void
@@ -836,6 +870,10 @@ struct CanvasViewRepresentable: UIViewControllerRepresentable {
             floorPlanBase64: floorPlanBase64,
             floorPlanOpacity: floorPlanOpacity
         )
+        if context.coordinator.lastFitToken != fitToken {
+            context.coordinator.lastFitToken = fitToken
+            DispatchQueue.main.async { vc.fitToContent(animated: true) }
+        }
     }
 
     func makeCoordinator() -> Coordinator {
@@ -844,6 +882,7 @@ struct CanvasViewRepresentable: UIViewControllerRepresentable {
 
     class Coordinator: NSObject, CanvasDelegate {
         let parent: CanvasViewRepresentable
+        var lastFitToken: Int = 0
 
         init(_ parent: CanvasViewRepresentable) {
             self.parent = parent

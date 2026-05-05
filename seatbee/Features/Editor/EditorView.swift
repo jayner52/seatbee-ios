@@ -12,6 +12,7 @@ struct EditorView: View {
     @State private var showDetailSheet = false
     @State private var showDeleteConfirm = false
     @State private var assigningSeatIndex: Int?
+    @State private var fitToken: Int = 0
 
     // Selection tracking
 
@@ -43,6 +44,7 @@ struct EditorView: View {
                     roomZones: plan?.roomZones,
                     floorPlanBase64: plan?.rawFloorPlanImage?.value as? String,
                     floorPlanOpacity: plan?.rawFloorPlanOpacity,
+                    fitToken: fitToken,
                     onSelectTable: { id in
                         selectedObjectId = nil
                         selectedTableId = id
@@ -201,6 +203,15 @@ struct EditorView: View {
                     .clipShape(Circle())
             }
             .disabled(!appState.undoManager.canRedo)
+
+            Button { fitToken &+= 1; HapticEngine.light() } label: {
+                Image(systemName: "arrow.up.left.and.arrow.down.right")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(Color.sbCharcoal)
+                    .frame(width: 34, height: 34)
+                    .background(.ultraThinMaterial)
+                    .clipShape(Circle())
+            }
 
             Button { showRoomSetup = true } label: {
                 Image(systemName: "square.dashed")
