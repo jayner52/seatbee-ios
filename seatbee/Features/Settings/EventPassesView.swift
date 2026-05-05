@@ -49,19 +49,31 @@ struct EventPassesView: View {
     // MARK: - Summary
 
     private var summarySection: some View {
-        Section {
-            HStack(spacing: 16) {
-                summaryStat(label: "Available", value: appState.userPasses.summary.available, color: .sbGold)
-                Divider()
-                summaryStat(label: "Redeemed", value: appState.userPasses.summary.redeemed, color: .sbCharcoal)
-                Divider()
-                summaryStat(label: "Expired", value: appState.userPasses.summary.expired, color: .sbWarm)
+        // 2×2 grid of tier-themed stat cards. Mirrors web's "Your Passes"
+        // layout: Event / Signature / Grand counts of AVAILABLE passes,
+        // plus a "Used on events" total of redeemed passes.
+        let avail = appState.userPasses.passes.filter { $0.isAvailable }
+        let eventCount = avail.filter { $0.tier == .eventPass }.count
+        let signatureCount = avail.filter { $0.tier == .signaturePass }.count
+        let grandCount = avail.filter { $0.tier == .proPass }.count
+        let usedCount = appState.userPasses.summary.redeemed
+
+        return Section {
+            VStack(spacing: 10) {
+                HStack(spacing: 10) {
+                    statCard(count: eventCount, title: "Event Pass", subtitle: "250 guests", tint: Color.sbChampagne, accent: Color.sbGoldDk)
+                    statCard(count: signatureCount, title: "Signature Pass", subtitle: "500 guests", tint: Color.sbChampagne2, accent: Color.sbGoldDk)
+                }
+                HStack(spacing: 10) {
+                    statCard(count: grandCount, title: "Grand Pass", subtitle: "1,000 guests", tint: Color.sbCharcoal.opacity(0.10), accent: Color.sbCharcoal)
+                    statCard(count: usedCount, title: "Used on Events", subtitle: usedCount == 1 ? "redeemed" : "redeemed", tint: Color.sbSage.opacity(0.20), accent: Color.sbSage)
+                }
             }
-            .padding(.vertical, 8)
+            .padding(.vertical, 4)
 
             if let nextExpiry = appState.userPasses.nextExpiry,
                appState.userPasses.summary.available > 0 {
-                HStack {
+                HStack(spacing: 6) {
                     Image(systemName: "clock")
                         .foregroundStyle(Color.sbGoldDk)
                     Text("Next pass expires \(nextExpiry.formatted(date: .abbreviated, time: .omitted))")
@@ -77,28 +89,35 @@ struct EventPassesView: View {
         }
     }
 
-    private func summaryStat(label: String, value: Int, color: Color) -> some View {
+    private func statCard(count: Int, title: String, subtitle: String, tint: Color, accent: Color) -> some View {
         VStack(spacing: 4) {
-            Text("\(value)")
-                .font(SBFont.statNumberSmall)
-                .foregroundStyle(color)
-            Text(label)
+            Text("\(count)")
+                .font(SBFont.statNumber)
+                .foregroundStyle(accent)
+            Text(title)
                 .font(SBFont.capsLabel)
-                .foregroundStyle(Color.sbWarm)
+                .foregroundStyle(Color.sbCharcoal)
                 .textCase(.uppercase)
+                .multilineTextAlignment(.center)
+            Text(subtitle)
+                .font(SBFont.small)
+                .foregroundStyle(Color.sbWarm)
         }
         .frame(maxWidth: .infinity)
+        .padding(.vertical, 14)
+        .background(tint)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
-    // MARK: - Available passes (grouped by tier)
+    // MARK: - Available passes (one section per tier)
 
     @ViewBuilder
     private var availableSection: some View {
         let groups = appState.userPasses.availableByTier()
         let allEmpty = groups.allSatisfy { $0.passes.isEmpty }
 
-        Section {
-            if allEmpty {
+        if allEmpty {
+            Section {
                 if appState.loadingPasses {
                     HStack { Spacer(); ProgressView(); Spacer() }
                         .padding(.vertical, 8)
@@ -118,32 +137,52 @@ struct EventPassesView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
                 }
-            } else {
-                ForEach(groups, id: \.tier) { group in
-                    if !group.passes.isEmpty {
+            } header: {
+                Text("Available")
+            }
+        } else {
+            // One section per tier — Event → Signature → Grand. Skips
+            // tiers where the user has no available passes.
+            ForEach(groups, id: \.tier) { group in
+                if !group.passes.isEmpty {
+                    Section {
                         ForEach(group.passes) { pass in
                             availablePassRow(pass)
+                        }
+                    } header: {
+                        HStack(spacing: 6) {
+                            Text(group.tier.displayName.uppercased())
+                            Text("·")
+                                .foregroundStyle(Color.sbWarm2)
+                            Text("\(group.passes.count) available")
+                                .foregroundStyle(Color.sbGoldDk)
                         }
                     }
                 }
             }
-        } header: {
-            Text("Available")
         }
     }
 
     private func availablePassRow(_ pass: EventPass) -> some View {
         HStack(spacing: 12) {
-            tierBadge(pass.tier)
+            Image(systemName: "ticket")
+                .foregroundStyle(Color.sbGoldDk)
+                .frame(width: 22)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(pass.tier.displayName)
-                    .font(SBFont.bodySmallBold)
-                    .foregroundStyle(Color.sbCharcoal)
                 if let exp = pass.expiresAt {
                     Text("Expires \(exp.formatted(date: .abbreviated, time: .omitted))")
-                        .font(SBFont.caption)
-                        .foregroundStyle(pass.isExpiringSoon ? Color.sbError : Color.sbWarm)
+                        .font(SBFont.bodySmallBold)
+                        .foregroundStyle(pass.isExpiringSoon ? Color.sbError : Color.sbCharcoal)
+                } else {
+                    Text("No expiry")
+                        .font(SBFont.bodySmallBold)
+                        .foregroundStyle(Color.sbCharcoal)
+                }
+                if let code = pass.giftCode {
+                    Text(code)
+                        .font(.system(size: 11, weight: .medium, design: .monospaced))
+                        .foregroundStyle(Color.sbWarm)
                 }
             }
 
