@@ -14,6 +14,11 @@ struct SeatingPlanDTO: Codable {
     let event_venue_name: String?
     let seated_guest_count: Int?
     let tier: String?
+    // Pass expiry — top-level columns set by web's /api/passes redemption
+    // flow. iOS reads but never writes these; Supabase PATCH preserves them
+    // because savePlanData omits them from its payload.
+    let event_pass_expires_at: String?
+    let event_pass_purchased_at: String?
     let created_at: String?
     let updated_at: String?
     let deleted_at: String?
@@ -87,6 +92,8 @@ struct SeatingPlanDTO: Codable {
             updatedAt: updated_at.flatMap { parseDate($0) },
             userId: user_id,
             tier: tier,
+            eventPassExpiresAt: event_pass_expires_at.flatMap { parseDate($0) },
+            eventPassPurchasedAt: event_pass_purchased_at.flatMap { parseDate($0) },
             // Raw passthrough — preserved unchanged on round-trip
             rawCategories: d?.categories,
             rawParties: d?.parties,

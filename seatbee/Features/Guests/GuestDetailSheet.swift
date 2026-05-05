@@ -23,6 +23,7 @@ struct GuestDetailSheet: View {
     @State private var selectedDietaryTags: Set<String> = []
     @State private var showDeleteConfirm = false
     @State private var showTierLimitAlert = false
+    @State private var showSoftWarningAlert = false
 
     private var isEditing: Bool { guest != nil }
 
@@ -255,7 +256,16 @@ struct GuestDetailSheet: View {
             } message: {
                 let limits = appState.activePlanLimits
                 let tier = appState.activePlanTier
-                Text("Your \(tier.displayName) plan supports up to \(limits.seatedGuests) guests. Apply an Event Pass in Settings to seat more.")
+                if appState.isActivePlanExpired {
+                    Text("This event's pass has expired. You can keep editing existing guests, but adding new ones requires applying a fresh Event Pass in Settings.")
+                } else {
+                    Text("Your \(tier.displayName) plan supports up to \(limits.seatedGuests) guests. Apply an Event Pass in Settings to seat more.")
+                }
+            }
+            .alert("You're at \(appState.activePlanLimits.seatedGuests * 8 / 10) of \(appState.activePlanLimits.seatedGuests) free guests", isPresented: $showSoftWarningAlert) {
+                Button("Got it", role: .cancel) {}
+            } message: {
+                Text("Apply an Event Pass before you hit the cap to seat up to 250 guests with AI seating included.")
             }
         }
         .onAppear { loadGuest() }
@@ -404,6 +414,17 @@ struct GuestDetailSheet: View {
 
         appState.activePlan = plan
         HapticEngine.success()
+
+        // After a successful add, fire the 80% soft-warning nudge once per
+        // session if the user has crossed the threshold on a free-tier plan.
+        // Mirrors web's nudge at App.jsx:6211.
+        if !isEditing
+            && appState.activePlanTier == .free
+            && plan.guests.count >= Int(Double(appState.activePlanLimits.seatedGuests) * 0.8)
+            && !appState.hasShownGuestSoftWarning {
+            appState.hasShownGuestSoftWarning = true
+            showSoftWarningAlert = true
+        }
 
         Task {
             try? await appState.database.savePlanData(plan: plan)
