@@ -662,42 +662,43 @@ struct AddRuleSheet: View {
         }
     }
 
-    // Web parity (src/App.jsx:13321-13345 createKeepApartRule):
-    // Keep Apart has two parallel guest pickers — Side A and Side B —
-    // and the rule must NOT seat anyone on Side A at the same table as
-    // anyone on Side B. We mirror that two-side selection on iOS, write
-    // both sideA and sideB arrays AND a flat guests array (backward
-    // compat — web does the same).
+    // Web parity (src/App.jsx:13321-13345 createKeepApartRule).
+    // Two side-by-side columns matching web's modal: each column has its
+    // own A/B badge, search field, fixed-height scrollable guest list with
+    // checkboxes. A guest selected in one side auto-removes from the other.
+    // Importance slider below; hard auto-derived at weight≥90.
     private var keepApartForm: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            Text("People on Side A won't sit at the same table as anyone on Side B.")
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Select guests who should NOT sit at the same table. People on Side A won't be seated with anyone on Side B.")
                 .font(SBFont.caption)
                 .foregroundStyle(Color.sbWarm)
+                .fixedSize(horizontal: false, vertical: true)
 
-            sidePickerSection(
-                title: "SIDE A",
-                badge: "A",
-                selection: $selectedSideAIds,
-                otherSelection: $selectedSideBIds,
-                search: $sideASearch
-            )
-            sidePickerSection(
-                title: "SIDE B",
-                badge: "B",
-                selection: $selectedSideBIds,
-                otherSelection: $selectedSideAIds,
-                search: $sideBSearch
-            )
+            HStack(alignment: .top, spacing: 12) {
+                sidePickerColumn(
+                    badge: "A",
+                    title: "Side A",
+                    selection: $selectedSideAIds,
+                    otherSelection: $selectedSideBIds,
+                    search: $sideASearch
+                )
+                sidePickerColumn(
+                    badge: "B",
+                    title: "Side B",
+                    selection: $selectedSideBIds,
+                    otherSelection: $selectedSideAIds,
+                    search: $sideBSearch
+                )
+            }
 
-            // Web's createKeepApartRule sets hard = (weight >= 90) implicitly.
             weightSliderSection(label: weight >= 90 ? "Required (high priority)" : "Preferred")
         }
     }
 
     @ViewBuilder
-    private func sidePickerSection(
-        title: String,
+    private func sidePickerColumn(
         badge: String,
+        title: String,
         selection: Binding<Set<String>>,
         otherSelection: Binding<Set<String>>,
         search: Binding<String>
@@ -708,61 +709,72 @@ struct AddRuleSheet: View {
         }()
 
         VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
+            // Header — compact A/B badge + label so the column fits on phone widths
+            HStack(spacing: 6) {
                 Text(badge)
-                    .font(SBFont.inter(11, weight: .bold))
+                    .font(SBFont.inter(10, weight: .bold))
                     .foregroundStyle(Color.sbGoldDk)
-                    .frame(width: 22, height: 22)
+                    .frame(width: 18, height: 18)
                     .background(Color.sbGold.opacity(0.2))
                     .clipShape(Circle())
                 Text(title)
-                    .font(SBFont.capsLabel)
-                    .foregroundStyle(Color.sbWarm)
-                    .letterSpacing(1.5)
-                Spacer()
-                Text("\(selection.wrappedValue.count) selected")
-                    .font(SBFont.caption)
-                    .foregroundStyle(Color.sbWarm)
+                    .font(SBFont.bodySmallBold)
+                    .foregroundStyle(Color.sbCharcoal)
+                Spacer(minLength: 0)
             }
 
-            HStack(spacing: 8) {
+            // Per-column search
+            HStack(spacing: 4) {
                 Image(systemName: "magnifyingglass")
+                    .font(.system(size: 11))
                     .foregroundStyle(Color.sbWarm)
                 TextField("Search...", text: search)
-                    .font(SBFont.body)
+                    .font(SBFont.bodySmall)
             }
-            .padding(10)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
             .background(Color.sbIvory2)
             .clipShape(RoundedRectangle(cornerRadius: SBRadius.small))
 
-            VStack(spacing: 4) {
-                ForEach(sideGuests.prefix(50)) { guest in
-                    Button {
-                        if selection.wrappedValue.contains(guest.id) {
-                            selection.wrappedValue.remove(guest.id)
-                        } else {
-                            selection.wrappedValue.insert(guest.id)
-                            // A guest can't be on both sides — remove from the other.
-                            otherSelection.wrappedValue.remove(guest.id)
+            // Fixed-height scrollable guest list — matches web's column behavior
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 2) {
+                    ForEach(sideGuests) { guest in
+                        Button {
+                            if selection.wrappedValue.contains(guest.id) {
+                                selection.wrappedValue.remove(guest.id)
+                            } else {
+                                selection.wrappedValue.insert(guest.id)
+                                otherSelection.wrappedValue.remove(guest.id)
+                            }
+                            HapticEngine.selection()
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: selection.wrappedValue.contains(guest.id) ? "checkmark.square.fill" : "square")
+                                    .font(.system(size: 14))
+                                    .foregroundStyle(selection.wrappedValue.contains(guest.id) ? Color.sbGold : Color.sbWarm2)
+                                Text(guest.displayName)
+                                    .font(SBFont.bodySmall)
+                                    .foregroundStyle(Color.sbCharcoal)
+                                    .lineLimit(1)
+                                    .truncationMode(.tail)
+                                Spacer(minLength: 0)
+                            }
+                            .padding(.vertical, 4)
                         }
-                        HapticEngine.selection()
-                    } label: {
-                        HStack(spacing: 10) {
-                            Image(systemName: selection.wrappedValue.contains(guest.id) ? "checkmark.circle.fill" : "circle")
-                                .foregroundStyle(selection.wrappedValue.contains(guest.id) ? Color.sbGold : Color.sbWarm2)
-                            Text(guest.displayName)
-                                .font(SBFont.bodySmall)
-                                .foregroundStyle(Color.sbCharcoal)
-                            Spacer()
-                        }
-                        .padding(.vertical, 6)
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
+                .padding(.horizontal, 4)
             }
+            .frame(height: 220)
+
+            Text("\(selection.wrappedValue.count) selected")
+                .font(SBFont.caption)
+                .foregroundStyle(Color.sbWarm)
         }
-        .padding(12)
-        .background(Color.sbIvory.opacity(0.5))
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(8)
         .overlay(
             RoundedRectangle(cornerRadius: SBRadius.small)
                 .strokeBorder(Color.sbLine, lineWidth: 1)
