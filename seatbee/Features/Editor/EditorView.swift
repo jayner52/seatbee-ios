@@ -13,6 +13,7 @@ struct EditorView: View {
     @State private var showDeleteConfirm = false
     @State private var assigningSeatIndex: Int?
     @State private var fitToken: Int = 0
+    @State private var showEditObject = false
 
     // Selection tracking
 
@@ -45,6 +46,7 @@ struct EditorView: View {
                     floorPlanBase64: plan?.rawFloorPlanImage?.value as? String,
                     floorPlanOpacity: plan?.rawFloorPlanOpacity,
                     fitToken: fitToken,
+                    planId: plan?.id,
                     onSelectTable: { id in
                         selectedObjectId = nil
                         selectedTableId = id
@@ -127,6 +129,14 @@ struct EditorView: View {
         .sheet(isPresented: $showRoomSetup) {
             RoomSetupSheet()
                 .environment(appState)
+        }
+        .sheet(isPresented: $showEditObject) {
+            if let id = selectedObjectId {
+                EditVenueObjectSheet(objectId: id)
+                    .environment(appState)
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
+            }
         }
         .alert("Delete object?", isPresented: $showDeleteConfirm) {
             Button("Delete", role: .destructive) {
@@ -262,7 +272,7 @@ struct EditorView: View {
                 .padding(.bottom, 8)
             } else if let objId = selectedObjectId, let obj = objects.first(where: { $0.id == objId }) {
                 HStack(spacing: 10) {
-                    let def = venueObjectTypes.first { $0.type == obj.type }
+                    let def = venueObjectTypes.byType(obj.type)
                     Image(systemName: def?.icon ?? "square")
                         .font(.system(size: 18))
                         .foregroundStyle(Color.sbGoldDk)
@@ -270,6 +280,17 @@ struct EditorView: View {
                         .font(SBFont.bodySmallBold)
                         .foregroundStyle(Color.sbCharcoal)
                     Spacer()
+                    Button {
+                        showEditObject = true
+                        HapticEngine.selection()
+                    } label: {
+                        Image(systemName: "pencil")
+                            .font(.system(size: 14))
+                            .foregroundStyle(Color.sbGoldDk)
+                            .frame(width: 34, height: 34)
+                            .background(.regularMaterial)
+                            .clipShape(Circle())
+                    }
                     Button {
                         showDeleteConfirm = true
                     } label: {
@@ -397,7 +418,12 @@ struct EditorView: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text(guest.displayName).font(SBFont.bodySmallBold).foregroundStyle(Color.sbCharcoal)
                 if !guest.categories.isEmpty {
-                    Text(guest.categories.first ?? "").font(SBFont.capsLabel).foregroundStyle(Color.sbWarm)
+                    // Resolve category ID → name from rawCategories (web parity).
+                    // Falls back to the raw string only when no entry matches —
+                    // same behavior as GuestsView.
+                    let firstId = guest.categories.first ?? ""
+                    let label = categoryName(forId: firstId) ?? firstId
+                    Text(label).font(SBFont.capsLabel).foregroundStyle(Color.sbWarm)
                 }
             }
             Spacer()
@@ -485,6 +511,14 @@ struct EditorView: View {
         appState.activePlan = p
         HapticEngine.success()
         Task { try? await appState.database.savePlanData(plan: p) }
+    }
+
+    // MARK: - Category lookup (web parity)
+
+    private func categoryName(forId id: String) -> String? {
+        guard let raw = plan?.rawCategories else { return nil }
+        let entry = raw.first { ($0["id"]?.value as? String) == id }
+        return (entry?["name"]?.value as? String).flatMap { $0.isEmpty ? nil : $0 }
     }
 }
 

@@ -26,9 +26,22 @@ class CanvasViewController: UIViewController, UIScrollViewDelegate {
     private var selectedId: String?
     private var selectedType: String? // "table" or "object"
 
-    // Content size — large enough for most venues
-    private let canvasSize = CGSize(width: 2000, height: 2000)
-    private let canvasOrigin = CGPoint(x: 400, y: 400) // offset so objects start visible
+    // Canvas size grows to fit the active room. Default covers up to a
+    // ~110×80ft (1650×1200px) Large preset with comfortable padding; bigger
+    // rooms (Ballroom, Grand, Convention) trigger a recompute in updateRoom.
+    // Padding on all sides so users can scroll outside the room.
+    private let canvasPadding: CGFloat = 400
+    private var canvasSize = CGSize(width: 2000, height: 2000)
+    private var canvasOrigin = CGPoint(x: 400, y: 400)
+    private var didInitialFit = false
+
+    // Viewport persistence — when the user zooms/scrolls then leaves the
+    // editor (Guests tab, AI sheet, app background), the next visit should
+    // resume at the same place. Stored in UserDefaults keyed by plan ID so
+    // each plan remembers its own viewport across app launches too.
+    private var planId: String?
+    private var didRestoreViewport = false
+    private static let viewportDefaultsPrefix = "seatbee.canvasViewport."
 
     // Room outline + floor plan backdrop layers. Both sit between the
     // dot pattern background (index 0) and the table/object subviews.
@@ -41,7 +54,9 @@ class CanvasViewController: UIViewController, UIScrollViewDelegate {
 
         // Scroll view setup
         scrollView.delegate = self
-        scrollView.minimumZoomScale = 0.3
+        // minimumZoomScale is recomputed in updateRoom() to guarantee any
+        // room size can fit on screen. Starting low so initial layout is safe.
+        scrollView.minimumZoomScale = 0.05
         scrollView.maximumZoomScale = 3.0
         scrollView.bouncesZoom = true
         scrollView.showsHorizontalScrollIndicator = false
@@ -133,6 +148,25 @@ class CanvasViewController: UIViewController, UIScrollViewDelegate {
     ) {
         let w = CGFloat(roomWidth ?? 0)
         let h = CGFloat(roomHeight ?? 0)
+
+        // Grow the canvas to fit the room with comfortable padding on every
+        // side. Big presets like Convention (4500×3000) need ~5300×3800 of
+        // canvas; small rooms keep the original 2000×2000 minimum so tables
+        // dragged to a corner have room to scroll.
+        let needW = max(2000, w + canvasPadding * 2)
+        let needH = max(2000, h + canvasPadding * 2)
+        if abs(needW - canvasSize.width) > 1 || abs(needH - canvasSize.height) > 1 {
+            canvasSize = CGSize(width: needW, height: needH)
+            canvasOrigin = CGPoint(x: canvasPadding, y: canvasPadding)
+            contentView.frame = CGRect(origin: .zero, size: canvasSize)
+            scrollView.contentSize = canvasSize
+            // Resize background dot pattern to match.
+            if let dotLayer = contentView.layer.sublayers?.first as? DotPatternLayer {
+                dotLayer.frame = contentView.bounds
+                dotLayer.setNeedsDisplay()
+            }
+            recomputeMinZoom()
+        }
 
         // Outline path
         if w > 0 && h > 0 {
@@ -235,32 +269,196 @@ class CanvasViewController: UIViewController, UIScrollViewDelegate {
         return path
     }
 
-    // Convert SVG-style elliptical arc parameters into a UIBezierPath
-    // segment. UIBezierPath has no native A command, so we approximate
-    // with addQuadCurve using the chord midpoint perpendicular-offset.
-    // For most floor-plan use cases (gentle wall curves) this looks
-    // identical to web's SVG arc; large-radius edge cases are rare and
-    // the persisted shape is preserved exactly on round-trip.
+    // SVG elliptical-arc → cubic Bézier conversion. Implements the
+    // endpoint→center-parameterisation in W3C SVG 1.1 §F.6.5, then
+    // subdivides into ≤90° segments and emits each as a kappa-tuned
+    // cubic Bézier. This is the correct rendering for oval / circle /
+    // any future curved walls; the previous quadratic approximation
+    // produced concave star shapes because it placed the control point
+    // toward the chord midpoint instead of outside the ellipse.
     private func appendArc(to path: UIBezierPath, end: CGPoint, arc: RoomArc) {
-        let start = path.currentPoint
-        let mid = CGPoint(x: (start.x + end.x)/2, y: (start.y + end.y)/2)
-        let dx = end.x - start.x
-        let dy = end.y - start.y
-        let chordLen = sqrt(dx*dx + dy*dy)
-        guard chordLen > 0 else {
-            path.addLine(to: end); return
-        }
-        let r = max(CGFloat(arc.rx), chordLen / 2)
-        let h = sqrt(max(0, r*r - (chordLen/2)*(chordLen/2)))
-        let nx = -dy / chordLen
-        let ny = dx / chordLen
-        let direction: CGFloat = arc.sweep == 1 ? 1 : -1
-        let controlOffset = (r - h) * 2  // approximate quadratic control offset
-        let control = CGPoint(
-            x: mid.x + nx * direction * controlOffset,
-            y: mid.y + ny * direction * controlOffset
+        let segments = svgArcToCubics(
+            start: path.currentPoint,
+            end: end,
+            rx: CGFloat(arc.rx),
+            ry: CGFloat(arc.ry),
+            largeArc: arc.largeArc == 1,
+            sweep: arc.sweep == 1
         )
-        path.addQuadCurve(to: end, controlPoint: control)
+        if segments.isEmpty {
+            path.addLine(to: end)
+            return
+        }
+        for seg in segments {
+            path.addCurve(to: seg.end, controlPoint1: seg.cp1, controlPoint2: seg.cp2)
+        }
+    }
+
+    private struct CubicSeg { let cp1: CGPoint; let cp2: CGPoint; let end: CGPoint }
+
+    private func svgArcToCubics(
+        start: CGPoint, end: CGPoint,
+        rx _rx: CGFloat, ry _ry: CGFloat,
+        largeArc: Bool, sweep: Bool
+    ) -> [CubicSeg] {
+        // Degenerate cases — straight line.
+        if start == end { return [] }
+        var rx = abs(_rx), ry = abs(_ry)
+        if rx < 0.0001 || ry < 0.0001 {
+            return [CubicSeg(cp1: start, cp2: end, end: end)]
+        }
+
+        // Step 1: compute (x1', y1') in the rotated frame (xRot=0 here).
+        let dx = (start.x - end.x) / 2
+        let dy = (start.y - end.y) / 2
+        let x1p = dx
+        let y1p = dy
+
+        // Ensure radii are large enough to span the chord; scale up if not.
+        let lambda = (x1p * x1p) / (rx * rx) + (y1p * y1p) / (ry * ry)
+        if lambda > 1 {
+            let s = sqrt(lambda)
+            rx *= s; ry *= s
+        }
+
+        // Step 2: compute (cx', cy') — the center in rotated frame.
+        let rxSq = rx * rx, rySq = ry * ry
+        let x1pSq = x1p * x1p, y1pSq = y1p * y1p
+        let denom = rxSq * y1pSq + rySq * x1pSq
+        let radicand = max(0, (rxSq * rySq - rxSq * y1pSq - rySq * x1pSq) / max(denom, 0.0001))
+        let factor = sqrt(radicand) * (largeArc == sweep ? -1 : 1)
+        let cxp = factor * (rx * y1p / ry)
+        let cyp = factor * (-ry * x1p / rx)
+
+        // Step 3: compute (cx, cy) — center in original coordinate space.
+        let cx = cxp + (start.x + end.x) / 2
+        let cy = cyp + (start.y + end.y) / 2
+
+        // Step 4: compute θ1 and Δθ.
+        func vecAngle(_ ux: CGFloat, _ uy: CGFloat, _ vx: CGFloat, _ vy: CGFloat) -> CGFloat {
+            let dot = ux * vx + uy * vy
+            let len = sqrt(ux * ux + uy * uy) * sqrt(vx * vx + vy * vy)
+            let clamped = max(-1, min(1, dot / max(len, 0.0001)))
+            let sign: CGFloat = (ux * vy - uy * vx) >= 0 ? 1 : -1
+            return sign * acos(clamped)
+        }
+        let theta1 = vecAngle(1, 0, (x1p - cxp) / rx, (y1p - cyp) / ry)
+        var deltaTheta = vecAngle(
+            (x1p - cxp) / rx, (y1p - cyp) / ry,
+            (-x1p - cxp) / rx, (-y1p - cyp) / ry
+        )
+        if !sweep && deltaTheta > 0 { deltaTheta -= 2 * .pi }
+        if sweep && deltaTheta < 0 { deltaTheta += 2 * .pi }
+
+        // Step 5: subdivide into ≤90° pieces and emit kappa-tuned cubics.
+        let count = max(1, Int(ceil(abs(deltaTheta) / (.pi / 2))))
+        let segDelta = deltaTheta / CGFloat(count)
+        let alpha = sin(segDelta) * (sqrt(4 + 3 * tan(segDelta / 2) * tan(segDelta / 2)) - 1) / 3
+
+        var beziers: [CubicSeg] = []
+        var t1 = theta1
+        for _ in 0..<count {
+            let t2 = t1 + segDelta
+            let p1 = ellipsePoint(cx: cx, cy: cy, rx: rx, ry: ry, theta: t1)
+            let p2 = ellipsePoint(cx: cx, cy: cy, rx: rx, ry: ry, theta: t2)
+            let dp1 = ellipseTangent(rx: rx, ry: ry, theta: t1)
+            let dp2 = ellipseTangent(rx: rx, ry: ry, theta: t2)
+            let cp1 = CGPoint(x: p1.x + alpha * dp1.x, y: p1.y + alpha * dp1.y)
+            let cp2 = CGPoint(x: p2.x - alpha * dp2.x, y: p2.y - alpha * dp2.y)
+            beziers.append(CubicSeg(cp1: cp1, cp2: cp2, end: p2))
+            t1 = t2
+        }
+        return beziers
+    }
+
+    private func ellipsePoint(cx: CGFloat, cy: CGFloat, rx: CGFloat, ry: CGFloat, theta: CGFloat) -> CGPoint {
+        CGPoint(x: cx + rx * cos(theta), y: cy + ry * sin(theta))
+    }
+
+    private func ellipseTangent(rx: CGFloat, ry: CGFloat, theta: CGFloat) -> CGPoint {
+        // Derivative of (rx·cosθ, ry·sinθ) = (-rx·sinθ, ry·cosθ)
+        CGPoint(x: -rx * sin(theta), y: ry * cos(theta))
+    }
+
+    // Pick a minimumZoomScale that guarantees the whole canvas can be
+    // shrunk to fit the viewport, with a small floor so we never go to 0.
+    // Without this, large rooms (Convention 5300pt canvas vs 400pt screen)
+    // need scale ~0.075 to fit — well below the old hardcoded 0.3 floor.
+    private func recomputeMinZoom() {
+        guard scrollView.bounds.width > 0 && scrollView.bounds.height > 0 else { return }
+        let xRatio = scrollView.bounds.width / canvasSize.width
+        let yRatio = scrollView.bounds.height / canvasSize.height
+        let needed = min(xRatio, yRatio)
+        scrollView.minimumZoomScale = max(0.05, min(0.5, needed * 0.9))
+        // Don't pin the current zoom below the new minimum — UIKit handles
+        // clamping but we re-clamp explicitly so layout doesn't get stuck.
+        if scrollView.zoomScale < scrollView.minimumZoomScale {
+            scrollView.zoomScale = scrollView.minimumZoomScale
+        }
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        recomputeMinZoom()
+        // First time we have both a sized scrollView and any content,
+        // either restore the user's last viewport for this plan or
+        // auto-fit so they see the whole layout. Restore wins so users
+        // returning from Guests / AI land where they left off.
+        if !didInitialFit && !contentBounds().isNull {
+            didInitialFit = true
+            DispatchQueue.main.async {
+                if !self.restoreViewport() {
+                    self.fitToContent(animated: false)
+                }
+            }
+        }
+    }
+
+    func setPlanId(_ id: String?) {
+        guard planId != id else { return }
+        planId = id
+        // Force the next viewDidLayoutSubviews to restore for the new plan.
+        didInitialFit = false
+        didRestoreViewport = false
+    }
+
+    @discardableResult
+    private func restoreViewport() -> Bool {
+        guard let id = planId, !didRestoreViewport else { return false }
+        let key = Self.viewportDefaultsPrefix + id
+        guard let dict = UserDefaults.standard.dictionary(forKey: key),
+              let zoom = dict["zoom"] as? Double,
+              let ox = dict["offsetX"] as? Double,
+              let oy = dict["offsetY"] as? Double else { return false }
+        let clampedZoom = CGFloat(min(Double(scrollView.maximumZoomScale),
+                                      max(Double(scrollView.minimumZoomScale), zoom)))
+        scrollView.zoomScale = clampedZoom
+        scrollView.contentOffset = CGPoint(x: ox, y: oy)
+        didRestoreViewport = true
+        return true
+    }
+
+    private func saveViewport() {
+        guard let id = planId else { return }
+        let key = Self.viewportDefaultsPrefix + id
+        let dict: [String: Any] = [
+            "zoom": Double(scrollView.zoomScale),
+            "offsetX": Double(scrollView.contentOffset.x),
+            "offsetY": Double(scrollView.contentOffset.y),
+        ]
+        UserDefaults.standard.set(dict, forKey: key)
+    }
+
+    func scrollViewDidEndZooming(_ scrollView: UIScrollView, with view: UIView?, atScale scale: CGFloat) {
+        saveViewport()
+    }
+
+    func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
+        saveViewport()
+    }
+
+    func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
+        if !decelerate { saveViewport() }
     }
 
     // MARK: - Fit-to-content
@@ -844,6 +1042,9 @@ struct CanvasViewRepresentable: UIViewControllerRepresentable {
     // Increment to trigger a fit-to-content zoom on next updateUIViewController.
     var fitToken: Int = 0
 
+    // Used to key viewport persistence (zoom + scroll offset) per plan.
+    var planId: String?
+
     var onSelectTable: (String) -> Void
     var onSelectObject: (String) -> Void
     var onDeselectAll: () -> Void
@@ -857,6 +1058,7 @@ struct CanvasViewRepresentable: UIViewControllerRepresentable {
     }
 
     func updateUIViewController(_ vc: CanvasViewController, context: Context) {
+        vc.setPlanId(planId)
         vc.updateTables(tables, guests: guests, selectedId: selectedTableId)
         vc.updateObjects(objects, selectedId: selectedObjectId)
         vc.updateRoom(
