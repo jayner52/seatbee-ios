@@ -408,7 +408,7 @@ struct ShareView: View {
     /// off the local plan.
     private func fetchQRConfig(planId: String) async {
         qrError = nil
-        guard let url = URL(string: "https://seatbee.app/api/guest?action=config&planId=\(planId)") else { return }
+        guard let url = URL(string: "\(AppConfig.guestAPIBaseURL)?action=config&planId=\(planId)") else { return }
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         if let token = await AuthService().accessToken {
@@ -436,7 +436,7 @@ struct ShareView: View {
         qrSyncing = true
         defer { qrSyncing = false }
 
-        guard let url = URL(string: "https://seatbee.app/api/guest") else {
+        guard let url = URL(string: "\(AppConfig.guestAPIBaseURL)") else {
             qrError = "Couldn't reach the QR service."
             return
         }
