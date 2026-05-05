@@ -172,11 +172,11 @@ struct ShareView: View {
                     .buttonStyle(.plain)
 
                     // Fine print explaining what a collaborator can and
-                    // can't do. Mirrors web's permission model exactly:
-                    // collabs get full edit access on guests / tables /
-                    // rules / objects, but rename / delete / arrangements /
-                    // invitations stay owner-only.
-                    Text("Collaborators can add guests, move tables, edit rules — full edit access. Only you can rename the event, create arrangements, manage collaborators, or delete the plan.")
+                    // can't do. Mirrors web's permission model: collabs
+                    // get full edit access on guests / tables / rules /
+                    // objects, but rename / delete / invitations stay
+                    // owner-only.
+                    Text("Collaborators can add guests, move tables, edit rules — full edit access. Only you can rename the event, manage collaborators, or delete the plan.")
                         .font(SBFont.caption)
                         .foregroundStyle(Color.sbWarm)
                         .padding(.top, 4)
