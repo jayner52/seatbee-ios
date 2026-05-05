@@ -331,9 +331,25 @@ struct RoomSetupSheet: View {
         let factor = RoomScale.factor(for: unit)
         let widthPx = max((Double(roomWidth) ?? 0) * factor, 100)
         let heightPx = max((Double(roomHeight) ?? 0) * factor, 100)
-        let livePoints: [RoomPoint] = workingPoints
-            ?? appState.activePlan?.customRoomPoints
-            ?? RoomShapePresets.defaultPoints(shape: selectedShape, width: widthPx, height: heightPx)
+        // Pick the right starting points for the trace canvas. If the user
+        // changed dimensions (e.g. tapped a Quick Preset) but kept a preset
+        // shape, the saved customRoomPoints are at the OLD size and would
+        // render off-screen — regenerate from preset at the live dims.
+        // Custom-shaped plans preserve their saved points only when the
+        // bbox roughly matches current dims; otherwise we fall back too.
+        let livePoints: [RoomPoint] = {
+            if let traced = workingPoints { return traced }
+            let saved = appState.activePlan?.customRoomPoints
+            if let saved = saved, !saved.isEmpty {
+                let maxX = saved.map(\.x).max() ?? 0
+                let maxY = saved.map(\.y).max() ?? 0
+                let widthMatches = widthPx > 0 && abs(maxX - widthPx) / widthPx < 0.15
+                let heightMatches = heightPx > 0 && abs(maxY - heightPx) / heightPx < 0.15
+                if widthMatches && heightMatches { return saved }
+            }
+            let shape = selectedShape == "custom" ? "rect" : selectedShape
+            return RoomShapePresets.defaultPoints(shape: shape, width: widthPx, height: heightPx)
+        }()
 
         TraceShapeSheet(
             initialPoints: livePoints,
@@ -413,24 +429,32 @@ struct RoomSetupSheet: View {
         plan.roomHeight = heightPx > 0 ? heightPx : plan.roomHeight
         plan.measurementUnit = unit
 
-        // Three-way priority: workingPoints (from trace sheet) wins, then a
-        // preset regen on shape-change, then leave existing points alone.
-        // Web's onShapeChange does the regen step; the trace sheet maps to
-        // setLocalPts() in web's RoomEditorModal.
+        // Regenerate customRoomPoints from the preset whenever EITHER the
+        // shape OR the dimensions changed — otherwise tapping a Quick Preset
+        // (e.g. Small 50×35ft) updated roomWidth/roomHeight but kept the
+        // old polygon, leaving the canvas rendering the previous room
+        // size. Custom shape preserves whatever points the user traced.
+        // Trace-sheet output (workingPoints) overrides everything.
         let previousShape = appState.activePlan?.roomShape
+        let previousW = appState.activePlan?.roomWidth ?? -1
+        let previousH = appState.activePlan?.roomHeight ?? -1
+        let shapeChanged = selectedShape != previousShape
+        let dimsChanged = abs((plan.roomWidth ?? 0) - previousW) > 1
+                       || abs((plan.roomHeight ?? 0) - previousH) > 1
+
+        plan.roomShape = selectedShape
         if let traced = workingPoints {
             plan.customRoomPoints = traced
-            plan.roomShape = selectedShape
-        } else if selectedShape != previousShape || plan.customRoomPoints == nil {
-            plan.roomShape = selectedShape
+        } else if selectedShape != "custom" &&
+                  (shapeChanged || dimsChanged || plan.customRoomPoints == nil) {
             if let w = plan.roomWidth, let h = plan.roomHeight, w > 0, h > 0 {
                 plan.customRoomPoints = RoomShapePresets.defaultPoints(
                     shape: selectedShape, width: w, height: h
                 )
             }
-        } else {
-            plan.roomShape = selectedShape
         }
+        // (else: selectedShape == "custom" with no traced override → preserve
+        // the user's existing custom polygon as-is.)
 
         // Flip flags persist (web parity — Trace canvas Flip H/V buttons).
         // Canvas reads these in its roomBezierPath() to mirror the rendered
