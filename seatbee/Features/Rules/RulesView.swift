@@ -492,6 +492,11 @@ struct AddRuleSheet: View {
     @State private var selectedTableId: String?
     @State private var selectedObjectId: String?
     @State private var selectedCategoryId: String?
+    // Keep Apart uses two parallel selections (sideA / sideB) — web parity.
+    @State private var selectedSideAIds: Set<String> = []
+    @State private var selectedSideBIds: Set<String> = []
+    @State private var sideASearch: String = ""
+    @State private var sideBSearch: String = ""
     @State private var nameText: String = ""
     @State private var weight: Double = 50
     @State private var isHard = false
@@ -535,6 +540,9 @@ struct AddRuleSheet: View {
             return selectedCategoryId != nil
         case .seatAdjacent:
             return selectedGuestIds.count == 2  // exactly 2
+        case .mustNot:
+            // Web parity: each side must have ≥1 guest.
+            return !selectedSideAIds.isEmpty && !selectedSideBIds.isEmpty
         default:
             return selectedGuestIds.count >= minGuestsForType
         }
@@ -654,33 +662,135 @@ struct AddRuleSheet: View {
         }
     }
 
+    // Web parity (src/App.jsx:13321-13345 createKeepApartRule):
+    // Keep Apart has two parallel guest pickers — Side A and Side B —
+    // and the rule must NOT seat anyone on Side A at the same table as
+    // anyone on Side B. We mirror that two-side selection on iOS, write
+    // both sideA and sideB arrays AND a flat guests array (backward
+    // compat — web does the same).
     private var keepApartForm: some View {
         VStack(alignment: .leading, spacing: 20) {
-            guestPickerSection
-            // Web's createKeepApartRule sets hard = (weight >= 90) implicitly,
-            // so iOS surfaces a single weight slider with a contextual label.
-            weightSliderSection(label: weight >= 90 ? "Required (high priority)" : "Importance (preferred)")
+            Text("People on Side A won't sit at the same table as anyone on Side B.")
+                .font(SBFont.caption)
+                .foregroundStyle(Color.sbWarm)
+
+            sidePickerSection(
+                title: "SIDE A",
+                badge: "A",
+                selection: $selectedSideAIds,
+                otherSelection: $selectedSideBIds,
+                search: $sideASearch
+            )
+            sidePickerSection(
+                title: "SIDE B",
+                badge: "B",
+                selection: $selectedSideBIds,
+                otherSelection: $selectedSideAIds,
+                search: $sideBSearch
+            )
+
+            // Web's createKeepApartRule sets hard = (weight >= 90) implicitly.
+            weightSliderSection(label: weight >= 90 ? "Required (high priority)" : "Preferred")
         }
     }
 
+    @ViewBuilder
+    private func sidePickerSection(
+        title: String,
+        badge: String,
+        selection: Binding<Set<String>>,
+        otherSelection: Binding<Set<String>>,
+        search: Binding<String>
+    ) -> some View {
+        let sideGuests: [Guest] = {
+            if search.wrappedValue.isEmpty { return guests }
+            return guests.filter { $0.displayName.localizedCaseInsensitiveContains(search.wrappedValue) }
+        }()
+
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Text(badge)
+                    .font(SBFont.inter(11, weight: .bold))
+                    .foregroundStyle(Color.sbGoldDk)
+                    .frame(width: 22, height: 22)
+                    .background(Color.sbGold.opacity(0.2))
+                    .clipShape(Circle())
+                Text(title)
+                    .font(SBFont.capsLabel)
+                    .foregroundStyle(Color.sbWarm)
+                    .letterSpacing(1.5)
+                Spacer()
+                Text("\(selection.wrappedValue.count) selected")
+                    .font(SBFont.caption)
+                    .foregroundStyle(Color.sbWarm)
+            }
+
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(Color.sbWarm)
+                TextField("Search...", text: search)
+                    .font(SBFont.body)
+            }
+            .padding(10)
+            .background(Color.sbIvory2)
+            .clipShape(RoundedRectangle(cornerRadius: SBRadius.small))
+
+            VStack(spacing: 4) {
+                ForEach(sideGuests.prefix(50)) { guest in
+                    Button {
+                        if selection.wrappedValue.contains(guest.id) {
+                            selection.wrappedValue.remove(guest.id)
+                        } else {
+                            selection.wrappedValue.insert(guest.id)
+                            // A guest can't be on both sides — remove from the other.
+                            otherSelection.wrappedValue.remove(guest.id)
+                        }
+                        HapticEngine.selection()
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: selection.wrappedValue.contains(guest.id) ? "checkmark.circle.fill" : "circle")
+                                .foregroundStyle(selection.wrappedValue.contains(guest.id) ? Color.sbGold : Color.sbWarm2)
+                            Text(guest.displayName)
+                                .font(SBFont.bodySmall)
+                                .foregroundStyle(Color.sbCharcoal)
+                            Spacer()
+                        }
+                        .padding(.vertical, 6)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .padding(12)
+        .background(Color.sbIvory.opacity(0.5))
+        .overlay(
+            RoundedRectangle(cornerRadius: SBRadius.small)
+                .strokeBorder(Color.sbLine, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: SBRadius.small))
+    }
+
+    // For these forms, the entity picker (table / venue object / category)
+    // sits at the TOP so users don't scroll past a long guest list to reach
+    // it. Per-form layout: entity → guests → slider (when applicable).
+
     private var assignToTableForm: some View {
         VStack(alignment: .leading, spacing: 20) {
-            guestPickerSection
             formSection("ASSIGN TO TABLE") { tableChips }
+            guestPickerSection
         }
     }
 
     private var nearTableForm: some View {
         VStack(alignment: .leading, spacing: 20) {
-            guestPickerSection
             formSection("NEAR WHICH TABLE") { tableChips }
             weightSliderSection(label: "Importance")
+            guestPickerSection
         }
     }
 
     private var nearVenueForm: some View {
         VStack(alignment: .leading, spacing: 20) {
-            guestPickerSection
             formSection("NEAR WHICH VENUE OBJECT") {
                 if objects.isEmpty {
                     Text("No venue objects in this plan yet. Add one from the Edit tab.")
@@ -691,6 +801,7 @@ struct AddRuleSheet: View {
                 }
             }
             weightSliderSection(label: "Importance")
+            guestPickerSection
         }
     }
 
@@ -963,19 +1074,29 @@ struct AddRuleSheet: View {
             plan.rules.append(rule)
 
         case .mustNot:
-            let names = selectedGuestIds.compactMap { id in
-                guests.first(where: { $0.id == id })?.displayName
-            }.joined(separator: " & ")
+            // Web parity (createKeepApartRule line 13321-13345): write
+            // sideA + sideB + flat guests (= sideA ++ sideB) so old web
+            // readers fall back to guests and new readers prefer the
+            // sideA/sideB split.
+            let sideA = Array(selectedSideAIds)
+            let sideB = Array(selectedSideBIds)
+            let merged = sideA + sideB
+            let nameOf: (String) -> String = { id in
+                guests.first(where: { $0.id == id })?.displayName ?? "?"
+            }
+            let aNames = sideA.map(nameOf).joined(separator: ", ")
+            let bNames = sideB.map(nameOf).joined(separator: ", ")
             let rule = SeatingRule(
                 id: ruleId,
                 type: .mustNot,
-                guests: Array(selectedGuestIds),
+                guests: merged,
                 tableId: nil,
                 weight: Int(weight),
                 hard: weight >= 90,
                 enabled: true,
                 categoryId: nil, objectId: nil, sideValue: nil,
-                desc: names,
+                sideA: sideA, sideB: sideB,
+                desc: "\(aNames) ✕ \(bNames)",
                 auto: nil, source: "manual",
                 partyId: nil, groupId: nil
             )
