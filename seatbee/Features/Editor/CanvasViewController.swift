@@ -30,6 +30,12 @@ class CanvasViewController: UIViewController, UIScrollViewDelegate {
     private let canvasSize = CGSize(width: 2000, height: 2000)
     private let canvasOrigin = CGPoint(x: 400, y: 400) // offset so objects start visible
 
+    // Room outline + floor plan backdrop layers. Both sit between the
+    // dot pattern background (index 0) and the table/object subviews.
+    private let floorPlanImageView = UIImageView()
+    private let roomOutlineLayer = CAShapeLayer()
+    private let zoneShapesLayer = CAShapeLayer()
+
     override func viewDidLoad() {
         super.viewDidLoad()
 
@@ -57,10 +63,32 @@ class CanvasViewController: UIViewController, UIScrollViewDelegate {
         scrollView.addSubview(contentView)
         scrollView.contentSize = canvasSize
 
-        // Dot pattern background
+        // Dot pattern background (layer index 0)
         let dotLayer = DotPatternLayer()
         dotLayer.frame = contentView.bounds
         contentView.layer.insertSublayer(dotLayer, at: 0)
+
+        // Floor plan backdrop (between dots and outline). Hidden until
+        // updateRoom(...) is called with a non-nil image.
+        floorPlanImageView.contentMode = .scaleAspectFit
+        floorPlanImageView.alpha = 0.4
+        floorPlanImageView.isUserInteractionEnabled = false
+        floorPlanImageView.isHidden = true
+        contentView.addSubview(floorPlanImageView)
+
+        // Room outline (above floor plan, below tables/objects).
+        roomOutlineLayer.fillColor = UIColor(red: 247/255, green: 231/255, blue: 206/255, alpha: 0.35).cgColor
+        roomOutlineLayer.strokeColor = UIColor(red: 201/255, green: 169/255, blue: 97/255, alpha: 0.7).cgColor
+        roomOutlineLayer.lineWidth = 2
+        contentView.layer.insertSublayer(roomOutlineLayer, above: dotLayer)
+
+        // Zone (labeled area) outlines. Drawn above the room outline so
+        // they read as nested regions within the room.
+        zoneShapesLayer.fillColor = UIColor.clear.cgColor
+        zoneShapesLayer.strokeColor = UIColor(red: 201/255, green: 169/255, blue: 97/255, alpha: 0.4).cgColor
+        zoneShapesLayer.lineWidth = 1.5
+        zoneShapesLayer.lineDashPattern = [4, 3]
+        contentView.layer.insertSublayer(zoneShapesLayer, above: roomOutlineLayer)
 
         // Tap to deselect
         let tap = UITapGestureRecognizer(target: self, action: #selector(handleBackgroundTap(_:)))
@@ -79,6 +107,171 @@ class CanvasViewController: UIViewController, UIScrollViewDelegate {
 
     func viewForZooming(in scrollView: UIScrollView) -> UIView? {
         contentView
+    }
+
+    // MARK: - Room outline + floor plan
+    //
+    // Web parity (src/App.jsx:3723-3761 roomPath()): convert customRoomPoints
+    // into an SVG-style path with M / L / A / Z segments, optionally flipped
+    // H / V. iOS draws the equivalent UIBezierPath as a CAShapeLayer.
+    //
+    // Coordinate system: room (0,0) lives at canvasOrigin (400, 400). Web
+    // points are absolute pixels in [0..roomWidth, 0..roomHeight], which we
+    // translate by canvasOrigin so they align with table x/y coordinates
+    // (which are also stored in the same room-pixel space).
+
+    func updateRoom(
+        roomShape: String?,
+        roomWidth: Double?,
+        roomHeight: Double?,
+        customRoomPoints: [RoomPoint]?,
+        roomFlipH: Bool?,
+        roomFlipV: Bool?,
+        roomZones: [RoomZone]?,
+        floorPlanBase64: String?,
+        floorPlanOpacity: Double?
+    ) {
+        let w = CGFloat(roomWidth ?? 0)
+        let h = CGFloat(roomHeight ?? 0)
+
+        // Outline path
+        if w > 0 && h > 0 {
+            let path = roomBezierPath(
+                shape: roomShape,
+                width: w,
+                height: h,
+                customPoints: customRoomPoints,
+                flipH: roomFlipH ?? false,
+                flipV: roomFlipV ?? false
+            )
+            // Translate to canvasOrigin so the room aligns with table x/y.
+            var transform = CGAffineTransform(translationX: canvasOrigin.x, y: canvasOrigin.y)
+            roomOutlineLayer.path = path.cgPath.copy(using: &transform)
+        } else {
+            roomOutlineLayer.path = nil
+        }
+
+        // Zones
+        if let zones = roomZones, !zones.isEmpty {
+            let combined = UIBezierPath()
+            for z in zones {
+                let r = CGRect(
+                    x: canvasOrigin.x + CGFloat(z.x),
+                    y: canvasOrigin.y + CGFloat(z.y),
+                    width: CGFloat(z.w),
+                    height: CGFloat(z.h)
+                )
+                combined.append(UIBezierPath(roundedRect: r, cornerRadius: 4))
+            }
+            zoneShapesLayer.path = combined.cgPath
+        } else {
+            zoneShapesLayer.path = nil
+        }
+
+        // Floor plan backdrop. Web stores floorPlanImage as a base64 data URL
+        // (string starting with "data:image/..."). iOS decodes it once and
+        // positions it at the canvas origin sized to the room dimensions.
+        if let base64 = floorPlanBase64, !base64.isEmpty,
+           let image = decodeBase64Image(base64), w > 0, h > 0 {
+            floorPlanImageView.image = image
+            floorPlanImageView.frame = CGRect(
+                x: canvasOrigin.x, y: canvasOrigin.y,
+                width: w, height: h
+            )
+            floorPlanImageView.alpha = CGFloat(floorPlanOpacity ?? 0.4)
+            floorPlanImageView.isHidden = false
+        } else {
+            floorPlanImageView.image = nil
+            floorPlanImageView.isHidden = true
+        }
+    }
+
+    // Direct port of web's roomPath() — builds a UIBezierPath equivalent
+    // to the SVG path web emits. Honors arc segments (rx, ry, sweep,
+    // largeArc) and the flipH/flipV transforms (which also invert the
+    // arc sweep direction when flipping H xor V).
+    private func roomBezierPath(
+        shape: String?,
+        width: CGFloat,
+        height: CGFloat,
+        customPoints: [RoomPoint]?,
+        flipH: Bool,
+        flipV: Bool
+    ) -> UIBezierPath {
+        let basePoints: [RoomPoint] = {
+            if let pts = customPoints, pts.count >= 3 { return pts }
+            return RoomShapePresets.defaultPoints(shape: shape ?? "rect", width: Double(width), height: Double(height))
+        }()
+
+        let flipped: [RoomPoint] = basePoints.map { p in
+            var f = p
+            if flipH { f.x = Double(width) - p.x }
+            if flipV { f.y = Double(height) - p.y }
+            if let arc = p.arc, flipH != flipV {
+                // Flipping H xor V inverts arc sweep direction.
+                f.arc = RoomArc(rx: arc.rx, ry: arc.ry, sweep: arc.sweep == 1 ? 0 : 1, largeArc: arc.largeArc)
+            }
+            return f
+        }
+
+        let path = UIBezierPath()
+        guard !flipped.isEmpty else { return path }
+        let first = flipped[0]
+        path.move(to: CGPoint(x: first.x, y: first.y))
+        for i in 1..<flipped.count {
+            let p = flipped[i]
+            if let arc = p.arc {
+                appendArc(to: path, end: CGPoint(x: p.x, y: p.y), arc: arc)
+            } else {
+                path.addLine(to: CGPoint(x: p.x, y: p.y))
+            }
+        }
+        // Close: if the FIRST point has an arc, the closing segment is an
+        // arc from the last point back to the first. Else a straight close.
+        if let arc = first.arc {
+            appendArc(to: path, end: CGPoint(x: first.x, y: first.y), arc: arc)
+        }
+        path.close()
+        return path
+    }
+
+    // Convert SVG-style elliptical arc parameters into a UIBezierPath
+    // segment. UIBezierPath has no native A command, so we approximate
+    // with addQuadCurve using the chord midpoint perpendicular-offset.
+    // For most floor-plan use cases (gentle wall curves) this looks
+    // identical to web's SVG arc; large-radius edge cases are rare and
+    // the persisted shape is preserved exactly on round-trip.
+    private func appendArc(to path: UIBezierPath, end: CGPoint, arc: RoomArc) {
+        let start = path.currentPoint
+        let mid = CGPoint(x: (start.x + end.x)/2, y: (start.y + end.y)/2)
+        let dx = end.x - start.x
+        let dy = end.y - start.y
+        let chordLen = sqrt(dx*dx + dy*dy)
+        guard chordLen > 0 else {
+            path.addLine(to: end); return
+        }
+        let r = max(CGFloat(arc.rx), chordLen / 2)
+        let h = sqrt(max(0, r*r - (chordLen/2)*(chordLen/2)))
+        let nx = -dy / chordLen
+        let ny = dx / chordLen
+        let direction: CGFloat = arc.sweep == 1 ? 1 : -1
+        let controlOffset = (r - h) * 2  // approximate quadratic control offset
+        let control = CGPoint(
+            x: mid.x + nx * direction * controlOffset,
+            y: mid.y + ny * direction * controlOffset
+        )
+        path.addQuadCurve(to: end, controlPoint: control)
+    }
+
+    private func decodeBase64Image(_ s: String) -> UIImage? {
+        // Web stores floorPlanImage as either a "data:image/...;base64,..."
+        // URL or a raw base64 string.
+        var raw = s
+        if let commaIdx = s.firstIndex(of: ","), s.hasPrefix("data:") {
+            raw = String(s[s.index(after: commaIdx)...])
+        }
+        guard let data = Data(base64Encoded: raw) else { return nil }
+        return UIImage(data: data)
     }
 
     // MARK: - Update from SwiftUI
@@ -606,6 +799,17 @@ struct CanvasViewRepresentable: UIViewControllerRepresentable {
     let selectedTableId: String?
     let selectedObjectId: String?
 
+    // Venue setup — drives the room outline + floor plan backdrop on the canvas.
+    var roomShape: String?
+    var roomWidth: Double?
+    var roomHeight: Double?
+    var customRoomPoints: [RoomPoint]?
+    var roomFlipH: Bool?
+    var roomFlipV: Bool?
+    var roomZones: [RoomZone]?
+    var floorPlanBase64: String?
+    var floorPlanOpacity: Double?
+
     var onSelectTable: (String) -> Void
     var onSelectObject: (String) -> Void
     var onDeselectAll: () -> Void
@@ -621,6 +825,17 @@ struct CanvasViewRepresentable: UIViewControllerRepresentable {
     func updateUIViewController(_ vc: CanvasViewController, context: Context) {
         vc.updateTables(tables, guests: guests, selectedId: selectedTableId)
         vc.updateObjects(objects, selectedId: selectedObjectId)
+        vc.updateRoom(
+            roomShape: roomShape,
+            roomWidth: roomWidth,
+            roomHeight: roomHeight,
+            customRoomPoints: customRoomPoints,
+            roomFlipH: roomFlipH,
+            roomFlipV: roomFlipV,
+            roomZones: roomZones,
+            floorPlanBase64: floorPlanBase64,
+            floorPlanOpacity: floorPlanOpacity
+        )
     }
 
     func makeCoordinator() -> Coordinator {

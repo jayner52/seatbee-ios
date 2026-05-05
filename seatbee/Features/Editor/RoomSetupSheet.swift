@@ -181,14 +181,51 @@ struct RoomSetupSheet: View {
 
     private func loadCurrentSetup() {
         guard let plan = appState.activePlan else { return }
-        if let w = plan.roomWidth { roomWidth = String(format: "%.0f", w) }
-        if let h = plan.roomHeight { roomHeight = String(format: "%.0f", h) }
+        // Web stores dimensions in pixels; convert back to ft/m for display.
+        let unit = plan.measurementUnit ?? "imperial"
+        useMetric = (unit.lowercased() == "metric")
+        let factor = RoomScale.factor(for: unit)
+        if let w = plan.roomWidth { roomWidth = String(format: "%.0f", w / factor) }
+        if let h = plan.roomHeight { roomHeight = String(format: "%.0f", h / factor) }
+        if let shape = plan.roomShape, !shape.isEmpty { selectedShape = shape }
     }
 
     private func applySetup() {
         guard var plan = appState.activePlan else { return }
-        plan.roomWidth = Double(roomWidth)
-        plan.roomHeight = Double(roomHeight)
+        let unit = useMetric ? "metric" : "imperial"
+        let factor = RoomScale.factor(for: unit)
+
+        // Convert user-entered ft/m to pixels before persisting (web parity).
+        let widthPx = (Double(roomWidth) ?? 0) * factor
+        let heightPx = (Double(roomHeight) ?? 0) * factor
+        plan.roomWidth = widthPx > 0 ? widthPx : plan.roomWidth
+        plan.roomHeight = heightPx > 0 ? heightPx : plan.roomHeight
+        plan.measurementUnit = unit
+
+        // If shape changed (or this is the first time the user has set
+        // a shape), regenerate customRoomPoints from the preset. Web's
+        // SHAPE-button onClick does exactly this.
+        let previousShape = appState.activePlan?.roomShape
+        if selectedShape != previousShape || plan.customRoomPoints == nil {
+            plan.roomShape = selectedShape
+            if let w = plan.roomWidth, let h = plan.roomHeight, w > 0, h > 0 {
+                plan.customRoomPoints = RoomShapePresets.defaultPoints(
+                    shape: selectedShape, width: w, height: h
+                )
+            }
+        } else {
+            plan.roomShape = selectedShape
+        }
+
+        // Persist floor plan image (if user uploaded one) as a base64 data
+        // URL on rawFloorPlanImage. Default opacity matches web (0.4).
+        if let image = floorPlanImage,
+           let data = image.jpegData(compressionQuality: 0.85) {
+            let dataURL = "data:image/jpeg;base64," + data.base64EncodedString()
+            plan.rawFloorPlanImage = AnyCodable(dataURL)
+            if plan.rawFloorPlanOpacity == nil { plan.rawFloorPlanOpacity = 0.4 }
+        }
+
         appState.activePlan = plan
         HapticEngine.success()
         Task { try? await appState.database.savePlanData(plan: plan) }

@@ -34,6 +34,15 @@ struct EditorView: View {
                     guests: plan?.guests ?? [],
                     selectedTableId: selectedTableId,
                     selectedObjectId: selectedObjectId,
+                    roomShape: plan?.roomShape,
+                    roomWidth: plan?.roomWidth,
+                    roomHeight: plan?.roomHeight,
+                    customRoomPoints: plan?.customRoomPoints,
+                    roomFlipH: plan?.roomFlipH,
+                    roomFlipV: plan?.roomFlipV,
+                    roomZones: plan?.roomZones,
+                    floorPlanBase64: plan?.rawFloorPlanImage?.value as? String,
+                    floorPlanOpacity: plan?.rawFloorPlanOpacity,
                     onSelectTable: { id in
                         selectedObjectId = nil
                         selectedTableId = id
