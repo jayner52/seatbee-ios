@@ -362,9 +362,15 @@ struct ShareView: View {
                 }
             }
         }
-        .onAppear { syncQRStateFromPlan(plan) }
+        .onAppear {
+            syncQRStateFromPlan(plan)
+            Task { await fetchQRConfig(planId: plan.id) }
+        }
         .onChange(of: appState.activePlan?.id) { _, _ in
-            if let p = appState.activePlan { syncQRStateFromPlan(p) }
+            if let p = appState.activePlan {
+                syncQRStateFromPlan(p)
+                Task { await fetchQRConfig(planId: p.id) }
+            }
         }
     }
 
@@ -395,10 +401,36 @@ struct ShareView: View {
         qrToken = plan.guestQRToken
     }
 
-    /// POST to the same `/api/guest` endpoint web uses. Returns the token
-    /// either freshly minted (first enable) or the existing one. iOS stores
-    /// the response back into the plan's `rawGuestQR` so subsequent saves
-    /// preserve it for web.
+    /// GET current config from the server on first appearance. The token +
+    /// enabled flag live on top-level `seating_plans` columns
+    /// (`guest_link_token`, `guest_experience`) — NOT inside the JSONB
+    /// `data` blob — so iOS has to ask the server rather than reading it
+    /// off the local plan.
+    private func fetchQRConfig(planId: String) async {
+        qrError = nil
+        guard let url = URL(string: "https://seatbee.app/api/guest?action=config&planId=\(planId)") else { return }
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        if let token = await AuthService().accessToken {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse, http.statusCode == 200,
+                  let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else {
+                return  // silent — section just stays in default state
+            }
+            qrToken = json["token"] as? String
+            let config = (json["config"] as? [String: Any]) ?? [:]
+            qrEnabled = (config["enabled"] as? Bool) ?? false
+        } catch {
+            // silent on read; the toggle still works for write
+        }
+    }
+
+    /// POST to `/api/guest`. Server stores config in the `guest_experience`
+    /// column and returns the (possibly newly-minted) token. iOS keeps the
+    /// returned token in local @State; no JSONB writeback needed.
     private func saveQRConfig(planId: String, enabled: Bool) async {
         qrError = nil
         qrSyncing = true
@@ -413,6 +445,9 @@ struct ShareView: View {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         if let token = await AuthService().accessToken {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        } else {
+            qrError = "Sign-in required. Try the Plans tab to refresh."
+            return
         }
 
         let body: [String: Any] = [
@@ -424,29 +459,20 @@ struct ShareView: View {
 
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
-            guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
-                qrError = "QR save failed. Try again."
+            guard let http = response as? HTTPURLResponse else {
+                qrError = "Unexpected response."
                 return
             }
             let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
-            let newToken = (json?["token"] as? String) ?? qrToken
-            qrToken = newToken
-            persistQRStateToPlan(enabled: enabled, token: newToken)
+            if http.statusCode != 200 {
+                let serverError = (json?["error"] as? String) ?? "status \(http.statusCode)"
+                qrError = "QR save failed: \(serverError)"
+                return
+            }
+            qrToken = (json?["token"] as? String) ?? qrToken
         } catch {
             qrError = "Network error: \(error.localizedDescription)"
         }
-    }
-
-    /// Mirror the new state into `rawGuestQR` so the next plan save persists
-    /// it. Preserves any extra fields the web has authored (qrStyle, etc.).
-    private func persistQRStateToPlan(enabled: Bool, token: String?) {
-        guard var plan = appState.activePlan else { return }
-        var dict = (plan.rawGuestQR?.value as? [String: Any]) ?? [:]
-        dict["enabled"] = enabled
-        if let t = token { dict["linkToken"] = t }
-        plan.rawGuestQR = AnyCodable(dict)
-        appState.activePlan = plan
-        Task { try? await appState.database.savePlanData(plan: plan) }
     }
 
     private func shareQR(url: String) {
