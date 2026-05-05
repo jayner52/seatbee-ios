@@ -9,6 +9,7 @@ struct EditorView: View {
     @State private var showAddTable = false
     @State private var showAddVenueObject = false
     @State private var showRoomSetup = false
+    @State private var showAllTablesList = false
     @State private var showDetailSheet = false
     @State private var showDeleteConfirm = false
     @State private var assigningSeatIndex: Int?
@@ -134,6 +135,12 @@ struct EditorView: View {
             RoomSetupSheet()
                 .environment(appState)
         }
+        .sheet(isPresented: $showAllTablesList) {
+            AllTablesListSheet()
+                .environment(appState)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+        }
         .sheet(isPresented: $showEditObject) {
             if let id = selectedObjectId {
                 EditVenueObjectSheet(objectId: id)
@@ -244,6 +251,15 @@ struct EditorView: View {
                         .background(.ultraThinMaterial)
                         .clipShape(Circle())
                 }
+            }
+
+            Button { showAllTablesList = true; HapticEngine.light() } label: {
+                Image(systemName: "list.bullet")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(Color.sbCharcoal)
+                    .frame(width: 34, height: 34)
+                    .background(.ultraThinMaterial)
+                    .clipShape(Circle())
             }
 
             Button { showRoomSetup = true } label: {
