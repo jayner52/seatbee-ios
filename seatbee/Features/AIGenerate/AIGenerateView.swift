@@ -12,6 +12,13 @@ struct AIGenerateView: View {
         .init(label: "Placing +1s", status: .pending),
         .init(label: "Final review", status: .pending),
     ]
+    @State private var tierGateAlert: TierGateAlert?
+
+    private struct TierGateAlert: Identifiable {
+        let id = UUID()
+        let title: String
+        let message: String
+    }
 
     enum GenerationPhase {
         case ready, generating, complete
@@ -50,6 +57,18 @@ struct AIGenerateView: View {
                 let plans = (try? await appState.database.fetchPlans()) ?? []
                 if let first = plans.first { appState.activePlan = first }
             }
+        }
+        .alert(
+            tierGateAlert?.title ?? "",
+            isPresented: Binding(
+                get: { tierGateAlert != nil },
+                set: { if !$0 { tierGateAlert = nil } }
+            ),
+            presenting: tierGateAlert
+        ) { _ in
+            Button("OK", role: .cancel) {}
+        } message: { gate in
+            Text(gate.message)
         }
     }
 
@@ -273,6 +292,25 @@ struct AIGenerateView: View {
     }
 
     private func startGeneration(unseated: Int) {
+        // Tier gate — mirrors web's checkTierLimit('ai_generate') at
+        // App.jsx:6217. Free tier blocked; expired pass tiers also blocked
+        // because activePlanLimits collapses to free when expired.
+        guard appState.activePlanLimits.aiGenerate else {
+            HapticEngine.error()
+            if appState.isActivePlanExpired {
+                tierGateAlert = TierGateAlert(
+                    title: "Pass Expired",
+                    message: "This event's pass has expired. Apply a new Event Pass in Settings to use AI seating again."
+                )
+            } else {
+                tierGateAlert = TierGateAlert(
+                    title: "AI Seating Needs an Event Pass",
+                    message: "AI seating is included with Event Pass, Signature Pass, and Grand Event Pass. Apply a pass in Settings → Event Passes to unlock."
+                )
+            }
+            return
+        }
+
         totalToSeat = unseated
         seatedCount = 0
         phase = .generating

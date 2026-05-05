@@ -9,7 +9,7 @@ final class DatabaseService {
     func fetchPlans() async throws -> [SeatingPlan] {
         let response: [SeatingPlanDTO] = try await client
             .from("seating_plans")
-            .select("id, user_id, name, data, event_date, event_type, event_venue_name, seated_guest_count, tier, created_at, updated_at, deleted_at")
+            .select("id, user_id, name, data, event_date, event_type, event_venue_name, seated_guest_count, tier, event_pass_expires_at, event_pass_purchased_at, created_at, updated_at, deleted_at")
             .is("deleted_at", value: nil as Bool?)
             .order("updated_at", ascending: false)
             .execute()

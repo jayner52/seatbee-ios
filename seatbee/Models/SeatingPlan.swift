@@ -31,6 +31,11 @@ struct SeatingPlan: Identifiable, Codable {
     var updatedAt: Date?
     var userId: String?
     var tier: String?
+    // Pass expiry — top-level columns on `seating_plans`, set by the web's
+    // /api/passes redemption flow. iOS reads these but never writes them
+    // (Supabase PATCH preserves untouched columns).
+    var eventPassExpiresAt: Date?
+    var eventPassPurchasedAt: Date?
 
     // Raw passthrough: entities iOS doesn't model but must preserve on round-trip
     var rawCategories: [[String: AnyCodable]]?

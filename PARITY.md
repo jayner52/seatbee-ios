@@ -88,7 +88,7 @@ A field is shared if it is persisted to Supabase `seating_plans.data` (JSONB). S
 
 | Entity | Web location | iOS location |
 |---|---|---|
-| Plan-level metadata | `state.event`, `state.tier`, etc. | `Models/SeatingPlan.swift` (root) |
+| Plan-level metadata | `state.event`, `state.tier`, `state.event_pass_expires_at`, `state.event_pass_purchased_at`, etc. | `Models/SeatingPlan.swift` (root) |
 | Guest | `state.guests[]` | `Models/SeatingPlan.swift` `Guest` struct |
 | SeatTable | `state.tables[]` | `Models/SeatingPlan.swift` `SeatTable` struct |
 | SeatingRule | `state.rules[]` | `Models/SeatingPlan.swift` `SeatingRule` struct |
@@ -108,6 +108,12 @@ These are the field shapes each entity must use on **both sides**. iOS DTOs and 
 ### `event` (EventData)
 
 `name`, `date`, `venue`, `eventType`, `roomWidth`, `roomHeight`, `roomShape`
+
+### Plan-level pass columns (top-level on `seating_plans` row, not in `data`)
+
+`tier` (string: `free` | `event_pass` | `signature_pass` | `pro_pass`), `event_pass_expires_at` (ISO timestamp), `event_pass_purchased_at` (ISO timestamp).
+
+These are set by the web's `/api/passes` redemption endpoint when a user applies a pass to a plan. iOS reads them on plan load and uses them to enforce tier limits + detect expiry. **iOS never writes these columns** — Supabase PATCH semantics preserve untouched columns, so the existing values are safe across iOS saves.
 
 ### Guest
 

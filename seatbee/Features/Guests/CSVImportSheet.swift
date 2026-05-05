@@ -361,7 +361,11 @@ struct CSVImportSheet: View {
             let limits = appState.activePlanLimits
             let tier = appState.activePlanTier
             let remaining = max(0, limits.seatedGuests - plan.guests.count)
-            tierLimitMessage = "Your \(tier.displayName) plan supports up to \(limits.seatedGuests) guests. You can add \(remaining) more — this CSV has \(parsedGuests.count). Apply an Event Pass in Settings to import the full list."
+            if appState.isActivePlanExpired {
+                tierLimitMessage = "This event's pass has expired, so it's back to a \(limits.seatedGuests)-guest cap. You can add \(remaining) more — this CSV has \(parsedGuests.count). Apply a fresh Event Pass in Settings to import the full list."
+            } else {
+                tierLimitMessage = "Your \(tier.displayName) plan supports up to \(limits.seatedGuests) guests. You can add \(remaining) more — this CSV has \(parsedGuests.count). Apply an Event Pass in Settings to import the full list."
+            }
             HapticEngine.error()
             return
         }
