@@ -14,6 +14,10 @@ struct EditorView: View {
     @State private var assigningSeatIndex: Int?
     @State private var fitToken: Int = 0
     @State private var showEditObject = false
+    // Floor plan visibility — defaults to hidden so a fresh plan doesn't
+    // crowd the canvas with the source image. Persists per-plan in
+    // UserDefaults keyed by plan ID so user preference survives switches.
+    @State private var floorPlanVisible: Bool = false
 
     // Selection tracking
 
@@ -43,7 +47,7 @@ struct EditorView: View {
                     roomFlipH: plan?.roomFlipH,
                     roomFlipV: plan?.roomFlipV,
                     roomZones: plan?.roomZones,
-                    floorPlanBase64: plan?.rawFloorPlanImage?.value as? String,
+                    floorPlanBase64: floorPlanVisible ? (plan?.rawFloorPlanImage?.value as? String) : nil,
                     floorPlanOpacity: plan?.rawFloorPlanOpacity,
                     fitToken: fitToken,
                     planId: plan?.id,
@@ -152,7 +156,9 @@ struct EditorView: View {
             if selectedTableId == nil, let first = tables.first {
                 selectedTableId = first.id
             }
+            loadFloorPlanVisible()
         }
+        .onChange(of: plan?.id) { _, _ in loadFloorPlanVisible() }
         .onReceive(NotificationCenter.default.publisher(for: .selectTable)) { notification in
             if let tableId = notification.userInfo?["tableId"] as? String {
                 withAnimation(.seatbee) {
@@ -221,6 +227,23 @@ struct EditorView: View {
                     .frame(width: 34, height: 34)
                     .background(.ultraThinMaterial)
                     .clipShape(Circle())
+            }
+
+            // Floor plan show/hide — only renders when the plan has an image.
+            // Tinted gold when visible so the active state reads at a glance.
+            if hasFloorPlan {
+                Button {
+                    floorPlanVisible.toggle()
+                    persistFloorPlanVisible()
+                    HapticEngine.selection()
+                } label: {
+                    Image(systemName: floorPlanVisible ? "photo.fill" : "photo")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(floorPlanVisible ? Color.sbGoldDk : Color.sbCharcoal)
+                        .frame(width: 34, height: 34)
+                        .background(.ultraThinMaterial)
+                        .clipShape(Circle())
+                }
             }
 
             Button { showRoomSetup = true } label: {
@@ -511,6 +534,29 @@ struct EditorView: View {
         appState.activePlan = p
         HapticEngine.success()
         Task { try? await appState.database.savePlanData(plan: p) }
+    }
+
+    // MARK: - Floor plan visibility
+
+    private var hasFloorPlan: Bool {
+        if let raw = plan?.rawFloorPlanImage?.value as? String, !raw.isEmpty {
+            return true
+        }
+        return false
+    }
+
+    private func floorPlanVisibleKey(_ planId: String) -> String {
+        "seatbee.floorPlanVisible.\(planId)"
+    }
+
+    private func loadFloorPlanVisible() {
+        guard let id = plan?.id else { floorPlanVisible = false; return }
+        floorPlanVisible = UserDefaults.standard.bool(forKey: floorPlanVisibleKey(id))
+    }
+
+    private func persistFloorPlanVisible() {
+        guard let id = plan?.id else { return }
+        UserDefaults.standard.set(floorPlanVisible, forKey: floorPlanVisibleKey(id))
     }
 
     // MARK: - Category lookup (web parity)
