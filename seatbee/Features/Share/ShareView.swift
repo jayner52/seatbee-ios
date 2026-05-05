@@ -3,9 +3,18 @@ import CoreImage.CIFilterBuiltins
 
 struct ShareView: View {
     @Environment(AppState.self) private var appState
-    @State private var selectedRole = "Viewer"
-    @State private var requireSignIn = false
-    @State private var linkCopied = false
+
+    // Collaborators (web parity — /api/collab)
+    @State private var collabIsOwner = false
+    @State private var collabOwner: CollabPerson?
+    @State private var collaborators: [CollabPerson] = []
+    @State private var invitations: [PendingInvitation] = []
+    @State private var collabLoading = false
+    @State private var collabError: String?
+    @State private var showInvitePrompt = false
+    @State private var inviteEmail = ""
+    @State private var inviteSending = false
+    @State private var inviteResult: String?
 
     // Guest QR section state
     @State private var qrExpanded = false
@@ -13,8 +22,6 @@ struct ShareView: View {
     @State private var qrToken: String?
     @State private var qrSyncing = false
     @State private var qrError: String?
-
-    private let roles = ["Viewer", "Commenter", "Editor"]
 
     var body: some View {
         NavigationStack {
@@ -41,18 +48,18 @@ struct ShareView: View {
                 } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: SBSpacing.sectionGap) {
-                        // Plan preview
+                        // Plan preview + collaborator banner (when non-owner)
                         if let plan = appState.activePlan {
                             planPreview(plan)
+                            if !collabIsOwner, let owner = collabOwner {
+                                collabBanner(owner: owner)
+                            }
                         }
 
-                        // Link card
-                        linkCard
-
-                        SBOrnament(label: "OR")
-
-                        // People list
-                        peopleSection
+                        // Collaborators (web parity — /api/collab)
+                        if let plan = appState.activePlan {
+                            collaboratorsCard(plan: plan)
+                        }
 
                         SBOrnament(label: "Share via")
 
@@ -99,95 +106,170 @@ struct ShareView: View {
         .clipShape(RoundedRectangle(cornerRadius: SBRadius.chip))
     }
 
-    // MARK: - Link Card
+    // MARK: - Collaborator banner (when not the owner)
 
-    private var linkCard: some View {
-        SBCard(backgroundColor: .sbIvory2) {
-            VStack(alignment: .leading, spacing: 14) {
-                Text("Anyone with the link")
-                    .font(SBFont.bodySemibold)
+    private func collabBanner(owner: CollabPerson) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "person.2.fill")
+                .font(.system(size: 14))
+                .foregroundStyle(Color.sbGoldDk)
+            VStack(alignment: .leading, spacing: 0) {
+                Text("Shared by \(owner.name)")
+                    .font(SBFont.bodySmallBold)
                     .foregroundStyle(Color.sbCharcoal)
+                Text("You're a collaborator")
+                    .font(SBFont.caption)
+                    .foregroundStyle(Color.sbWarm)
+            }
+            Spacer()
+        }
+        .padding(12)
+        .background(Color.sbChampagne.opacity(0.5))
+        .clipShape(RoundedRectangle(cornerRadius: SBRadius.chip))
+    }
 
-                // Role segmented control
-                HStack(spacing: 0) {
-                    ForEach(roles, id: \.self) { role in
-                        Button {
-                            withAnimation(.seatbee) { selectedRole = role }
-                        } label: {
-                            Text(role)
-                                .font(SBFont.inter(12, weight: .semibold))
-                                .foregroundStyle(selectedRole == role ? Color.sbGoldDk : Color.sbWarm)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
-                                .background(
-                                    selectedRole == role ? Color.sbChampagne : Color.clear
-                                )
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(4)
-                .background(Color.sbIvory)
-                .clipShape(RoundedRectangle(cornerRadius: 10))
+    // MARK: - Collaborators (web parity — /api/collab)
 
-                // Copy link button
-                Button {
-                    if let plan = appState.activePlan {
-                        let url = "https://seatbee.app/plan/\(plan.id)"
-                        UIPasteboard.general.string = url
-                    }
-                    linkCopied = true
-                    HapticEngine.success()
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                        linkCopied = false
-                    }
-                } label: {
-                    HStack {
-                        Image(systemName: linkCopied ? "checkmark" : "doc.on.doc")
-                        Text(linkCopied ? "Copied!" : "Copy link")
-                    }
-                    .font(SBFont.inter(12, weight: .semibold))
-                    .foregroundStyle(Color.sbGoldDk)
-                }
-
-                // Require sign-in toggle
-                Toggle(isOn: $requireSignIn) {
-                    Text("Require sign-in")
-                        .font(SBFont.bodySmall)
+    private func collaboratorsCard(plan: SeatingPlan) -> some View {
+        SBCard(backgroundColor: .sbIvory2) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 8) {
+                    Text("Collaborators")
+                        .font(SBFont.bodySemibold)
                         .foregroundStyle(Color.sbCharcoal)
+                    Spacer()
+                    if collabLoading {
+                        ProgressView().scaleEffect(0.7)
+                    }
                 }
-                .tint(.sbGold)
+
+                if let owner = collabOwner {
+                    collaboratorRow(person: owner, isOwnerEntry: true, planId: plan.id)
+                }
+                ForEach(collaborators, id: \.userId) { c in
+                    Divider().background(Color.sbLine)
+                    collaboratorRow(person: c, isOwnerEntry: false, planId: plan.id)
+                }
+                ForEach(invitations, id: \.id) { inv in
+                    Divider().background(Color.sbLine)
+                    invitationRow(invitation: inv, planId: plan.id)
+                }
+
+                if collabIsOwner {
+                    Button {
+                        inviteEmail = ""
+                        inviteResult = nil
+                        showInvitePrompt = true
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "plus.circle.fill")
+                            Text("Invite by email")
+                        }
+                        .font(SBFont.bodySemibold)
+                        .foregroundStyle(Color.sbGoldDk)
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                if let err = collabError {
+                    Text(err)
+                        .font(SBFont.caption)
+                        .foregroundStyle(Color.sbError)
+                }
+
+                if collabOwner == nil && collaborators.isEmpty && invitations.isEmpty && !collabLoading {
+                    Text("Loading collaborators…")
+                        .font(SBFont.caption)
+                        .foregroundStyle(Color.sbWarm)
+                }
+            }
+        }
+        .onAppear { Task { await loadCollaborators(planId: plan.id) } }
+        .onChange(of: appState.activePlan?.id) { _, newId in
+            if let id = newId { Task { await loadCollaborators(planId: id) } }
+        }
+        .alert("Invite a collaborator", isPresented: $showInvitePrompt) {
+            TextField("name@example.com", text: $inviteEmail)
+                .keyboardType(.emailAddress)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+            Button("Cancel", role: .cancel) {}
+            Button("Send invite") {
+                Task { await sendInvite(planId: plan.id, email: inviteEmail) }
+            }
+        } message: {
+            Text("They'll get an email with a link to join. Anyone you invite gets full edit access.")
+        }
+        .alert("Invitation", isPresented: Binding(
+            get: { inviteResult != nil },
+            set: { if !$0 { inviteResult = nil } }
+        )) {
+            Button("OK", role: .cancel) { inviteResult = nil }
+        } message: {
+            Text(inviteResult ?? "")
+        }
+    }
+
+    private func collaboratorRow(person: CollabPerson, isOwnerEntry: Bool, planId: String) -> some View {
+        HStack(spacing: 10) {
+            SBAvatar(name: person.name, size: 32)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(person.name)
+                    .font(SBFont.bodySmallBold)
+                    .foregroundStyle(Color.sbCharcoal)
+                if !person.email.isEmpty {
+                    Text(person.email)
+                        .font(SBFont.caption)
+                        .foregroundStyle(Color.sbWarm)
+                        .lineLimit(1)
+                }
+            }
+            Spacer()
+            if isOwnerEntry {
+                Text("OWNER")
+                    .font(SBFont.capsLabel)
+                    .foregroundStyle(Color.sbGoldDk)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(Color.sbChampagne)
+                    .clipShape(Capsule())
+            } else if collabIsOwner {
+                Button {
+                    Task { await removeCollaborator(planId: planId, userId: person.userId) }
+                } label: {
+                    Image(systemName: "minus.circle")
+                        .font(.system(size: 16))
+                        .foregroundStyle(Color.sbWarm2)
+                }
+                .buttonStyle(.plain)
             }
         }
     }
 
-    // MARK: - People
-
-    private var peopleSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // Placeholder collaborators
-            ForEach(0..<2) { _ in
-                HStack(spacing: 10) {
-                    SBAvatar(name: "Collaborator", size: 32)
-                    VStack(alignment: .leading) {
-                        Text("Invite someone")
-                            .font(SBFont.bodySmall)
-                            .foregroundStyle(Color.sbWarm)
-                    }
-                    Spacer()
-                }
+    private func invitationRow(invitation: PendingInvitation, planId: String) -> some View {
+        HStack(spacing: 10) {
+            ZStack {
+                Circle().fill(Color.sbIvory).frame(width: 32, height: 32)
+                Image(systemName: "envelope")
+                    .font(.system(size: 14))
+                    .foregroundStyle(Color.sbWarm)
             }
-
+            VStack(alignment: .leading, spacing: 1) {
+                Text(invitation.email)
+                    .font(SBFont.bodySmall)
+                    .foregroundStyle(Color.sbCharcoal)
+                    .lineLimit(1)
+                Text("Pending")
+                    .font(SBFont.caption)
+                    .foregroundStyle(Color.sbWarm)
+            }
+            Spacer()
             Button {
-                HapticEngine.light()
+                Task { await revokeInvitation(invitationId: invitation.id) }
             } label: {
-                HStack {
-                    Image(systemName: "plus")
-                    Text("Invite people")
-                }
-                .font(SBFont.bodySemibold)
-                .foregroundStyle(Color.sbGoldDk)
+                Image(systemName: "xmark.circle")
+                    .font(.system(size: 16))
+                    .foregroundStyle(Color.sbWarm2)
             }
             .buttonStyle(.plain)
         }
@@ -543,6 +625,156 @@ struct ShareView: View {
             )
         }
         .buttonStyle(.plain)
+    }
+
+    // MARK: - Collaborator API
+    //
+    // Web parity (api/collab.js). All four actions hit the www subdomain
+    // directly to avoid the seatbee.app → www.seatbee.app 307 redirect
+    // that strips Authorization headers in URLSession.
+
+    private func loadCollaborators(planId: String) async {
+        collabError = nil
+        collabLoading = true
+        defer { collabLoading = false }
+
+        guard let url = URL(string: "\(AppConfig.collabAPIBaseURL)?action=list&planId=\(planId)") else {
+            collabError = "Couldn't build collab URL."
+            return
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        guard let token = await AuthService().accessToken else {
+            collabError = "Sign in again to load collaborators."
+            return
+        }
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse else { return }
+            let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+            if http.statusCode != 200 {
+                collabError = (json?["error"] as? String) ?? "Couldn't load collaborators."
+                return
+            }
+            collabIsOwner = (json?["isOwner"] as? Bool) ?? false
+
+            if let ownerDict = json?["owner"] as? [String: Any] {
+                collabOwner = CollabPerson(dict: ownerDict)
+            }
+            if let arr = json?["collaborators"] as? [[String: Any]] {
+                collaborators = arr.compactMap { CollabPerson(dict: $0) }
+            }
+            if let arr = json?["invitations"] as? [[String: Any]] {
+                invitations = arr.compactMap { PendingInvitation(dict: $0) }
+            } else {
+                invitations = []
+            }
+        } catch {
+            collabError = "Network error: \(error.localizedDescription)"
+        }
+    }
+
+    private func sendInvite(planId: String, email: String) async {
+        let trimmed = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            inviteResult = "Email can't be empty."
+            return
+        }
+        inviteSending = true
+        defer { inviteSending = false }
+
+        guard let url = URL(string: "\(AppConfig.collabAPIBaseURL)?action=invite") else { return }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if let token = await AuthService().accessToken {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        } else {
+            inviteResult = "Sign in again to invite."
+            return
+        }
+        request.httpBody = try? JSONSerialization.data(withJSONObject: [
+            "planId": planId,
+            "email": trimmed,
+        ])
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse else { return }
+            let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+            if http.statusCode == 200 {
+                let emailSent = (json?["emailSent"] as? Bool) ?? false
+                inviteResult = emailSent ? "Invite sent to \(trimmed)." : "Invite created for \(trimmed). They can sign up to join."
+                HapticEngine.success()
+                await loadCollaborators(planId: planId)
+            } else {
+                inviteResult = (json?["error"] as? String) ?? "Invite failed (status \(http.statusCode))."
+            }
+        } catch {
+            inviteResult = "Network error: \(error.localizedDescription)"
+        }
+    }
+
+    private func removeCollaborator(planId: String, userId: String) async {
+        guard let url = URL(string: "\(AppConfig.collabAPIBaseURL)?action=remove") else { return }
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if let token = await AuthService().accessToken {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        request.httpBody = try? JSONSerialization.data(withJSONObject: [
+            "planId": planId,
+            "userId": userId,
+        ])
+        _ = try? await URLSession.shared.data(for: request)
+        await loadCollaborators(planId: planId)
+    }
+
+    private func revokeInvitation(invitationId: String) async {
+        guard let plan = appState.activePlan else { return }
+        guard let url = URL(string: "\(AppConfig.collabAPIBaseURL)?action=revoke") else { return }
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if let token = await AuthService().accessToken {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        request.httpBody = try? JSONSerialization.data(withJSONObject: [
+            "invitationId": invitationId,
+        ])
+        _ = try? await URLSession.shared.data(for: request)
+        await loadCollaborators(planId: plan.id)
+    }
+}
+
+// MARK: - Collaborator response models
+
+struct CollabPerson {
+    let userId: String
+    let name: String
+    let email: String
+
+    init?(dict: [String: Any]) {
+        // userId field name differs between owner ({userId:..., isOwner:true})
+        // and collaborator entries — both use "userId" per the API contract.
+        guard let id = dict["userId"] as? String else { return nil }
+        self.userId = id
+        self.name = (dict["name"] as? String) ?? "Unknown"
+        self.email = (dict["email"] as? String) ?? ""
+    }
+}
+
+struct PendingInvitation {
+    let id: String
+    let email: String
+
+    init?(dict: [String: Any]) {
+        guard let id = dict["id"] as? String else { return nil }
+        self.id = id
+        self.email = (dict["email"] as? String) ?? ""
     }
 }
 
