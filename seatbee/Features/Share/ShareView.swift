@@ -667,7 +667,14 @@ struct ShareView: View {
                 collaborators = arr.compactMap { CollabPerson(dict: $0) }
             }
             if let arr = json?["invitations"] as? [[String: Any]] {
-                invitations = arr.compactMap { PendingInvitation(dict: $0) }
+                // Filter out invitations that have already been accepted —
+                // web's API returns the full history (`SELECT *`), but the
+                // accepted user already appears in `collaborators` and
+                // showing the invite row again confuses users (it looks
+                // like Shayan is both a collaborator AND pending).
+                invitations = arr
+                    .compactMap { PendingInvitation(dict: $0) }
+                    .filter { !$0.accepted }
             } else {
                 invitations = []
             }
@@ -770,11 +777,13 @@ struct CollabPerson {
 struct PendingInvitation {
     let id: String
     let email: String
+    let accepted: Bool
 
     init?(dict: [String: Any]) {
         guard let id = dict["id"] as? String else { return nil }
         self.id = id
         self.email = (dict["email"] as? String) ?? ""
+        self.accepted = (dict["accepted"] as? Bool) ?? false
     }
 }
 
