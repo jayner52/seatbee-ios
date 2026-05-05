@@ -386,6 +386,14 @@ struct ShareView: View {
                         get: { qrEnabled },
                         set: { newValue in
                             qrEnabled = newValue
+                            // Auto-expand the section when turning on so the
+                            // user immediately sees their QR — they enabled
+                            // it because they want to use it. Don't auto-
+                            // collapse on toggle-off; user might want to
+                            // re-share the link before re-enabling.
+                            if newValue {
+                                withAnimation(.seatbee) { qrExpanded = true }
+                            }
                             Task { await saveQRConfig(planId: plan.id, enabled: newValue) }
                         }
                     ))
