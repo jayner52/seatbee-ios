@@ -30,6 +30,43 @@ struct SettingsSheet: View {
                     Text("Account")
                 }
 
+                // Event Passes
+                if appState.auth.currentUser != nil {
+                    Section {
+                        NavigationLink {
+                            EventPassesView()
+                                .environment(appState)
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: "ticket")
+                                    .foregroundStyle(Color.sbGoldDk)
+                                    .frame(width: 24)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Event Passes")
+                                        .foregroundStyle(Color.sbCharcoal)
+                                    if appState.activePlanTier != .free {
+                                        Text("This plan: \(appState.activePlanTier.displayName)")
+                                            .font(SBFont.caption)
+                                            .foregroundStyle(Color.sbGoldDk)
+                                    }
+                                }
+                                Spacer()
+                                if appState.userPasses.summary.available > 0 {
+                                    Text("\(appState.userPasses.summary.available) available")
+                                        .font(SBFont.caption)
+                                        .foregroundStyle(Color.sbGoldDk)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 3)
+                                        .background(Color.sbGold.opacity(0.15))
+                                        .clipShape(Capsule())
+                                }
+                            }
+                        }
+                    } header: {
+                        Text("Passes")
+                    }
+                }
+
                 // Plan management
                 if appState.activePlan != nil {
                     Section {

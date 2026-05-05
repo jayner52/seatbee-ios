@@ -22,6 +22,7 @@ struct GuestDetailSheet: View {
     @State private var selectedCategories: Set<String> = []
     @State private var selectedDietaryTags: Set<String> = []
     @State private var showDeleteConfirm = false
+    @State private var showTierLimitAlert = false
 
     private var isEditing: Bool { guest != nil }
 
@@ -249,6 +250,13 @@ struct GuestDetailSheet: View {
             } message: {
                 Text("This will remove \(guest?.displayName ?? "this guest") from the plan.")
             }
+            .alert("Guest Limit Reached", isPresented: $showTierLimitAlert) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                let limits = appState.activePlanLimits
+                let tier = appState.activePlanTier
+                Text("Your \(tier.displayName) plan supports up to \(limits.seatedGuests) guests. Apply an Event Pass in Settings to seat more.")
+            }
         }
         .onAppear { loadGuest() }
     }
@@ -386,6 +394,11 @@ struct GuestDetailSheet: View {
                 plan.guests[idx] = updatedGuest
             }
         } else {
+            // Tier-limit guard for new guests only — never block edits to existing.
+            if appState.wouldExceedGuestLimit(adding: 1) {
+                showTierLimitAlert = true
+                return
+            }
             plan.guests.append(updatedGuest)
         }
 

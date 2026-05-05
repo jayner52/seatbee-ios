@@ -10,6 +10,7 @@ struct CSVImportSheet: View {
     @State private var detectedPlatform = ""
     @State private var isProcessing = false
     @State private var errorMessage: String?
+    @State private var tierLimitMessage: String?
 
     var body: some View {
         NavigationStack {
@@ -151,6 +152,14 @@ struct CSVImportSheet: View {
                 case .failure(let error):
                     errorMessage = error.localizedDescription
                 }
+            }
+            .alert(
+                "Guest Limit Reached",
+                isPresented: Binding(get: { tierLimitMessage != nil }, set: { if !$0 { tierLimitMessage = nil } })
+            ) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(tierLimitMessage ?? "")
             }
         }
     }
@@ -346,6 +355,17 @@ struct CSVImportSheet: View {
 
     private func importGuests() {
         guard var plan = appState.activePlan else { return }
+
+        // Tier-limit guard: block if importing this batch would exceed the cap.
+        if appState.wouldExceedGuestLimit(adding: parsedGuests.count) {
+            let limits = appState.activePlanLimits
+            let tier = appState.activePlanTier
+            let remaining = max(0, limits.seatedGuests - plan.guests.count)
+            tierLimitMessage = "Your \(tier.displayName) plan supports up to \(limits.seatedGuests) guests. You can add \(remaining) more — this CSV has \(parsedGuests.count). Apply an Event Pass in Settings to import the full list."
+            HapticEngine.error()
+            return
+        }
+
         plan.guests.append(contentsOf: parsedGuests)
         appState.activePlan = plan
         HapticEngine.success()
