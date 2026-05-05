@@ -1,5 +1,7 @@
 import SwiftUI
 import PhotosUI
+import PDFKit
+import UniformTypeIdentifiers
 
 struct RoomSetupSheet: View {
     @Environment(AppState.self) private var appState
@@ -11,11 +13,13 @@ struct RoomSetupSheet: View {
     @State private var selectedShape = "rect"
     @State private var flipH = false
     @State private var flipV = false
-    @State private var showImagePicker = false
+    @State private var showPhotoPicker = false
+    @State private var showFilePicker = false
     @State private var selectedImage: PhotosPickerItem?
     @State private var floorPlanImage: UIImage?
     @State private var isAnalyzing = false
     @State private var analysisResult: String?
+    @State private var importError: String?
     @State private var showTraceSheet = false
     @State private var workingPoints: [RoomPoint]? = nil
 
@@ -243,8 +247,10 @@ struct RoomSetupSheet: View {
                         }
                     }
 
-                    // Floor plan upload
-                    formSection("FLOOR PLAN IMAGE") {
+                    // Floor plan upload — supports both Photos and Files
+                    // (Files lets users grab a PDF or image from iCloud
+                    // Drive, Dropbox, etc., matching web's accept="image/*,.pdf").
+                    formSection("FLOOR PLAN") {
                         if let image = floorPlanImage {
                             Image(uiImage: image)
                                 .resizable()
@@ -271,30 +277,55 @@ struct RoomSetupSheet: View {
                             }
                         }
 
-                        PhotosPicker(selection: $selectedImage, matching: .images) {
-                            HStack {
-                                Image(systemName: "photo.badge.plus")
-                                Text(floorPlanImage == nil ? "Upload floor plan" : "Change image")
-                            }
-                            .font(SBFont.bodySemibold)
-                            .foregroundStyle(Color.sbGoldDk)
-                            .frame(maxWidth: .infinity)
-                            .padding(14)
-                            .background(Color.sbIvory2)
-                            .clipShape(RoundedRectangle(cornerRadius: SBRadius.button))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: SBRadius.button)
-                                    .strokeBorder(Color.sbLine2, style: StrokeStyle(lineWidth: 1, dash: [6, 4]))
-                            )
+                        if let err = importError {
+                            Text(err)
+                                .font(SBFont.caption)
+                                .foregroundStyle(Color.sbError)
                         }
-                        .onChange(of: selectedImage) { _, newItem in
-                            Task {
-                                if let data = try? await newItem?.loadTransferable(type: Data.self),
-                                   let uiImage = UIImage(data: data) {
-                                    floorPlanImage = uiImage
-                                    analyzeFloorPlan(uiImage)
+
+                        HStack(spacing: 10) {
+                            PhotosPicker(selection: $selectedImage, matching: .images) {
+                                uploadButtonLabel(icon: "photo.on.rectangle", label: "Photos")
+                            }
+                            .onChange(of: selectedImage) { _, newItem in
+                                Task {
+                                    importError = nil
+                                    if let data = try? await newItem?.loadTransferable(type: Data.self),
+                                       let uiImage = UIImage(data: data) {
+                                        floorPlanImage = uiImage
+                                        analyzeFloorPlan(uiImage)
+                                    } else if newItem != nil {
+                                        importError = "Couldn't load that photo."
+                                    }
                                 }
                             }
+
+                            Button {
+                                showFilePicker = true
+                            } label: {
+                                uploadButtonLabel(icon: "doc.badge.plus", label: "Files / PDF")
+                            }
+                            .buttonStyle(.plain)
+                        }
+
+                        Text(floorPlanImage == nil
+                             ? "Pick a floor plan from your photo library or a PDF / image from Files."
+                             : "Pick a different one to replace.")
+                            .font(SBFont.caption)
+                            .foregroundStyle(Color.sbWarm)
+                    }
+                    .fileImporter(
+                        isPresented: $showFilePicker,
+                        allowedContentTypes: [.pdf, .image],
+                        allowsMultipleSelection: false
+                    ) { result in
+                        importError = nil
+                        switch result {
+                        case .success(let urls):
+                            guard let url = urls.first else { return }
+                            handleImportedFile(url: url)
+                        case .failure(let error):
+                            importError = "Import failed: \(error.localizedDescription)"
                         }
                     }
 
@@ -481,6 +512,76 @@ struct RoomSetupSheet: View {
         HapticEngine.success()
         Task { try? await appState.database.savePlanData(plan: plan) }
         dismiss()
+    }
+
+    // Reusable button face for the two upload entry points (Photos / Files).
+    @ViewBuilder
+    private func uploadButtonLabel(icon: String, label: String) -> some View {
+        VStack(spacing: 4) {
+            Image(systemName: icon)
+                .font(.system(size: 16, weight: .medium))
+            Text(label)
+                .font(SBFont.bodySmallBold)
+        }
+        .foregroundStyle(Color.sbGoldDk)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 14)
+        .background(Color.sbIvory2)
+        .clipShape(RoundedRectangle(cornerRadius: SBRadius.button))
+        .overlay(
+            RoundedRectangle(cornerRadius: SBRadius.button)
+                .strokeBorder(Color.sbLine2, style: StrokeStyle(lineWidth: 1, dash: [6, 4]))
+        )
+    }
+
+    // Handle a file picked from the Files app. fileImporter gives us a
+    // security-scoped URL that we have to open + close around the read.
+    // PDFs render page 1 to a UIImage via PDFKit (matches web's PDF.js
+    // page-1-only behavior); standard image files load directly.
+    private func handleImportedFile(url: URL) {
+        let didStart = url.startAccessingSecurityScopedResource()
+        defer { if didStart { url.stopAccessingSecurityScopedResource() } }
+
+        let ext = url.pathExtension.lowercased()
+        if ext == "pdf" {
+            guard let image = renderPDFFirstPage(at: url) else {
+                importError = "Couldn't render that PDF."
+                return
+            }
+            floorPlanImage = image
+            analyzeFloorPlan(image)
+            return
+        }
+
+        // Anything else: try to load as an image. UIImage(data:) auto-handles
+        // HEIC/JPG/PNG/GIF; falls through to error if the bytes aren't usable.
+        guard let data = try? Data(contentsOf: url),
+              let image = UIImage(data: data) else {
+            importError = "That file format isn't supported."
+            return
+        }
+        floorPlanImage = image
+        analyzeFloorPlan(image)
+    }
+
+    // Render the first page of a PDF at 2× display scale into a UIImage.
+    // 2× keeps the AI input crisp without blowing up base64 size; we use
+    // the page's mediaBox bounds rather than cropBox so margins are kept
+    // (some floor plans use cropBox to hide the legend).
+    private func renderPDFFirstPage(at url: URL) -> UIImage? {
+        guard let pdf = PDFDocument(url: url),
+              let page = pdf.page(at: 0) else { return nil }
+        let bounds = page.bounds(for: .mediaBox)
+        let scale: CGFloat = 2
+        let size = CGSize(width: bounds.width * scale, height: bounds.height * scale)
+        let renderer = UIGraphicsImageRenderer(size: size)
+        return renderer.image { ctx in
+            UIColor.white.setFill()
+            ctx.fill(CGRect(origin: .zero, size: size))
+            ctx.cgContext.translateBy(x: 0, y: size.height)
+            ctx.cgContext.scaleBy(x: scale, y: -scale)
+            page.draw(with: .mediaBox, to: ctx.cgContext)
+        }
     }
 
     private func analyzeFloorPlan(_ image: UIImage) {
