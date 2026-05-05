@@ -15,6 +15,18 @@ struct SeatingPlan: Identifiable, Codable {
     var objects: [RoomObject]
     var roomWidth: Double?
     var roomHeight: Double?
+    // Venue setup (web parity — see PARITY.md and src/App.jsx:11046-11589):
+    // these were being silently dropped on iOS save before 2026-05-04. iOS
+    // now preserves them on round-trip. Coordinates inside customRoomPoints
+    // are absolute pixels (0..roomWidth, 0..roomHeight), matching web's
+    // SCALE = 15 px/ft.
+    var roomShape: String? = nil
+    var measurementUnit: String? = nil      // "imperial" | "metric"
+    var customRoomPoints: [RoomPoint]? = nil
+    var roomFlipH: Bool? = nil
+    var roomFlipV: Bool? = nil
+    var roomZones: [RoomZone]? = nil
+    var hasSweetheartTable: Bool? = nil
     var createdAt: Date?
     var updatedAt: Date?
     var userId: String?
@@ -33,6 +45,189 @@ struct SeatingPlan: Identifiable, Codable {
         case corporate
         case celebration
         case custom
+    }
+}
+
+// MARK: - Room geometry (web parity)
+//
+// Web stores customRoomPoints as an array of {x, y, arc?} where arc is
+// an optional {rx, ry, sweep, largeArc} object. Straight walls have no
+// arc; double-tap on a wall to add an arc. Coordinates are absolute
+// pixels relative to the room origin (0,0) at the top-left.
+
+struct RoomPoint: Codable, Equatable {
+    var x: Double
+    var y: Double
+    var arc: RoomArc?
+}
+
+struct RoomArc: Codable, Equatable {
+    var rx: Double
+    var ry: Double
+    var sweep: Int
+    var largeArc: Int
+}
+
+// Zone = labeled rectangular area inside the room (e.g. Dance Floor).
+// Web key: roomZones array of {id, label, x, y, w, h}.
+struct RoomZone: Codable, Identifiable, Equatable {
+    let id: String
+    var label: String
+    var x: Double
+    var y: Double
+    var w: Double
+    var h: Double
+}
+
+// Direct port of web's getDefaultPoints (src/App.jsx:3763-3789). When the
+// user picks a preset shape, generate the canonical point array for that
+// shape at the given dimensions. iOS reuses these for canvas rendering
+// fallback when customRoomPoints is missing, AND for the eventual trace
+// modal (PR V2).
+enum RoomShapePresets {
+    static func defaultPoints(shape: String, width w: Double, height h: Double) -> [RoomPoint] {
+        switch shape.lowercased() {
+        case "l":
+            return [
+                .init(x: 0, y: 0), .init(x: w*0.6, y: 0), .init(x: w*0.6, y: h*0.5),
+                .init(x: w, y: h*0.5), .init(x: w, y: h), .init(x: 0, y: h)
+            ]
+        case "l_rev":
+            return [
+                .init(x: w*0.4, y: 0), .init(x: w, y: 0), .init(x: w, y: h),
+                .init(x: 0, y: h), .init(x: 0, y: h*0.5), .init(x: w*0.4, y: h*0.5)
+            ]
+        case "t":
+            return [
+                .init(x: w*0.2, y: 0), .init(x: w*0.8, y: 0), .init(x: w*0.8, y: h*0.35),
+                .init(x: w, y: h*0.35), .init(x: w, y: h), .init(x: 0, y: h),
+                .init(x: 0, y: h*0.35), .init(x: w*0.2, y: h*0.35)
+            ]
+        case "u":
+            return [
+                .init(x: 0, y: 0), .init(x: w*0.3, y: 0), .init(x: w*0.3, y: h*0.6),
+                .init(x: w*0.7, y: h*0.6), .init(x: w*0.7, y: 0), .init(x: w, y: 0),
+                .init(x: w, y: h), .init(x: 0, y: h)
+            ]
+        case "circle":
+            let r = min(w, h) / 2
+            let cx = w / 2, cy = h / 2
+            let arc = RoomArc(rx: r, ry: r, sweep: 1, largeArc: 0)
+            return [
+                RoomPoint(x: cx, y: cy - r, arc: arc),
+                RoomPoint(x: cx + r, y: cy, arc: arc),
+                RoomPoint(x: cx, y: cy + r, arc: arc),
+                RoomPoint(x: cx - r, y: cy, arc: arc),
+            ]
+        case "oval":
+            let arc = RoomArc(rx: w * 0.5, ry: h * 0.5, sweep: 1, largeArc: 0)
+            return [
+                RoomPoint(x: w * 0.5, y: 0,       arc: arc),
+                RoomPoint(x: w,       y: h * 0.5, arc: arc),
+                RoomPoint(x: w * 0.5, y: h,       arc: arc),
+                RoomPoint(x: 0,       y: h * 0.5, arc: arc),
+            ]
+        default:  // "rect" or unknown
+            return [
+                .init(x: 0, y: 0), .init(x: w, y: 0),
+                .init(x: w, y: h), .init(x: 0, y: h)
+            ]
+        }
+    }
+}
+
+extension RoomPoint {
+    init(x: Double, y: Double) {
+        self.x = x; self.y = y; self.arc = nil
+    }
+}
+
+// Web's UNITS table (src/App.jsx:2577-2579). All persisted room dims are
+// pixels; the unit is just a display preference. iOS uses these factors to
+// convert user-entered ft/m back to pixels on save and pixels to ft/m on load.
+enum RoomScale {
+    static let imperial: Double = 15.0
+    static let metric: Double = 49.21
+    static func factor(for unit: String?) -> Double {
+        (unit ?? "imperial").lowercased() == "metric" ? metric : imperial
+    }
+    static func unitLabel(for unit: String?) -> String {
+        (unit ?? "imperial").lowercased() == "metric" ? "m" : "ft"
+    }
+}
+
+// Lenient bridge between AnyCodable (DTO storage — preserves any shape on
+// round-trip) and typed RoomPoint / RoomZone (iOS-side use). Bad legacy
+// entries decode as nil rather than blowing up the entire plan fetch.
+enum RoomGeometryCoder {
+    static func decodePoints(_ raw: AnyCodable?) -> [RoomPoint]? {
+        guard let array = raw?.value as? [Any], !array.isEmpty else { return nil }
+        let pts: [RoomPoint] = array.compactMap { item in
+            guard let dict = item as? [String: Any] else { return nil }
+            guard let x = numericDouble(dict["x"]), let y = numericDouble(dict["y"]) else { return nil }
+            var arc: RoomArc?
+            if let arcDict = dict["arc"] as? [String: Any] {
+                let rx = numericDouble(arcDict["rx"]) ?? 0
+                let ry = numericDouble(arcDict["ry"]) ?? 0
+                let sweep = numericInt(arcDict["sweep"]) ?? 1
+                let largeArc = numericInt(arcDict["largeArc"]) ?? 0
+                arc = RoomArc(rx: rx, ry: ry, sweep: sweep, largeArc: largeArc)
+            }
+            return RoomPoint(x: x, y: y, arc: arc)
+        }
+        return pts.isEmpty ? nil : pts
+    }
+
+    static func encodePoints(_ pts: [RoomPoint]?) -> AnyCodable? {
+        guard let pts = pts, !pts.isEmpty else { return nil }
+        let array: [[String: Any]] = pts.map { p in
+            var dict: [String: Any] = ["x": p.x, "y": p.y]
+            if let arc = p.arc {
+                dict["arc"] = [
+                    "rx": arc.rx, "ry": arc.ry,
+                    "sweep": arc.sweep, "largeArc": arc.largeArc
+                ]
+            }
+            return dict
+        }
+        return AnyCodable(array)
+    }
+
+    static func decodeZones(_ raw: AnyCodable?) -> [RoomZone]? {
+        guard let array = raw?.value as? [Any], !array.isEmpty else { return nil }
+        let zones: [RoomZone] = array.compactMap { item in
+            guard let dict = item as? [String: Any] else { return nil }
+            let id = (dict["id"] as? String) ?? UUID().uuidString
+            let label = (dict["label"] as? String) ?? "Area"
+            guard let x = numericDouble(dict["x"]),
+                  let y = numericDouble(dict["y"]),
+                  let w = numericDouble(dict["w"]),
+                  let h = numericDouble(dict["h"]) else { return nil }
+            return RoomZone(id: id, label: label, x: x, y: y, w: w, h: h)
+        }
+        return zones.isEmpty ? nil : zones
+    }
+
+    static func encodeZones(_ zones: [RoomZone]?) -> AnyCodable? {
+        guard let zones = zones, !zones.isEmpty else { return nil }
+        let array: [[String: Any]] = zones.map { z in
+            ["id": z.id, "label": z.label, "x": z.x, "y": z.y, "w": z.w, "h": z.h]
+        }
+        return AnyCodable(array)
+    }
+
+    private static func numericDouble(_ any: Any?) -> Double? {
+        if let d = any as? Double { return d }
+        if let i = any as? Int { return Double(i) }
+        if let s = any as? String { return Double(s) }
+        return nil
+    }
+
+    private static func numericInt(_ any: Any?) -> Int? {
+        if let i = any as? Int { return i }
+        if let d = any as? Double { return Int(d) }
+        if let s = any as? String { return Int(s) }
+        return nil
     }
 }
 
@@ -297,13 +492,13 @@ extension SeatingPlan {
                 eventType: eventType.rawValue,
                 roomWidth: roomWidth,
                 roomHeight: roomHeight,
-                roomShape: nil,
-                measurementUnit: nil,
-                customRoomPoints: nil,
-                roomFlipH: nil,
-                roomFlipV: nil,
-                roomZones: nil,
-                hasSweetheartTable: nil
+                roomShape: roomShape,
+                measurementUnit: measurementUnit,
+                customRoomPoints: RoomGeometryCoder.encodePoints(customRoomPoints),
+                roomFlipH: roomFlipH,
+                roomFlipV: roomFlipV,
+                roomZones: RoomGeometryCoder.encodeZones(roomZones),
+                hasSweetheartTable: hasSweetheartTable
             ),
             guests: guests.map { g in
                 GuestDTO(

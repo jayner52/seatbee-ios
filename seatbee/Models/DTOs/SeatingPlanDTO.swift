@@ -76,6 +76,13 @@ struct SeatingPlanDTO: Codable {
             objects: (d?.objects ?? []).map { $0.toDomain() },
             roomWidth: d?.event?.roomWidth,
             roomHeight: d?.event?.roomHeight,
+            roomShape: d?.event?.roomShape,
+            measurementUnit: d?.event?.measurementUnit,
+            customRoomPoints: RoomGeometryCoder.decodePoints(d?.event?.customRoomPoints),
+            roomFlipH: d?.event?.roomFlipH,
+            roomFlipV: d?.event?.roomFlipV,
+            roomZones: RoomGeometryCoder.decodeZones(d?.event?.roomZones),
+            hasSweetheartTable: d?.event?.hasSweetheartTable,
             createdAt: created_at.flatMap { parseDate($0) },
             updatedAt: updated_at.flatMap { parseDate($0) },
             userId: user_id,
@@ -128,8 +135,10 @@ struct EventDataDTO: Codable {
     let roomWidth: Double?
     let roomHeight: Double?
     let roomShape: String?
-    // Web-parity passthrough
     let measurementUnit: String?
+    // Stored as AnyCodable for lenient round-trip — any malformed legacy
+    // entries decode without throwing. iOS converts to/from typed
+    // [RoomPoint] / [RoomZone] in toDomain + toPlanData.
     let customRoomPoints: AnyCodable?
     let roomFlipH: Bool?
     let roomFlipV: Bool?
