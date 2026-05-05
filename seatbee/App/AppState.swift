@@ -32,6 +32,12 @@ final class AppState {
     // ref at App.jsx:6211.
     var hasShownGuestSoftWarning = false
 
+    // Cross-tab navigation hint: when the Plans-tab "Rules" quick-action
+    // button is tapped, we switch to the Guests tab and ask GuestsView to
+    // open the Rules sheet on next appearance. GuestsView reads + resets
+    // this flag in onChange.
+    var pendingShowRules = false
+
     /// Refresh the user's pass inventory from /api/passes.
     /// Safe to call on app foreground and after sign-in.
     func refreshPasses() async {

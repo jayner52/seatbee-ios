@@ -249,13 +249,16 @@ struct DashboardView: View {
         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
             quickActionButton(icon: "person.2", title: "Guests", tab: .guests)
             quickActionButton(icon: "map", title: "Venue", tab: .edit)
-            quickActionButton(icon: "list.bullet", title: "Rules", tab: .edit)
+            // Rules routes to Guests tab (where the Rules sheet lives) and
+            // asks GuestsView to open the Rules panel via pendingShowRules.
+            quickActionButton(icon: "list.bullet", title: "Rules", tab: .guests, openRules: true)
             quickActionButton(icon: "square.and.arrow.up", title: "Export", tab: .share)
         }
     }
 
-    private func quickActionButton(icon: String, title: String, tab: SBTab) -> some View {
+    private func quickActionButton(icon: String, title: String, tab: SBTab, openRules: Bool = false) -> some View {
         Button {
+            if openRules { appState.pendingShowRules = true }
             appState.selectedTab = tab
         } label: {
             HStack(spacing: 8) {

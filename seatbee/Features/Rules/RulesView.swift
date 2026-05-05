@@ -6,7 +6,18 @@ struct RulesView: View {
     @State private var showAddRule = false
     @State private var showAddParty = false
     @State private var pendingAddType: SeatingRule.RuleType = .mustTogether
-    @State private var collapsedSections: Set<String> = []
+    @State private var collapsedSections: Set<String>
+
+    // Default every section collapsed on open so users see all categories
+    // at a glance and expand only what they need. Mirrors the section IDs
+    // declared in `sectionDefs` plus the "parties" header above them.
+    init() {
+        _collapsedSections = State(initialValue: [
+            "parties",
+            "seat-together", "keep-apart", "assign-table",
+            "near-venue", "near-table", "category"
+        ])
+    }
 
     private var rules: [SeatingRule] { appState.activePlan?.rules ?? [] }
     private var guests: [Guest] { appState.activePlan?.guests ?? [] }

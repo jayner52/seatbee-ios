@@ -83,6 +83,22 @@ struct GuestsView: View {
                         }
                     } catch {}
                 }
+
+                // If we landed here via the Plans-tab "Rules" quick action,
+                // open the Rules sheet now and clear the hint.
+                if appState.pendingShowRules {
+                    showRules = true
+                    appState.pendingShowRules = false
+                }
+            }
+            .onChange(of: appState.pendingShowRules) { _, newValue in
+                // Catches the case where GuestsView is already on screen
+                // when the hint is set (i.e. user re-taps Rules quick action
+                // after we've already loaded the tab once).
+                if newValue {
+                    showRules = true
+                    appState.pendingShowRules = false
+                }
             }
             .sheet(isPresented: $showAddGuest) {
                 GuestDetailSheet(guest: nil)
