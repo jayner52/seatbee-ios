@@ -49,20 +49,25 @@ struct RoomSetupSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
                     // Quick Presets — one-tap dimension shortcuts (web parity).
+                    // Preset values are stored in feet (the canonical web unit
+                    // for these labels); displayed and applied in the user's
+                    // current unit. Tapping a preset never flips the unit
+                    // toggle — only the dimension fields update.
                     formSection("QUICK PRESETS") {
                         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
                             ForEach(quickPresets, id: \.label) { preset in
                                 Button {
-                                    useMetric = false
-                                    roomWidth = String(format: "%.0f", preset.w)
-                                    roomHeight = String(format: "%.0f", preset.h)
+                                    let displayW = useMetric ? preset.w / 3.28084 : preset.w
+                                    let displayH = useMetric ? preset.h / 3.28084 : preset.h
+                                    roomWidth = String(format: "%.0f", displayW)
+                                    roomHeight = String(format: "%.0f", displayH)
                                     HapticEngine.selection()
                                 } label: {
                                     VStack(spacing: 2) {
                                         Text(preset.label)
                                             .font(SBFont.bodySmallBold)
                                             .foregroundStyle(Color.sbCharcoal)
-                                        Text(preset.sub)
+                                        Text(presetSubtitle(preset))
                                             .font(SBFont.caption)
                                             .foregroundStyle(Color.sbWarm)
                                     }
@@ -177,6 +182,27 @@ struct RoomSetupSheet: View {
                                 .font(SBFont.bodySmall)
                         }
                         .tint(Color.sbGold)
+                        .onChange(of: useMetric) { _, newValue in
+                            // Convert displayed values to the new unit so the
+                            // numbers in the field reflect what they mean.
+                            // 1 m = 3.28084 ft. Empty fields stay empty.
+                            let ftPerM = 3.28084
+                            if newValue {
+                                if let w = Double(roomWidth), w > 0 {
+                                    roomWidth = String(format: "%.0f", w / ftPerM)
+                                }
+                                if let h = Double(roomHeight), h > 0 {
+                                    roomHeight = String(format: "%.0f", h / ftPerM)
+                                }
+                            } else {
+                                if let w = Double(roomWidth), w > 0 {
+                                    roomWidth = String(format: "%.0f", w * ftPerM)
+                                }
+                                if let h = Double(roomHeight), h > 0 {
+                                    roomHeight = String(format: "%.0f", h * ftPerM)
+                                }
+                            }
+                        }
                     }
 
                     // Zones (read-only V2 — web users can author Dance Floor /
@@ -323,6 +349,16 @@ struct RoomSetupSheet: View {
             flipV = newFlipV
             selectedShape = "custom"
         }
+    }
+
+    private func presetSubtitle(_ p: (label: String, sub: String, w: Double, h: Double)) -> String {
+        // Preset values are stored in feet. Show ft when imperial, m when metric.
+        if useMetric {
+            let w = p.w / 3.28084
+            let h = p.h / 3.28084
+            return String(format: "%.0f×%.0fm", w, h)
+        }
+        return p.sub
     }
 
     private func flipButton(title: String, systemImage: String, isOn: Bool, action: @escaping () -> Void) -> some View {
@@ -494,9 +530,21 @@ struct TraceShapeSheet: View {
                     .padding(.vertical, 12)
                     .background(Color.sbIvory2)
 
+                // Aspect-ratio container instead of GeometryReader-fill —
+                // GR sometimes returns the wrong size while the sheet is
+                // animating in, which left the polygon drawn at stale
+                // coordinates and only one corner visible. Locking the
+                // canvas to the room's aspect ratio with a max height
+                // gives a stable size on first paint.
+                let aspect = max(roomWidth / max(roomHeight, 1), 0.1)
                 GeometryReader { geo in
                     traceCanvas(in: geo.size)
                 }
+                .aspectRatio(aspect, contentMode: .fit)
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 16)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color.sbIvory)
 
                 toolbar

@@ -26,9 +26,22 @@ class CanvasViewController: UIViewController, UIScrollViewDelegate {
     private var selectedId: String?
     private var selectedType: String? // "table" or "object"
 
-    // Content size — large enough for most venues
-    private let canvasSize = CGSize(width: 2000, height: 2000)
-    private let canvasOrigin = CGPoint(x: 400, y: 400) // offset so objects start visible
+    // Canvas size grows to fit the active room. Default covers up to a
+    // ~110×80ft (1650×1200px) Large preset with comfortable padding; bigger
+    // rooms (Ballroom, Grand, Convention) trigger a recompute in updateRoom.
+    // Padding on all sides so users can scroll outside the room.
+    private let canvasPadding: CGFloat = 400
+    private var canvasSize = CGSize(width: 2000, height: 2000)
+    private var canvasOrigin = CGPoint(x: 400, y: 400)
+    private var didInitialFit = false
+
+    // Viewport persistence — when the user zooms/scrolls then leaves the
+    // editor (Guests tab, AI sheet, app background), the next visit should
+    // resume at the same place. Stored in UserDefaults keyed by plan ID so
+    // each plan remembers its own viewport across app launches too.
+    private var planId: String?
+    private var didRestoreViewport = false
+    private static let viewportDefaultsPrefix = "seatbee.canvasViewport."
 
     // Room outline + floor plan backdrop layers. Both sit between the
     // dot pattern background (index 0) and the table/object subviews.
@@ -41,7 +54,9 @@ class CanvasViewController: UIViewController, UIScrollViewDelegate {
 
         // Scroll view setup
         scrollView.delegate = self
-        scrollView.minimumZoomScale = 0.3
+        // minimumZoomScale is recomputed in updateRoom() to guarantee any
+        // room size can fit on screen. Starting low so initial layout is safe.
+        scrollView.minimumZoomScale = 0.05
         scrollView.maximumZoomScale = 3.0
         scrollView.bouncesZoom = true
         scrollView.showsHorizontalScrollIndicator = false
@@ -133,6 +148,25 @@ class CanvasViewController: UIViewController, UIScrollViewDelegate {
     ) {
         let w = CGFloat(roomWidth ?? 0)
         let h = CGFloat(roomHeight ?? 0)
+
+        // Grow the canvas to fit the room with comfortable padding on every
+        // side. Big presets like Convention (4500×3000) need ~5300×3800 of
+        // canvas; small rooms keep the original 2000×2000 minimum so tables
+        // dragged to a corner have room to scroll.
+        let needW = max(2000, w + canvasPadding * 2)
+        let needH = max(2000, h + canvasPadding * 2)
+        if abs(needW - canvasSize.width) > 1 || abs(needH - canvasSize.height) > 1 {
+            canvasSize = CGSize(width: needW, height: needH)
+            canvasOrigin = CGPoint(x: canvasPadding, y: canvasPadding)
+            contentView.frame = CGRect(origin: .zero, size: canvasSize)
+            scrollView.contentSize = canvasSize
+            // Resize background dot pattern to match.
+            if let dotLayer = contentView.layer.sublayers?.first as? DotPatternLayer {
+                dotLayer.frame = contentView.bounds
+                dotLayer.setNeedsDisplay()
+            }
+            recomputeMinZoom()
+        }
 
         // Outline path
         if w > 0 && h > 0 {
@@ -261,6 +295,87 @@ class CanvasViewController: UIViewController, UIScrollViewDelegate {
             y: mid.y + ny * direction * controlOffset
         )
         path.addQuadCurve(to: end, controlPoint: control)
+    }
+
+    // Pick a minimumZoomScale that guarantees the whole canvas can be
+    // shrunk to fit the viewport, with a small floor so we never go to 0.
+    // Without this, large rooms (Convention 5300pt canvas vs 400pt screen)
+    // need scale ~0.075 to fit — well below the old hardcoded 0.3 floor.
+    private func recomputeMinZoom() {
+        guard scrollView.bounds.width > 0 && scrollView.bounds.height > 0 else { return }
+        let xRatio = scrollView.bounds.width / canvasSize.width
+        let yRatio = scrollView.bounds.height / canvasSize.height
+        let needed = min(xRatio, yRatio)
+        scrollView.minimumZoomScale = max(0.05, min(0.5, needed * 0.9))
+        // Don't pin the current zoom below the new minimum — UIKit handles
+        // clamping but we re-clamp explicitly so layout doesn't get stuck.
+        if scrollView.zoomScale < scrollView.minimumZoomScale {
+            scrollView.zoomScale = scrollView.minimumZoomScale
+        }
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        recomputeMinZoom()
+        // First time we have both a sized scrollView and any content,
+        // either restore the user's last viewport for this plan or
+        // auto-fit so they see the whole layout. Restore wins so users
+        // returning from Guests / AI land where they left off.
+        if !didInitialFit && !contentBounds().isNull {
+            didInitialFit = true
+            DispatchQueue.main.async {
+                if !self.restoreViewport() {
+                    self.fitToContent(animated: false)
+                }
+            }
+        }
+    }
+
+    func setPlanId(_ id: String?) {
+        guard planId != id else { return }
+        planId = id
+        // Force the next viewDidLayoutSubviews to restore for the new plan.
+        didInitialFit = false
+        didRestoreViewport = false
+    }
+
+    @discardableResult
+    private func restoreViewport() -> Bool {
+        guard let id = planId, !didRestoreViewport else { return false }
+        let key = Self.viewportDefaultsPrefix + id
+        guard let dict = UserDefaults.standard.dictionary(forKey: key),
+              let zoom = dict["zoom"] as? Double,
+              let ox = dict["offsetX"] as? Double,
+              let oy = dict["offsetY"] as? Double else { return false }
+        let clampedZoom = CGFloat(min(Double(scrollView.maximumZoomScale),
+                                      max(Double(scrollView.minimumZoomScale), zoom)))
+        scrollView.zoomScale = clampedZoom
+        scrollView.contentOffset = CGPoint(x: ox, y: oy)
+        didRestoreViewport = true
+        return true
+    }
+
+    private func saveViewport() {
+        guard let id = planId else { return }
+        let key = Self.viewportDefaultsPrefix + id
+        let dict: [String: Any] = [
+            "zoom": Double(scrollView.zoomScale),
+            "offsetX": Double(scrollView.contentOffset.x),
+            "offsetY": Double(scrollView.contentOffset.y),
+        ]
+        UserDefaults.standard.set(dict, forKey: key)
+    }
+
+    func scrollViewDidEndZooming(_ scrollView: UIScrollView, with view: UIView?, atScale scale: CGFloat) {
+        saveViewport()
+    }
+
+    func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
+        saveViewport()
+    }
+
+    func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
+        if !decelerate { saveViewport() }
     }
 
     // MARK: - Fit-to-content
@@ -844,6 +959,9 @@ struct CanvasViewRepresentable: UIViewControllerRepresentable {
     // Increment to trigger a fit-to-content zoom on next updateUIViewController.
     var fitToken: Int = 0
 
+    // Used to key viewport persistence (zoom + scroll offset) per plan.
+    var planId: String?
+
     var onSelectTable: (String) -> Void
     var onSelectObject: (String) -> Void
     var onDeselectAll: () -> Void
@@ -857,6 +975,7 @@ struct CanvasViewRepresentable: UIViewControllerRepresentable {
     }
 
     func updateUIViewController(_ vc: CanvasViewController, context: Context) {
+        vc.setPlanId(planId)
         vc.updateTables(tables, guests: guests, selectedId: selectedTableId)
         vc.updateObjects(objects, selectedId: selectedObjectId)
         vc.updateRoom(
