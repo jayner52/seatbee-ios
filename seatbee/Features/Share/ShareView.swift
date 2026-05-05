@@ -113,13 +113,14 @@ struct ShareView: View {
             Image(systemName: "person.2.fill")
                 .font(.system(size: 14))
                 .foregroundStyle(Color.sbGoldDk)
-            VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text("Shared by \(owner.name)")
                     .font(SBFont.bodySmallBold)
                     .foregroundStyle(Color.sbCharcoal)
-                Text("You're a collaborator")
+                Text("You can edit guests, tables, and rules. Only the owner can rename or delete the plan.")
                     .font(SBFont.caption)
                     .foregroundStyle(Color.sbWarm)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Spacer()
         }
@@ -169,6 +170,16 @@ struct ShareView: View {
                         .foregroundStyle(Color.sbGoldDk)
                     }
                     .buttonStyle(.plain)
+
+                    // Fine print explaining what a collaborator can and
+                    // can't do. Mirrors web's permission model exactly:
+                    // collabs get full edit access on guests / tables /
+                    // rules / objects, but rename / delete / arrangements /
+                    // invitations stay owner-only.
+                    Text("Collaborators can add guests, move tables, edit rules — full edit access. Only you can rename the event, create arrangements, manage collaborators, or delete the plan.")
+                        .font(SBFont.caption)
+                        .foregroundStyle(Color.sbWarm)
+                        .padding(.top, 4)
                 }
 
                 if let err = collabError {
@@ -198,7 +209,7 @@ struct ShareView: View {
                 Task { await sendInvite(planId: plan.id, email: inviteEmail) }
             }
         } message: {
-            Text("They'll get an email with a link to join. Anyone you invite gets full edit access.")
+            Text("They'll get an email link to join. Collaborators can edit guests, tables, and rules — but only you can rename or delete the plan.")
         }
         .alert("Invitation", isPresented: Binding(
             get: { inviteResult != nil },
