@@ -4,39 +4,73 @@ struct RulesView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
     @State private var showAddRule = false
+    @State private var pendingAddType: SeatingRule.RuleType = .mustTogether
+    @State private var collapsedSections: Set<String> = []
 
     private var rules: [SeatingRule] { appState.activePlan?.rules ?? [] }
     private var guests: [Guest] { appState.activePlan?.guests ?? [] }
     private var tables: [SeatTable] { appState.activePlan?.tables ?? [] }
 
+    // Section ordering mirrors web's Rules tab (src/App.jsx:13667-13939):
+    // Seat Together, Keep Apart, Assign to Table, Near Venue, Near Table,
+    // Category Rules. We add Couples (seat_adjacent) and a read-only Auto
+    // Rules bucket (vip_priority + side_together) which web auto-generates
+    // and doesn't surface a creation form for.
+    private struct RuleSectionDef: Identifiable {
+        let id: String
+        let title: String
+        let icon: String
+        let color: Color
+        let createType: SeatingRule.RuleType?  // nil → no "+" button (display-only)
+        let matches: (SeatingRule.RuleType) -> Bool
+    }
+
+    // Web's Rules tab shows 6 user-managed sections (plus Parties, which
+    // is a separate concept tracked under PR B). iOS mirrors those 6 in
+    // the same order. Auto-synthesized types (vip_priority, side_together,
+    // and seat_adjacent — created at onboarding time) are intentionally
+    // hidden, matching web's behavior.
+    private var sectionDefs: [RuleSectionDef] {
+        [
+            RuleSectionDef(id: "seat-together", title: "Seat Together",
+                icon: "person.2.fill", color: .sbSage,
+                createType: .mustTogether,
+                matches: { t in
+                    if case .mustTogether = t { return true }
+                    if case .preferTogether = t { return true }
+                    return false
+                }),
+            RuleSectionDef(id: "keep-apart", title: "Keep Apart",
+                icon: "arrow.left.and.right", color: .sbError,
+                createType: .mustNot,
+                matches: { t in if case .mustNot = t { return true }; return false }),
+            RuleSectionDef(id: "assign-table", title: "Assign to Table",
+                icon: "tablecells", color: .sbGold,
+                createType: .mustTable,
+                matches: { t in if case .mustTable = t { return true }; return false }),
+            RuleSectionDef(id: "near-venue", title: "Near Venue",
+                icon: "mappin.and.ellipse", color: .sbBlush,
+                createType: nil,  // PR A2
+                matches: { t in if case .nearObject = t { return true }; return false }),
+            RuleSectionDef(id: "near-table", title: "Near Table",
+                icon: "rectangle.expand.vertical", color: .sbBlush,
+                createType: nil,  // PR A2
+                matches: { t in if case .nearTable = t { return true }; return false }),
+            RuleSectionDef(id: "category", title: "Category Rules",
+                icon: "tag.fill", color: .sbBlush,
+                createType: nil,  // PR A2
+                matches: { t in if case .categoryTogether = t { return true }; return false }),
+        ]
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    if rules.isEmpty {
-                        // Empty state
-                        VStack(spacing: 16) {
-                            Spacer().frame(height: 40)
-                            Image(systemName: "list.bullet.rectangle")
-                                .font(.system(size: 40))
-                                .foregroundStyle(Color.sbWarm2)
-                            Text("No rules yet")
-                                .font(SBFont.displaySmall)
-                                .foregroundStyle(Color.sbCharcoal)
-                            Text("Add rules to control who sits together or apart")
-                                .font(SBFont.body)
-                                .foregroundStyle(Color.sbWarm)
-                                .multilineTextAlignment(.center)
-                        }
-                        .frame(maxWidth: .infinity)
-                    } else {
-                        ForEach(rules) { rule in
-                            ruleCard(rule)
-                        }
-                    }
+                    headerSummary
 
-                    SBButton(title: "Add Rule", icon: "plus", variant: .gold, fullWidth: true) {
-                        showAddRule = true
+                    ForEach(sectionDefs) { section in
+                        sectionView(section)
                     }
 
                     Spacer(minLength: 40)
@@ -54,8 +88,95 @@ struct RulesView: View {
                 }
             }
             .sheet(isPresented: $showAddRule) {
-                AddRuleSheet()
+                AddRuleSheet(initialType: pendingAddType)
                     .environment(appState)
+            }
+        }
+    }
+
+    private var headerSummary: some View {
+        HStack(spacing: 12) {
+            Text("\(rules.count)")
+                .font(SBFont.statNumberSmall)
+                .foregroundStyle(Color.sbCharcoal)
+            Text("rules total")
+                .font(SBFont.bodySmall)
+                .foregroundStyle(Color.sbWarm)
+            Spacer()
+        }
+        .padding(.bottom, 4)
+    }
+
+    @ViewBuilder
+    private func sectionView(_ section: RuleSectionDef) -> some View {
+        let sectionRules = rules.filter { section.matches($0.type) }
+        let isCollapsed = collapsedSections.contains(section.id)
+
+        VStack(alignment: .leading, spacing: 8) {
+            // Header (tap to collapse / expand)
+            Button {
+                if isCollapsed { collapsedSections.remove(section.id) }
+                else { collapsedSections.insert(section.id) }
+                HapticEngine.selection()
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: section.icon)
+                        .font(.system(size: 14))
+                        .foregroundStyle(section.color)
+                        .frame(width: 28, height: 28)
+                        .background(section.color.opacity(0.15))
+                        .clipShape(Circle())
+                    Text(section.title)
+                        .font(SBFont.bodySemibold)
+                        .foregroundStyle(Color.sbCharcoal)
+                    Text("(\(sectionRules.count))")
+                        .font(SBFont.caption)
+                        .foregroundStyle(Color.sbWarm)
+                    Spacer()
+                    Image(systemName: isCollapsed ? "chevron.down" : "chevron.up")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Color.sbWarm)
+                }
+                .padding(12)
+                .background(Color.sbIvory2)
+                .clipShape(RoundedRectangle(cornerRadius: SBRadius.small))
+            }
+            .buttonStyle(.plain)
+
+            if !isCollapsed {
+                if sectionRules.isEmpty && section.createType == nil {
+                    // Read-only section with no rules → small placeholder so
+                    // users know the section exists for web-authored content.
+                    Text("None yet")
+                        .font(SBFont.caption)
+                        .foregroundStyle(Color.sbWarm.opacity(0.6))
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 6)
+                }
+                ForEach(sectionRules) { rule in
+                    ruleCard(rule)
+                }
+                if let createType = section.createType {
+                    Button {
+                        pendingAddType = createType
+                        showAddRule = true
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "plus.circle")
+                                .font(.system(size: 14))
+                            Text("Add \(section.title) rule")
+                                .font(SBFont.bodySmallBold)
+                        }
+                        .foregroundStyle(Color.sbGoldDk)
+                        .frame(maxWidth: .infinity)
+                        .padding(10)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: SBRadius.small)
+                                .strokeBorder(Color.sbGold.opacity(0.4), style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
             }
         }
     }
@@ -176,6 +297,11 @@ struct RulesView: View {
 struct AddRuleSheet: View {
     @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
+
+    // The per-section "+" buttons in RulesView preselect a rule type. The
+    // type picker still renders so users can change their mind, but the
+    // sheet opens with the contextually-correct default selected.
+    var initialType: SeatingRule.RuleType = .mustTogether
 
     @State private var ruleType: SeatingRule.RuleType = .mustTogether
     @State private var selectedGuestIds: Set<String> = []
@@ -316,6 +442,7 @@ struct AddRuleSheet: View {
                         .disabled(selectedGuestIds.count < 2 && ruleType != .mustTable)
                 }
             }
+            .onAppear { ruleType = initialType }
         }
     }
 
