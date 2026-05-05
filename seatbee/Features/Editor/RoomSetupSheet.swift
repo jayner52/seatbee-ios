@@ -61,6 +61,12 @@ struct RoomSetupSheet: View {
                                     let displayH = useMetric ? preset.h / 3.28084 : preset.h
                                     roomWidth = String(format: "%.0f", displayW)
                                     roomHeight = String(format: "%.0f", displayH)
+                                    // Quick Presets are W×H rectangle dimensions
+                                    // by definition, so snap shape to Rectangle.
+                                    // Drops any prior custom polygon — applySetup
+                                    // regenerates points at the new dims.
+                                    selectedShape = "rect"
+                                    workingPoints = nil
                                     HapticEngine.selection()
                                 } label: {
                                     VStack(spacing: 2) {
