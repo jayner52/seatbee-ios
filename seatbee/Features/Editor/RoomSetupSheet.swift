@@ -9,45 +9,111 @@ struct RoomSetupSheet: View {
     @State private var roomHeight = ""
     @State private var useMetric = false
     @State private var selectedShape = "rect"
+    @State private var flipH = false
+    @State private var flipV = false
     @State private var showImagePicker = false
     @State private var selectedImage: PhotosPickerItem?
     @State private var floorPlanImage: UIImage?
     @State private var isAnalyzing = false
     @State private var analysisResult: String?
 
-    private let shapes = [
-        ("rect", "Rectangle", "rectangle"),
-        ("l", "L-Shape", "l.rectangle.roundedbottom"),
-        ("t", "T-Shape", "t.square"),
-        ("u", "U-Shape", "u.square"),
+    // Web parity: 8 preset shapes. iOS lays them out in a 4×2 grid.
+    // Icons are SF Symbols approximations — exact glyphs differ from web SVG
+    // but read clearly enough that users can match the shape they want.
+    private let shapes: [(id: String, label: String, icon: String, mirror: Bool)] = [
+        ("rect",   "Rectangle", "rectangle", false),
+        ("l",      "L-Shape",   "l.rectangle.roundedbottom", false),
+        ("l_rev",  "L-Reversed","l.rectangle.roundedbottom", true),
+        ("t",      "T-Shape",   "t.square", false),
+        ("u",      "U-Shape",   "u.square", false),
+        ("oval",   "Oval",      "oval", false),
+        ("circle", "Circle",    "circle", false),
+        ("custom", "Custom",    "scribble.variable", false),
+    ]
+
+    // Web parity: matches the Quick Presets row in src/App.jsx Room Settings.
+    // Stored in feet — converted to pixels (or metric meters) on apply.
+    private let quickPresets: [(label: String, sub: String, w: Double, h: Double)] = [
+        ("Small",      "50×35ft",   50,  35),
+        ("Medium",     "80×60ft",   80,  60),
+        ("Large",      "110×80ft",  110, 80),
+        ("Ballroom",   "150×100ft", 150, 100),
+        ("Grand",      "200×150ft", 200, 150),
+        ("Convention", "300×200ft", 300, 200),
     ]
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
-                    // Room shape
-                    formSection("ROOM SHAPE") {
-                        HStack(spacing: 10) {
-                            ForEach(shapes, id: \.0) { shape in
+                    // Quick Presets — one-tap dimension shortcuts (web parity).
+                    formSection("QUICK PRESETS") {
+                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                            ForEach(quickPresets, id: \.label) { preset in
                                 Button {
-                                    selectedShape = shape.0
+                                    useMetric = false
+                                    roomWidth = String(format: "%.0f", preset.w)
+                                    roomHeight = String(format: "%.0f", preset.h)
                                     HapticEngine.selection()
                                 } label: {
-                                    VStack(spacing: 6) {
-                                        Image(systemName: shape.2)
-                                            .font(.system(size: 24))
-                                            .foregroundStyle(selectedShape == shape.0 ? Color.sbGoldDk : Color.sbWarm)
-                                        Text(shape.1)
-                                            .font(SBFont.capsLabel)
-                                            .foregroundStyle(selectedShape == shape.0 ? Color.sbGoldDk : Color.sbWarm)
+                                    VStack(spacing: 2) {
+                                        Text(preset.label)
+                                            .font(SBFont.bodySmallBold)
+                                            .foregroundStyle(Color.sbCharcoal)
+                                        Text(preset.sub)
+                                            .font(SBFont.caption)
+                                            .foregroundStyle(Color.sbWarm)
                                     }
                                     .frame(maxWidth: .infinity)
-                                    .padding(12)
-                                    .background(selectedShape == shape.0 ? Color.sbChampagne : Color.sbIvory2)
+                                    .padding(.vertical, 10)
+                                    .background(Color.sbIvory2)
                                     .clipShape(RoundedRectangle(cornerRadius: SBRadius.small))
                                 }
                                 .buttonStyle(.plain)
+                            }
+                        }
+                    }
+
+                    // Room shape — 8 presets in a 4×2 grid (web parity).
+                    formSection("ROOM SHAPE") {
+                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                            ForEach(shapes, id: \.id) { shape in
+                                Button {
+                                    selectedShape = shape.id
+                                    HapticEngine.selection()
+                                } label: {
+                                    VStack(spacing: 6) {
+                                        Image(systemName: shape.icon)
+                                            .font(.system(size: 22))
+                                            .scaleEffect(x: shape.mirror ? -1 : 1, y: 1)
+                                            .foregroundStyle(selectedShape == shape.id ? Color.sbGoldDk : Color.sbWarm)
+                                        Text(shape.label)
+                                            .font(SBFont.capsLabel)
+                                            .foregroundStyle(selectedShape == shape.id ? Color.sbGoldDk : Color.sbWarm)
+                                            .lineLimit(1)
+                                            .minimumScaleFactor(0.7)
+                                    }
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 10)
+                                    .background(selectedShape == shape.id ? Color.sbChampagne : Color.sbIvory2)
+                                    .clipShape(RoundedRectangle(cornerRadius: SBRadius.small))
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+
+                    // Flip H / Flip V (web parity — Trace canvas Flip buttons,
+                    // surfaced here as quick toggles since iOS V2 has no trace UI yet).
+                    formSection("ORIENTATION") {
+                        HStack(spacing: 10) {
+                            flipButton(title: "Flip H", systemImage: "arrow.left.and.right.righttriangle.left.righttriangle.right", isOn: flipH) {
+                                flipH.toggle()
+                                HapticEngine.selection()
+                            }
+                            flipButton(title: "Flip V", systemImage: "arrow.up.and.down.righttriangle.up.righttriangle.down", isOn: flipV) {
+                                flipV.toggle()
+                                HapticEngine.selection()
                             }
                         }
                     }
@@ -89,6 +155,38 @@ struct RoomSetupSheet: View {
                                 .font(SBFont.bodySmall)
                         }
                         .tint(Color.sbGold)
+                    }
+
+                    // Zones (read-only V2 — web users can author Dance Floor /
+                    // Bar / Stage areas; iOS doesn't have an editor yet, so
+                    // surface them as a list so users know they exist).
+                    if let zones = appState.activePlan?.roomZones, !zones.isEmpty {
+                        formSection("LABELED AREAS") {
+                            VStack(spacing: 8) {
+                                ForEach(zones, id: \.id) { zone in
+                                    HStack(spacing: 10) {
+                                        Image(systemName: "rectangle.dashed")
+                                            .font(.system(size: 14))
+                                            .foregroundStyle(Color.sbGoldDk)
+                                        Text(zone.label)
+                                            .font(SBFont.bodySmallBold)
+                                            .foregroundStyle(Color.sbCharcoal)
+                                        Spacer()
+                                        Text("\(Int(zone.w))×\(Int(zone.h))")
+                                            .font(SBFont.caption)
+                                            .foregroundStyle(Color.sbWarm)
+                                    }
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 10)
+                                    .background(Color.sbIvory2)
+                                    .clipShape(RoundedRectangle(cornerRadius: SBRadius.small))
+                                }
+                                Text("Edit areas on the web app for now.")
+                                    .font(SBFont.caption)
+                                    .foregroundStyle(Color.sbWarm)
+                                    .padding(.top, 4)
+                            }
+                        }
                     }
 
                     // Floor plan upload
@@ -169,6 +267,23 @@ struct RoomSetupSheet: View {
         .onAppear { loadCurrentSetup() }
     }
 
+    private func flipButton(title: String, systemImage: String, isOn: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 14, weight: .medium))
+                Text(title)
+                    .font(SBFont.bodySmallBold)
+            }
+            .foregroundStyle(isOn ? Color.sbGoldDk : Color.sbCharcoal)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
+            .background(isOn ? Color.sbChampagne : Color.sbIvory2)
+            .clipShape(RoundedRectangle(cornerRadius: SBRadius.small))
+        }
+        .buttonStyle(.plain)
+    }
+
     private func formSection<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
@@ -188,6 +303,8 @@ struct RoomSetupSheet: View {
         if let w = plan.roomWidth { roomWidth = String(format: "%.0f", w / factor) }
         if let h = plan.roomHeight { roomHeight = String(format: "%.0f", h / factor) }
         if let shape = plan.roomShape, !shape.isEmpty { selectedShape = shape }
+        flipH = plan.roomFlipH ?? false
+        flipV = plan.roomFlipV ?? false
     }
 
     private func applySetup() {
@@ -216,6 +333,12 @@ struct RoomSetupSheet: View {
         } else {
             plan.roomShape = selectedShape
         }
+
+        // Flip flags persist (web parity — Trace canvas Flip H/V buttons).
+        // Canvas reads these in its roomBezierPath() to mirror the rendered
+        // shape without mutating customRoomPoints.
+        plan.roomFlipH = flipH
+        plan.roomFlipV = flipV
 
         // Persist floor plan image (if user uploaded one) as a base64 data
         // URL on rawFloorPlanImage. Default opacity matches web (0.4).
