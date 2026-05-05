@@ -326,8 +326,22 @@ struct DashboardView: View {
     }
 
     private func selectPlan(_ plan: SeatingPlan) {
-        appState.activePlan = plan
-        appState.selectedTab = .edit
+        // Switch active plan WITHOUT navigating away. Bubble the chosen
+        // plan to the top of the local list so the hero card updates and
+        // the user can see they're now operating on a different plan
+        // before deciding which tab to dive into.
+        //
+        // Guard against re-selecting the already-active plan — the hero
+        // card itself calls selectPlan, so a hero tap shouldn't trigger
+        // a redundant reorder animation.
+        guard plan.id != plans.first?.id else { return }
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.78)) {
+            if let idx = plans.firstIndex(where: { $0.id == plan.id }) {
+                plans.remove(at: idx)
+                plans.insert(plan, at: 0)
+            }
+            appState.activePlan = plan
+        }
         HapticEngine.selection()
     }
 
