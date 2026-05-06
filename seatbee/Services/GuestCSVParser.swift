@@ -53,7 +53,31 @@ enum GuestCSVParser {
                 return needles.contains { lc.contains($0) }
             }
         }
-        let nameIdx       = find(["name", "guest"]) ?? 0
+        // Split first/last name columns (web's downloadable templates use
+        // these). When both exist we concatenate; otherwise fall back to a
+        // single "Name" / "Guest" column. Match exact tokens here so
+        // "First Name" doesn't also satisfy the broader name find().
+        func findExact(_ tokens: [String]) -> Int? {
+            headerCols.firstIndex { col in
+                let lc = col.lowercased().trimmingCharacters(in: .whitespaces)
+                return tokens.contains(lc)
+            }
+        }
+        let firstNameIdx  = findExact(["first name", "firstname", "first", "given name"])
+        let lastNameIdx   = findExact(["last name", "lastname", "last", "surname", "family name"])
+        // The fallback single name index excludes the first/last splits so
+        // we don't accidentally treat "First Name" as the full name.
+        let nameIdx: Int = {
+            if let f = firstNameIdx { _ = f } // referenced to silence unused-let in closures
+            let candidate = headerCols.firstIndex { col in
+                let lc = col.lowercased()
+                let lcTrim = lc.trimmingCharacters(in: .whitespaces)
+                let isSplit = ["first name","firstname","first","given name",
+                               "last name","lastname","last","surname","family name"].contains(lcTrim)
+                return !isSplit && (lc.contains("name") || lc.contains("guest"))
+            }
+            return candidate ?? 0
+        }()
         let emailIdx      = find(["email", "e-mail", "e mail"])
         let sideIdx       = find(["side"])
         let mealIdx       = find(["meal", "entree", "entrée", "dinner choice", "food choice", "dinner selection"])
@@ -73,8 +97,20 @@ enum GuestCSVParser {
 
         for line in lines.dropFirst() {
             let cols = parseRow(line)
-            guard cols.count > nameIdx else { continue }
-            let name = cols[nameIdx].trimmingCharacters(in: .whitespaces)
+            // Resolve name from First+Last when both are present, otherwise
+            // from the single Name column.
+            let resolvedFirst = colValue(firstNameIdx, cols)
+            let resolvedLast  = colValue(lastNameIdx, cols)
+            let resolvedName: String
+            if resolvedFirst != nil || resolvedLast != nil {
+                resolvedName = [resolvedFirst, resolvedLast]
+                    .compactMap { $0 }
+                    .joined(separator: " ")
+            } else {
+                guard cols.count > nameIdx else { continue }
+                resolvedName = cols[nameIdx].trimmingCharacters(in: .whitespaces)
+            }
+            let name = resolvedName
             guard !name.isEmpty else { continue }
             let parts = name.split(separator: " ", maxSplits: 1)
 
@@ -101,11 +137,14 @@ enum GuestCSVParser {
             let dietaryText = colValue(dietaryIdx, cols)
             let inferredTags = inferDietaryTags(from: dietaryText)
 
+            // Prefer explicit first/last from columns when present.
+            let outFirst = resolvedFirst ?? String(parts.first ?? "")
+            let outLast: String? = resolvedLast ?? (parts.count > 1 ? String(parts.last ?? "") : nil)
             guests.append(Guest(
                 id: UUID().uuidString,
                 name: name,
-                firstName: String(parts.first ?? ""),
-                lastName: parts.count > 1 ? String(parts.last ?? "") : nil,
+                firstName: outFirst,
+                lastName: outLast,
                 email: colValue(emailIdx, cols),
                 categories: categories,
                 dietary: dietaryText,

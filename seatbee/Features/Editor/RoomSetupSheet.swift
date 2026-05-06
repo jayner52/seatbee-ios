@@ -395,7 +395,8 @@ struct RoomSetupSheet: View {
             currentShape: selectedShape,
             roomWidth: widthPx,
             roomHeight: heightPx,
-            measurementUnit: unit
+            measurementUnit: unit,
+            floorPlanImage: floorPlanImage
         ) { newPoints, newFlipH, newFlipV in
             workingPoints = newPoints
             flipH = newFlipH
@@ -639,6 +640,10 @@ struct TraceShapeSheet: View {
     let roomWidth: Double
     let roomHeight: Double
     let measurementUnit: String?
+    /// Optional floor-plan image rendered behind the polygon as a faded
+    /// reference so the user can trace the actual walls. Web does the
+    /// same thing in RoomEditorModal step 1.
+    var floorPlanImage: UIImage? = nil
 
     /// Called with the user's final point list + flip flags when they tap Apply.
     /// Cancel discards everything; the parent sheet keeps its existing values.
@@ -745,10 +750,29 @@ struct TraceShapeSheet: View {
     // the boundaries.
     private func traceCanvas(in size: CGSize) -> some View {
         let layout = canvasLayout(canvasSize: size)
+        let imageRect = CGRect(
+            x: layout.offsetX,
+            y: layout.offsetY,
+            width: roomWidth * layout.scale,
+            height: roomHeight * layout.scale
+        )
         return ZStack {
+            // Floor-plan reference image (when provided) sits beneath
+            // everything at half-opacity so corners + edges read clearly.
+            if let img = floorPlanImage {
+                Image(uiImage: img)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: imageRect.width, height: imageRect.height)
+                    .clipped()
+                    .opacity(0.5)
+                    .position(x: imageRect.midX, y: imageRect.midY)
+                    .allowsHitTesting(false)
+            }
+
             // Filled outline
             shapeFillPath(layout: layout)
-                .fill(Color.sbChampagne.opacity(0.35))
+                .fill(Color.sbChampagne.opacity(floorPlanImage == nil ? 0.35 : 0.18))
 
             shapeOutlinePath(layout: layout)
                 .stroke(Color.sbGoldDk, style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
