@@ -6,6 +6,7 @@ struct AddTableSheet: View {
 
     let tableTypes: [(type: SeatTable.TableType, name: String, icon: String, seats: Int, description: String)] = [
         (.round, "Round Table", "circle", 8, "Classic round table for 8 guests"),
+        (.oval, "Oval Table", "oval", 10, "Ellipse table for 10 guests"),
         (.rect, "Rectangular", "rectangle", 6, "Long table for 6 guests"),
         (.head, "Head Table", "person.2", 12, "Main table for the wedding party"),
         (.sweetheart, "Sweetheart", "heart", 2, "Intimate table for the couple"),
@@ -135,6 +136,8 @@ enum TableDefaults {
             return Dimensions(width: 270, height: 37.5, oneSide: true) // 18ft × 2.5ft
         case .sweetheart:
             return Dimensions(width: 60, height: 45, sweetShape: "heart") // 4ft × 3ft
+        case .oval:
+            return Dimensions(width: 120, height: 60)  // 8ft × 4ft (App.jsx:8453)
         }
     }
 }

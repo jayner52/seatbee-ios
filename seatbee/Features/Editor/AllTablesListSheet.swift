@@ -163,6 +163,7 @@ struct AllTablesListSheet: View {
         case .sweetheart: symbol = "heart"
         case .rect:       symbol = "rectangle"
         case .round:      symbol = "circle"
+        case .oval:       symbol = "oval"
         }
         return Image(systemName: symbol)
             .font(.system(size: 13, weight: .medium))
@@ -195,8 +196,15 @@ struct AllTablesListSheet: View {
                     .clipShape(Circle())
             }
             if let tags = guest.dietaryTags, !tags.isEmpty {
-                Text("🍽")
-                    .font(.system(size: 11))
+                // Show specific dietary emoji per tag (vegan 🌱, halal ☪️,
+                // etc.) instead of a generic plate. Matches web behaviour.
+                HStack(spacing: 1) {
+                    ForEach(tags.prefix(3), id: \.self) { tag in
+                        if let emoji = DietaryTag.emoji(for: tag) {
+                            Text(emoji).font(.system(size: 11))
+                        }
+                    }
+                }
             }
         }
         .padding(.vertical, 2)

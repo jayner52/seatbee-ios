@@ -1,0 +1,53 @@
+#!/bin/sh
+# Seatbee iOS pre-commit hook
+# Enforces the rules in CLAUDE.md:
+#   1. No direct commits to main
+#   2. Never commit Secrets.swift
+
+BRANCH=$(git branch --show-current)
+
+# Rule 1: Block commits to main
+if [ "$BRANCH" = "main" ]; then
+    echo ""
+    echo "================================================================"
+    echo "  BLOCKED: trying to commit directly to 'main'."
+    echo "================================================================"
+    echo ""
+    echo "  Per CLAUDE.md, all changes go through a branch + Pull Request."
+    echo ""
+    echo "  To fix:"
+    echo "    git checkout -b jayne/your-task-name   # or shayan/..."
+    echo "    git commit ...                          # try again"
+    echo ""
+    echo "  If you genuinely need to bypass (you almost never do):"
+    echo "    git commit --no-verify"
+    echo ""
+    echo "================================================================"
+    exit 1
+fi
+
+# Rule 2: Block commits of Secrets.swift
+if git diff --cached --name-only | grep -q "seatbee/Config/Secrets.swift"; then
+    echo ""
+    echo "================================================================"
+    echo "  BLOCKED: trying to commit seatbee/Config/Secrets.swift"
+    echo "================================================================"
+    echo ""
+    echo "  This file holds secrets and must never be in git."
+    echo "  Verify .gitignore excludes it, then unstage:"
+    echo "    git reset HEAD seatbee/Config/Secrets.swift"
+    echo ""
+    echo "================================================================"
+    exit 1
+fi
+
+# Rule 3: Warn (don't block) when project.pbxproj is in the commit
+if git diff --cached --name-only | grep -q "project.pbxproj"; then
+    echo ""
+    echo "  Heads-up: this commit modifies seatbee.xcodeproj/project.pbxproj"
+    echo "  (file structure change). Make sure you've coordinated with the"
+    echo "  other dev via Telegram. Push & merge this PR ASAP to avoid conflicts."
+    echo ""
+fi
+
+exit 0

@@ -258,6 +258,7 @@ These are paper cuts in iOS UX that don't risk data loss. Listed in priority ord
 | LOW | RoomObject icon/category/isObstacle UI on iOS | Round-trip preserved. iOS doesn't yet display the icon catalog or surface obstacle warnings. |
 | LOW | `SeatTable.seatingLayout` field not on iOS | Web supports `seatingLayout: 'all' \| 'banquet'` for rect tables to drive 4-side or banquet seat layouts. iOS DTO/model doesn't have the field, so it's dropped on iOS save → web, and the iOS edit drawer can't surface "All Sides" / "Banquet" buttons. Adding requires `Models/SeatingPlan.swift` change (high-risk file — coordinate with Shayan). |
 | LOW | `genResults` preservation | Intentional skip. Recomputable. |
+| LOW | Round-table seat placement: Half / Quarter on web, not on iOS | Web's edit-table panel offers "All Around / Half / Quarter" placement for round tables (controls how seats distribute around the perimeter). iOS only supports "All Around" (default) for round tables — no half/quarter UI. Round-trip preserves the web setting (it's stored on the table object), but iOS-edited round tables always reset to all-around. Defer until users ask. |
 
 ---
 
