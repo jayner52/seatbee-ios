@@ -34,6 +34,26 @@ final class SeatService {
         let seatOrders: [String: [String?]]            // tableId → seatMap[]
         let score: Int?
         let fallback: Bool?
+
+        enum CodingKeys: String, CodingKey {
+            case assignments, seatOrders, score, fallback
+        }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            assignments = (try? c.decode([String: String].self, forKey: .assignments)) ?? [:]
+            seatOrders  = (try? c.decode([String: [String?]].self, forKey: .seatOrders)) ?? [:]
+            // score may come back as Int or Double depending on the
+            // path solve() took (rounded vs computed). Accept either.
+            if let i = try? c.decode(Int.self, forKey: .score) {
+                score = i
+            } else if let d = try? c.decode(Double.self, forKey: .score) {
+                score = Int(d.rounded())
+            } else {
+                score = nil
+            }
+            fallback = try? c.decode(Bool.self, forKey: .fallback)
+        }
     }
 
     /// Run server-side seating for the given plan. Honours existing locked
@@ -104,6 +124,11 @@ final class SeatService {
             do {
                 return try JSONDecoder().decode(GenerateResult.self, from: data)
             } catch {
+                // Diagnostic: show first 500 bytes of the response so we can
+                // see the shape mismatch. Remove once parity is confirmed.
+                let preview = String(data: data.prefix(500), encoding: .utf8) ?? "(non-utf8)"
+                print("[SeatService] decode failed: \(error)")
+                print("[SeatService] response preview: \(preview)")
                 throw SeatError.server("Could not parse response: \(error.localizedDescription)")
             }
         case 401:
