@@ -259,6 +259,7 @@ struct SeatTable: Identifiable, Codable {
     var diameter: Double?   // round table diameter in px
     var sweetShape: String? // "heart"/"oval"/"diamond" for sweetheart
     var oneSide: Bool?      // head table one-side-only seating
+    var notes: String?      // table-level free-text notes (kitchen, vendor, etc.)
 
     enum TableType: String, Codable, CaseIterable {
         case round
@@ -527,7 +528,7 @@ extension SeatingPlan {
                     id: t.id, name: t.name, type: t.type.rawValue, seats: t.seats,
                     x: t.x, y: t.y, rotation: t.rotation, locked: t.locked, color: t.color,
                     width: t.width, height: t.height, diameter: t.diameter,
-                    sweetShape: t.sweetShape, oneSide: t.oneSide
+                    sweetShape: t.sweetShape, oneSide: t.oneSide, notes: t.notes
                 )
             },
             rules: rules.map { r in

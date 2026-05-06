@@ -123,9 +123,9 @@ Web-parity (preserved on iOS round-trip): `dietaryTags` (array of strings — dr
 
 ### SeatTable
 
-Core: `id`, `name`, `type` (`round`/`rect`/`head`/`sweetheart`), `seats`, `x`, `y`, `rotation`, `assignments` (handled separately, see below), `locked`, `color`
+Core: `id`, `name`, `type` (`round`/`rect`/`head`/`sweetheart`/`oval`), `seats`, `x`, `y`, `rotation`, `assignments` (handled separately, see below), `locked`, `color`
 
-Web-parity (preserved on iOS round-trip): `width`, `height` (rect/head), `diameter` (round), `sweetShape` (`HEART`/`OVAL`/`DIAMOND` for sweetheart variants), `oneSide` (boolean for head table)
+Web-parity (preserved on iOS round-trip): `width`, `height` (rect/head/oval), `diameter` (round), `sweetShape` (`HEART`/`OVAL`/`DIAMOND` for sweetheart variants), `oneSide` (boolean for head table), `notes` (free-text per-table notes — kitchen, vendor, internal)
 
 ### SeatingRule
 
