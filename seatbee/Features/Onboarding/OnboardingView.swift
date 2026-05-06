@@ -45,8 +45,17 @@ struct OnboardingView: View {
     @State private var detectedPartiesCount = 0
     @State private var detectedPlatform: String?
     @State private var isProcessing = false
-    @State private var showFilePicker = false
+    /// Single source of truth for the iOS document picker. Two
+/// `.fileImporter` modifiers in the same view tree silently conflict —
+/// only the outer one would present, so the floor-plan Files button
+/// stayed dead. We dispatch on this enum so one importer handles both.
+    @State private var activeFileImport: FileImportMode? = nil
     @State private var csvImportError: String?
+    /// Pre-headed CSV template generated for the current event type so
+    /// users without an export from Joy/Zola/etc. can download a starter
+    /// file, fill in their guests, and upload. Regenerated when
+    /// eventType flips.
+    @State private var csvTemplateURL: URL?
 
     // MARK: - Step 3
     @State private var useMetric = false
@@ -58,8 +67,12 @@ struct OnboardingView: View {
     @State private var roomFlipV = false
     @State private var floorPlanImage: UIImage? = nil
     @State private var showFloorPlanPhotoPicker = false
-    @State private var showFloorPlanFilePicker = false
     @State private var floorPlanPickerItem: PhotosPickerItem? = nil
+    /// Polygon traced over the floor plan. Empty until the user
+    /// applies a trace; then writes to plan.customRoomPoints +
+    /// roomShape = "custom" on finalize.
+    @State private var tracedPoints: [RoomPoint] = []
+    @State private var showTraceSheet = false
 
     // MARK: - Step 4
     @State private var tableStyle: TableStyle = .round
@@ -73,6 +86,8 @@ struct OnboardingView: View {
     @State private var errorMessage: String?
 
     // MARK: - Local enums
+
+    enum FileImportMode: Equatable { case csv, floorPlan }
 
     enum EventTypeOption: String {
         case wedding, celebration
@@ -303,14 +318,27 @@ struct OnboardingView: View {
                 }
             }
             .fileImporter(
-                isPresented: $showFilePicker,
-                allowedContentTypes: [.commaSeparatedText, .plainText, .data]
+                isPresented: Binding(
+                    get: { activeFileImport != nil },
+                    set: { if !$0 { activeFileImport = nil } }
+                ),
+                allowedContentTypes: activeFileImport == .floorPlan
+                    ? [.image, .pdf]
+                    : [.commaSeparatedText, .plainText, .data]
             ) { result in
+                let mode = activeFileImport
+                activeFileImport = nil
                 switch result {
                 case .success(let url):
-                    importCSVFromURL(url)
+                    if mode == .floorPlan {
+                        loadFloorPlanFromURL(url)
+                    } else {
+                        importCSVFromURL(url)
+                    }
                 case .failure(let error):
-                    csvImportError = error.localizedDescription
+                    if mode != .floorPlan {
+                        csvImportError = error.localizedDescription
+                    }
                 }
             }
         }
@@ -406,7 +434,7 @@ struct OnboardingView: View {
             // CSV upload — gold pill button
             Button {
                 csvImportError = nil
-                showFilePicker = true
+                activeFileImport = .csv
             } label: {
                 HStack(spacing: 10) {
                     Image(systemName: "tray.and.arrow.down")
@@ -432,6 +460,21 @@ struct OnboardingView: View {
                 Text(csvImportError).font(SBFont.caption).foregroundStyle(Color.sbError)
             }
 
+            // Template download — for users without an existing export.
+            // Pre-filled with all the columns GuestCSVParser recognises
+            // and 2 sample rows so they know the shape.
+            if let csvTemplateURL {
+                ShareLink(item: csvTemplateURL) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "arrow.down.doc")
+                            .font(.system(size: 12, weight: .semibold))
+                        Text("Download CSV template")
+                            .font(SBFont.caption)
+                    }
+                    .foregroundStyle(Color.sbGoldDk)
+                }
+            }
+
             // Paste fallback
             HStack {
                 Rectangle().fill(Color.sbLine2).frame(height: 1)
@@ -440,13 +483,15 @@ struct OnboardingView: View {
             }
 
             ZStack(alignment: .topLeading) {
-                if guestListText.isEmpty {
-                    Text("Sarah Chen, vegetarian\nJon Park\nMia Khalid, +1\n…")
-                        .font(SBFont.body).foregroundStyle(Color.sbWarm2).padding(14)
-                }
                 TextEditor(text: $guestListText)
                     .font(SBFont.body).scrollContentBackground(.hidden).padding(8)
                     .onChange(of: guestListText) { _, _ in parsePastedGuests() }
+                if guestListText.isEmpty {
+                    Text("Sarah Chen, vegetarian\nJon Park\nMia Khalid, +1\n…")
+                        .font(SBFont.body).foregroundStyle(Color.sbWarm2)
+                        .padding(.horizontal, 14).padding(.vertical, 16)
+                        .allowsHitTesting(false)
+                }
             }
             .frame(height: 140)
             .background(Color.sbIvory2)
@@ -458,6 +503,7 @@ struct OnboardingView: View {
 
             Spacer(minLength: 40)
         }
+        .task(id: eventType) { regenerateCSVTemplate() }
     }
 
     private var detectedSummary: some View {
@@ -472,12 +518,22 @@ struct OnboardingView: View {
                 }
                 Spacer()
             }
-            // Quick stats
-            HStack(spacing: 12) {
-                detectedStat(value: "\(detectedGuests.filter { $0.rsvp == .yes }.count)", label: "RSVP'd Yes")
-                detectedStat(value: "\(detectedPartiesCount)", label: "Parties")
-                detectedStat(value: "\(detectedGuests.filter { ($0.dietaryTags ?? []).count > 0 || ($0.dietary ?? "").count > 0 }.count)", label: "Dietary")
-                detectedStat(value: "\(detectedGuests.filter { $0.vip }.count)", label: "VIPs")
+            // Quick stats — only show tiles with non-zero counts so the
+            // paste path doesn't display "0 RSVPs / 0 Parties / 0 …" when
+            // those fields just weren't in the input.
+            let stats: [(value: Int, label: String)] = [
+                (detectedGuests.filter { $0.rsvp == .yes }.count,            "RSVP'd Yes"),
+                (detectedPartiesCount,                                        "Parties"),
+                (detectedGuests.filter { ($0.dietaryTags ?? []).count > 0
+                                        || ($0.dietary ?? "").count > 0 }.count, "Dietary"),
+                (detectedGuests.filter { $0.vip }.count,                      "VIPs"),
+            ].filter { $0.value > 0 }
+            if !stats.isEmpty {
+                HStack(spacing: 12) {
+                    ForEach(stats, id: \.label) { stat in
+                        detectedStat(value: "\(stat.value)", label: stat.label)
+                    }
+                }
             }
             FlowLayout(spacing: 6) {
                 ForEach(detectedGuests.prefix(20), id: \.id) { g in
@@ -575,7 +631,7 @@ struct OnboardingView: View {
                 }
                 .buttonStyle(.plain)
                 Button {
-                    showFloorPlanFilePicker = true
+                    activeFileImport = .floorPlan
                 } label: {
                     floorPlanPickerLabel(icon: "doc.badge.plus", text: "Files / PDF")
                 }
@@ -592,6 +648,7 @@ struct OnboardingView: View {
                     Button {
                         floorPlanImage = nil
                         floorPlanPickerItem = nil
+                        tracedPoints = []
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 22))
@@ -602,7 +659,59 @@ struct OnboardingView: View {
                 }
             }
 
+            // Trace CTA — visible when there's something to trace against
+            // (uploaded plan) OR the user picked the Custom shape.
+            if floorPlanImage != nil || roomShape == .custom {
+                Button {
+                    showTraceSheet = true
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "scribble.variable")
+                        Text(tracedPoints.isEmpty ? "Trace floor plan" : "Edit traced shape (\(tracedPoints.count) corners)")
+                            .font(SBFont.bodySemibold)
+                        Spacer()
+                        Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold))
+                    }
+                    .foregroundStyle(Color.sbGoldDk)
+                    .padding(14)
+                    .frame(maxWidth: .infinity)
+                    .background(Color.sbChampagne.opacity(0.5))
+                    .clipShape(RoundedRectangle(cornerRadius: SBRadius.button))
+                }
+                .buttonStyle(.plain)
+                if !tracedPoints.isEmpty {
+                    HStack(spacing: 6) {
+                        Image(systemName: "checkmark.circle.fill").foregroundStyle(Color.sbSage)
+                        Text("Custom shape saved — finalise on the next steps.")
+                            .font(SBFont.caption).foregroundStyle(Color.sbCharcoal2)
+                    }
+                }
+            }
+
             Spacer(minLength: 40)
+        }
+        .sheet(isPresented: $showTraceSheet) {
+            let dim = currentRoomPx
+            let seedPoints: [RoomPoint] = tracedPoints.isEmpty
+                ? RoomShapePresets.defaultPoints(
+                    shape: roomShape == .custom ? "rect" : roomShape.rawValue,
+                    width: dim.width, height: dim.height)
+                : tracedPoints
+            TraceShapeSheet(
+                initialPoints: seedPoints,
+                initialFlipH: roomFlipH,
+                initialFlipV: roomFlipV,
+                currentShape: roomShape == .custom ? "CUSTOM" : roomShape.displayName.uppercased(),
+                roomWidth: dim.width,
+                roomHeight: dim.height,
+                measurementUnit: useMetric ? "metric" : "imperial",
+                floorPlanImage: floorPlanImage
+            ) { newPoints, newFlipH, newFlipV in
+                tracedPoints = newPoints
+                roomFlipH = newFlipH
+                roomFlipV = newFlipV
+                roomShape = .custom
+            }
         }
         .photosPicker(isPresented: $showFloorPlanPhotoPicker, selection: $floorPlanPickerItem, matching: .images)
         .onChange(of: floorPlanPickerItem) { _, newItem in
@@ -612,19 +721,6 @@ struct OnboardingView: View {
                    let img = UIImage(data: data) {
                     await MainActor.run { floorPlanImage = img }
                 }
-            }
-        }
-        .fileImporter(
-            isPresented: $showFloorPlanFilePicker,
-            allowedContentTypes: [.image, .pdf],
-            allowsMultipleSelection: false
-        ) { result in
-            switch result {
-            case .success(let urls):
-                guard let url = urls.first else { return }
-                loadFloorPlanFromURL(url)
-            case .failure:
-                break
             }
         }
     }
@@ -1180,6 +1276,45 @@ struct OnboardingView: View {
         detectedPlatform = guests.isEmpty ? nil : "Pasted names"
     }
 
+    /// Web parity (App.jsx:3100 CSV_TEMPLATES). Wedding mirrors web's
+    /// `wedding`; celebration mirrors web's `general`. iOS doesn't ship
+    /// the corporate flow yet so we omit that template.
+    private func csvTemplateBody(for type: EventTypeOption) -> String {
+        switch type {
+        case .wedding:
+            return """
+            First Name,Last Name,Email,Phone,Party/Group,RSVP,Meal Choice,Dietary Restrictions,VIP,Child,Tags,Notes
+            John,Smith,john@email.com,555-0102,Smith Family,Yes,Chicken,,No,No,"Family, Groom",Best man
+            Jane,Smith,jane@email.com,555-0103,Smith Family,Yes,Fish,Gluten-free,No,No,"Family, Groom",
+            Emily,Johnson,emily@email.com,555-0104,Johnson Party,Yes,Vegetarian,Vegan,No,No,"Friends, Bride",College friend
+            Michael,Brown,michael@email.com,,,Maybe,,Nut allergy,No,No,Coworkers,
+            David,Lee,david@email.com,555-0101,Lee Family,Yes,Chicken,,Yes,No,"Family, Head Table",Father of the bride
+            """
+        case .celebration:
+            return """
+            First Name,Last Name,Email,Phone,Party/Group,RSVP,VIP,Child,Tags,Dietary Restrictions,Notes
+            Alex,Taylor,alex@email.com,555-0120,Taylor Family,Yes,Yes,No,Host,,Guest of honour
+            Jordan,Lee,jordan@email.com,,,Yes,No,No,Guest,Vegetarian,
+            Morgan,Chen,morgan@email.com,555-0121,Chen Group,Maybe,No,No,Speaker,,Presenting at 3pm
+            Casey,Brown,casey@email.com,,,Yes,No,No,Volunteer,Gluten-free,Setup crew
+            Riley,Patel,riley@email.com,,Patel Family,Yes,No,No,Guest,,
+            """
+        }
+    }
+
+    /// Writes the current event type's template to the temp dir and
+    /// caches the URL for ShareLink.
+    private func regenerateCSVTemplate() {
+        let body = csvTemplateBody(for: eventType)
+        // Web parity (App.jsx:3103 CSV_TEMPLATES.*.filename).
+        let filename = eventType == .wedding
+            ? "seatbee-wedding-template.csv"
+            : "seatbee-general-template.csv"
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(filename)
+        try? body.write(to: url, atomically: true, encoding: .utf8)
+        csvTemplateURL = url
+    }
+
     private func importCSVFromURL(_ url: URL) {
         guard url.startAccessingSecurityScopedResource() else {
             csvImportError = "Couldn't access file"
@@ -1261,6 +1396,10 @@ struct OnboardingView: View {
                    let png = img.pngData() {
                     let b64 = png.base64EncodedString()
                     plan.rawFloorPlanImage = AnyCodable("data:image/png;base64,\(b64)")
+                }
+                if tracedPoints.count >= 3 {
+                    plan.customRoomPoints = tracedPoints
+                    plan.roomShape = "custom"
                 }
                 // Objects go into rawCategories' sibling — there's no
                 // typed `objects` on iOS Plan; mutate by re-encoding via
