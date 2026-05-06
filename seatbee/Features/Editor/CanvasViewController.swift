@@ -648,6 +648,7 @@ class CanvasTableView: UIView {
     private let selectionLayer = CAShapeLayer()
     private let label = UILabel()
     private var seatLayers: [CAShapeLayer] = []
+    private let lockBadge = UIImageView()
 
     init(table: SeatTable, guests: [Guest], isSelected: Bool) {
         self.table = table
@@ -678,6 +679,20 @@ class CanvasTableView: UIView {
         label.font = UIFont.systemFont(ofSize: 10, weight: .medium)
         label.textColor = UIColor(red: 45/255, green: 45/255, blue: 45/255, alpha: 1)
         addSubview(label)
+
+        // Lock badge — shown when the table is marked locked. Sits in
+        // the top-right corner of the bounding box. Web shows a lock
+        // icon overlay on the table; this is the iOS equivalent.
+        lockBadge.image = UIImage(systemName: "lock.fill")
+        lockBadge.tintColor = UIColor(red: 168/255, green: 136/255, blue: 67/255, alpha: 1) // sbGoldDk
+        lockBadge.contentMode = .scaleAspectFit
+        lockBadge.isHidden = true
+        // Soft cream chip behind the icon so it reads against any table colour.
+        lockBadge.backgroundColor = UIColor(red: 255/255, green: 254/255, blue: 249/255, alpha: 0.95)
+        lockBadge.layer.cornerRadius = 8
+        lockBadge.layer.borderColor = UIColor(red: 168/255, green: 136/255, blue: 67/255, alpha: 0.35).cgColor
+        lockBadge.layer.borderWidth = 0.5
+        addSubview(lockBadge)
     }
 
     func update(table: SeatTable, guests: [Guest], isSelected: Bool) {
@@ -727,6 +742,18 @@ class CanvasTableView: UIView {
             layer.addSublayer(dot)
             seatLayers.append(dot)
         }
+
+        // Lock badge — centred horizontally on the table, sitting just
+        // above the table-name label so it reads as "this table is
+        // locked" without overlapping seats or sticking outside the body.
+        let badgeSize: CGFloat = 14
+        let labelTopY = bodyCenter.y - 6  // matches label.frame.origin.y above
+        lockBadge.frame = CGRect(
+            x: bodyCenter.x - badgeSize / 2,
+            y: labelTopY - badgeSize - 2,
+            width: badgeSize, height: badgeSize
+        )
+        lockBadge.isHidden = (table.locked != true)
 
         applyTransform(animated: false)
     }

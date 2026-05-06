@@ -137,10 +137,17 @@ struct AllTablesListSheet: View {
             HStack(spacing: 10) {
                 tableIcon(for: table)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(table.name.isEmpty ? "Untitled table" : table.name)
-                        .font(SBFont.bodySmallBold)
-                        .foregroundStyle(Color.sbCharcoal)
-                    Text("\(seated)/\(capacity) seats filled")
+                    HStack(spacing: 6) {
+                        Text(table.name.isEmpty ? "Untitled table" : table.name)
+                            .font(SBFont.bodySmallBold)
+                            .foregroundStyle(Color.sbCharcoal)
+                        if table.locked == true {
+                            Image(systemName: "lock.fill")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(Color.sbGoldDk)
+                        }
+                    }
+                    Text("\(seated)/\(capacity) seats filled\(table.locked == true ? " · locked" : "")")
                         .font(SBFont.caption)
                         .foregroundStyle(seated == 0 ? Color.sbWarm : Color.sbGoldDk)
                 }
