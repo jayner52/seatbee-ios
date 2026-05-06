@@ -743,12 +743,14 @@ class CanvasTableView: UIView {
             seatLayers.append(dot)
         }
 
-        // Lock badge — top-right corner of the table body. Hidden when
-        // the table isn't locked so unlocked tables stay clean.
-        let badgeSize: CGFloat = 16
+        // Lock badge — centred horizontally on the table, sitting just
+        // above the table-name label so it reads as "this table is
+        // locked" without overlapping seats or sticking outside the body.
+        let badgeSize: CGFloat = 14
+        let labelTopY = bodyCenter.y - 6  // matches label.frame.origin.y above
         lockBadge.frame = CGRect(
-            x: bodyCenter.x + body.width / 2 - badgeSize - 2,
-            y: bodyCenter.y - body.height / 2 - badgeSize / 2,
+            x: bodyCenter.x - badgeSize / 2,
+            y: labelTopY - badgeSize - 2,
             width: badgeSize, height: badgeSize
         )
         lockBadge.isHidden = (table.locked != true)
