@@ -15,11 +15,17 @@ struct TableDrawerView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Header
-            HStack {
-                Text(table.name)
-                    .font(SBFont.displayMedium)
-                    .foregroundStyle(Color.sbCharcoal)
+            // Header — table name + seated count (web parity, mirrors the
+            // "4/8 guests seated" stat at the top of web's edit-table panel)
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(table.name)
+                        .font(SBFont.displayMedium)
+                        .foregroundStyle(Color.sbCharcoal)
+                    Text("\(table.assignments.count)/\(table.seats) guests seated")
+                        .font(SBFont.caption)
+                        .foregroundStyle(table.assignments.count > 0 ? Color.sbGoldDk : Color.sbWarm)
+                }
                 Spacer()
                 Button { dismiss() } label: {
                     Image(systemName: "xmark")
@@ -296,11 +302,18 @@ struct TableDrawerView: View {
     private var shapeSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             sectionLabel("SHAPE")
-            HStack(spacing: 8) {
-                shapeButton("Round", type: .round)
-                shapeButton("Rect", type: .rect)
-                shapeButton("Head", type: .head)
-                shapeButton("Sweet", type: .sweetheart)
+            // Two rows of three: keeps everything readable on narrow phones.
+            VStack(spacing: 8) {
+                HStack(spacing: 8) {
+                    shapeButton("Round", type: .round)
+                    shapeButton("Oval", type: .oval)
+                    shapeButton("Rect", type: .rect)
+                }
+                HStack(spacing: 8) {
+                    shapeButton("Head", type: .head)
+                    shapeButton("Sweet", type: .sweetheart)
+                    Spacer().frame(maxWidth: .infinity)
+                }
             }
         }
     }
@@ -382,10 +395,32 @@ struct TableDrawerView: View {
             sectionLabel("SIZE")
             switch table.type {
             case .round:
+                // Discrete size presets — mirrors web (App.jsx GenPanel /
+                // table edit screenshot). 4–8ft covers the realistic range
+                // for round tables. Tapping a preset snaps the slider.
+                sizePresetButtons(footValues: [4, 5, 6, 7, 8],
+                                  currentPx: Double(table.diameter ?? 90)) { v in
+                    mutateTable { $0.diameter = v }
+                }
                 sizeSlider(label: "D",
                            value: bindingNoSave(get: { Double(table.diameter ?? 90) },
                                                 set: { v in mutateTable(save: false) { $0.diameter = v } }),
                            range: 60...200, step: 5)
+            case .oval:
+                // Oval size: presets snap the WIDTH; height is adjusted
+                // separately via slider below.
+                sizePresetButtons(footValues: [6, 7, 8, 9, 10],
+                                  currentPx: Double(table.width ?? 120)) { v in
+                    mutateTable { $0.width = v }
+                }
+                sizeSlider(label: "W",
+                           value: bindingNoSave(get: { Double(table.width ?? 120) },
+                                                set: { v in mutateTable(save: false) { $0.width = v } }),
+                           range: 60...300, step: 10)
+                sizeSlider(label: "H",
+                           value: bindingNoSave(get: { Double(table.height ?? 60) },
+                                                set: { v in mutateTable(save: false) { $0.height = v } }),
+                           range: 40...200, step: 5)
             case .rect, .head, .sweetheart:
                 sizeSlider(label: "W",
                            value: bindingNoSave(get: { Double(table.width ?? 100) },
@@ -410,6 +445,31 @@ struct TableDrawerView: View {
                     }
                     .buttonStyle(.plain)
                 }
+            }
+        }
+    }
+
+    /// Row of preset-foot buttons that snap the active size dimension.
+    /// Selected when `currentPx` matches the foot value (within ±2px to
+    /// account for slider increments).
+    private func sizePresetButtons(footValues: [Int], currentPx: Double, onSelect: @escaping (Double) -> Void) -> some View {
+        HStack(spacing: 6) {
+            ForEach(footValues, id: \.self) { ft in
+                let targetPx = Double(ft) * pxPerFoot
+                let isActive = abs(currentPx - targetPx) < 2
+                Button {
+                    onSelect(targetPx)
+                    HapticEngine.selection()
+                } label: {
+                    Text("\(ft)ft")
+                        .font(SBFont.bodySemibold)
+                        .foregroundStyle(isActive ? Color.white : Color.sbCharcoal)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .background(isActive ? Color.sbGold : Color.sbIvory2)
+                        .clipShape(RoundedRectangle(cornerRadius: SBRadius.small))
+                }
+                .buttonStyle(.plain)
             }
         }
     }
@@ -562,6 +622,7 @@ struct TableDrawerView: View {
             switch t.type {
             case .sweetheart: return 2
             case .round:      return 12
+            case .oval:       return 14   // ellipse perimeter > round, slightly higher
             case .rect, .head: return 200
             }
         }()
@@ -614,6 +675,14 @@ struct TableDrawerView: View {
             t.diameter = nil
             t.oneSide = nil
             if t.sweetShape == nil { t.sweetShape = "heart" }
+        case .oval:
+            // Oval default 8ft × 4ft (=120×60 at scale 15) — App.jsx:8453.
+            // Reuse existing diameter as width if present so converting
+            // round → oval feels continuous.
+            t.width = t.diameter ?? t.width ?? 120
+            t.height = t.height ?? 60
+            t.diameter = nil
+            t.oneSide = nil
         }
         plan.tables[idx] = t
         appState.activePlan = plan
@@ -623,10 +692,11 @@ struct TableDrawerView: View {
 
     private func typeIcon(_ type: SeatTable.TableType) -> String {
         switch type {
-        case .round: return "circle"
-        case .rect: return "rectangle"
-        case .head: return "person.2"
+        case .round:      return "circle"
+        case .rect:       return "rectangle"
+        case .head:       return "person.2"
         case .sweetheart: return "heart"
+        case .oval:       return "oval"
         }
     }
 

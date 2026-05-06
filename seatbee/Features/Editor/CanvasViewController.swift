@@ -785,6 +785,9 @@ class CanvasTableView: UIView {
             return CGSize(width: CGFloat(table.width ?? 280), height: CGFloat(table.height ?? 50))
         case .sweetheart:
             return CGSize(width: CGFloat(table.width ?? 100), height: CGFloat(table.height ?? 60))
+        case .oval:
+            // Web default: 8ft × 4ft (=120×60 at scale 15) — see App.jsx:8453.
+            return CGSize(width: CGFloat(table.width ?? 120), height: CGFloat(table.height ?? 60))
         }
     }
 
@@ -799,6 +802,11 @@ class CanvasTableView: UIView {
             return UIBezierPath(roundedRect: rect, cornerRadius: 6)
         case .sweetheart:
             return sweetheartPath(shape: table.sweetShape, body: body, center: c)
+        case .oval:
+            // Web renders <ellipse rx={w/2} ry={h/2}> — App.jsx:7466.
+            let rect = CGRect(x: c.x - body.width/2, y: c.y - body.height/2,
+                              width: body.width, height: body.height)
+            return UIBezierPath(ovalIn: rect)
         }
     }
 
@@ -814,6 +822,10 @@ class CanvasTableView: UIView {
         case .sweetheart:
             let inflated = CGSize(width: body.width + 12, height: body.height + 12)
             return sweetheartPath(shape: table.sweetShape, body: inflated, center: c)
+        case .oval:
+            let inflated = CGRect(x: c.x - body.width/2 - 6, y: c.y - body.height/2 - 6,
+                                  width: body.width + 12, height: body.height + 12)
+            return UIBezierPath(ovalIn: inflated)
         }
     }
 
@@ -853,6 +865,17 @@ class CanvasTableView: UIView {
                 let ang = CGFloat(i) / CGFloat(n) * .pi * 2 - .pi / 2
                 return CGPoint(x: c.x + cos(ang) * (r + offset),
                                y: c.y + sin(ang) * (r + offset))
+            }
+        case .oval:
+            // Distribute seats evenly by angle around the ellipse, with
+            // each seat sitting `offset` outside the perimeter. Same start
+            // angle as round (-π/2 = top) for visual consistency.
+            let rx = body.width / 2 + offset
+            let ry = body.height / 2 + offset
+            return (0..<n).map { i in
+                let ang = CGFloat(i) / CGFloat(n) * .pi * 2 - .pi / 2
+                return CGPoint(x: c.x + cos(ang) * rx,
+                               y: c.y + sin(ang) * ry)
             }
         case .sweetheart:
             // Web hardcodes 2 seats at the bottom regardless of seat count.

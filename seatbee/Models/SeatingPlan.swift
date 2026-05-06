@@ -265,6 +265,7 @@ struct SeatTable: Identifiable, Codable {
         case rect
         case head
         case sweetheart
+        case oval     // ellipse-shaped table; seats distributed around perimeter
     }
 
     var filledCount: Int {
