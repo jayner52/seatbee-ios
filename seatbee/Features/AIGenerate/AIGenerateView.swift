@@ -14,6 +14,7 @@ struct AIGenerateView: View {
     @State private var fellBackToRoundRobin = false
     @State private var tierGateAlert: TierGateAlert?
     @State private var clearConfirm: ClearAction?
+    @State private var showResetSheet = false
 
     enum Phase { case ready, generating, complete, error }
 
@@ -108,20 +109,43 @@ struct AIGenerateView: View {
         }
     }
 
-    /// Ready: shows stats + active rules + the three action buttons.
-    /// Mirrors the web's "Generate Seating" panel layout.
+    /// Ready: stats + active rules + Generate. Reset is conditional on
+    /// having seated guests. Web parity in concepts; iOS-native in feel.
     private var readyState: some View {
         ScrollView {
-            VStack(spacing: 20) {
+            VStack(spacing: 18) {
                 header
                 statsRow
                 activeRulesCard
-                actionStack
+                if lockedTablesCount > 0 {
+                    lockedTablesHint
+                }
+                generateButton
+                if guestsSeated > 0 {
+                    resetButton
+                }
                 tipText
                 Spacer(minLength: 60)
             }
             .padding(.horizontal, SBSpacing.screenMargin)
             .padding(.top, 8)
+        }
+        .confirmationDialog(
+            "Reset seating",
+            isPresented: $showResetSheet,
+            titleVisibility: .visible
+        ) {
+            Button("Clear unlocked tables") {
+                clearConfirm = .unlockedOnly
+            }
+            Button("Clear all assignments", role: .destructive) {
+                clearConfirm = .all
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(lockedTablesCount > 0
+                 ? "Clearing unlocked tables keeps your \(lockedTablesCount) locked table\(lockedTablesCount == 1 ? "" : "s") intact."
+                 : "Clearing assignments removes every guest from every table.")
         }
     }
 
@@ -361,12 +385,17 @@ struct AIGenerateView: View {
     // MARK: - Components
 
     private var header: some View {
-        HStack {
+        HStack(alignment: .top, spacing: 10) {
+            // Small honeycomb mark to tie the page to the loader's vibe.
+            Image(systemName: "hexagon.fill")
+                .font(.system(size: 18))
+                .foregroundStyle(Color.sbGold)
+                .padding(.top, 4)
             VStack(alignment: .leading, spacing: 2) {
                 Text("Generate Seating")
                     .font(SBFont.displaySmall)
                     .foregroundStyle(Color.sbCharcoal)
-                Text("AI seating powered by your rules and parties")
+                Text("AI-powered, tuned to your rules and parties")
                     .font(SBFont.caption)
                     .foregroundStyle(Color.sbWarm)
             }
@@ -374,97 +403,206 @@ struct AIGenerateView: View {
         }
     }
 
+    /// Stat row: two cards side-by-side, each with a tinted icon, a big
+    /// number, a small label, and (for "Seated") a thin progress bar so
+    /// users can see the seated proportion at a glance.
     private var statsRow: some View {
         HStack(spacing: 10) {
-            statCard(
-                title: "guests seated",
-                value: "\(guestsSeated)/\(activeGuestCount)",
-                tint: Color.sbChampagne
-            )
-            statCard(
-                title: "seats available",
-                value: "\(seatsAvailable)",
-                tint: Color.sbSage.opacity(0.20)
-            )
+            seatedStatCard
+            availableStatCard
         }
     }
 
-    private func statCard(title: String, value: String, tint: Color) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(value)
+    private var seatedStatCard: some View {
+        let progress = activeGuestCount == 0 ? 0 : Double(guestsSeated) / Double(activeGuestCount)
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Image(systemName: "person.2.fill")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Color.sbGoldDk)
+                Text("SEATED")
+                    .font(SBFont.capsLabel)
+                    .foregroundStyle(Color.sbGoldDk)
+            }
+            Text("\(guestsSeated)")
                 .font(SBFont.statNumber)
-                .foregroundStyle(Color.sbGoldDk)
-            Text(title)
-                .font(SBFont.caption)
+                .foregroundStyle(Color.sbCharcoal)
+            + Text(" / \(activeGuestCount)")
+                .font(SBFont.bodySemibold)
                 .foregroundStyle(Color.sbWarm)
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Color.sbWarm2.opacity(0.20))
+                    Capsule()
+                        .fill(LinearGradient(colors: [Color.sbGold, Color.sbGoldDk], startPoint: .leading, endPoint: .trailing))
+                        .frame(width: geo.size.width * CGFloat(progress))
+                }
+            }
+            .frame(height: 5)
+            .padding(.top, 2)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
-        .background(tint)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(Color.sbChampagne.opacity(0.55))
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
+    private var availableStatCard: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Image(systemName: "chair.lounge.fill")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Color.sbSage)
+                Text("AVAILABLE")
+                    .font(SBFont.capsLabel)
+                    .foregroundStyle(Color.sbSage)
+            }
+            Text("\(seatsAvailable)")
+                .font(SBFont.statNumber)
+                .foregroundStyle(Color.sbCharcoal)
+            Text("of \(totalSeats) total seats")
+                .font(SBFont.caption)
+                .foregroundStyle(Color.sbWarm)
+                .padding(.top, 2)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .background(Color.sbSage.opacity(0.18))
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    /// Active Rules card: total + a stacked horizontal bar showing the
+    /// proportional split between Required (gold) and Preferences (sage).
+    /// More visual than two separate sub-cards and uses brand colors.
     private var activeRulesCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 6) {
+                Image(systemName: "checklist")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Color.sbCharcoal)
                 Text("Active Rules")
                     .font(SBFont.bodySmallBold)
                     .foregroundStyle(Color.sbCharcoal)
                 Spacer()
                 Text("\(enabledRulesCount)")
                     .font(SBFont.bodySemibold)
-                    .foregroundStyle(Color.sbGoldDk)
+                    .foregroundStyle(Color.sbCharcoal)
             }
-            HStack(spacing: 10) {
-                ruleSubCard(label: "Required", count: requiredRulesCount, accent: Color.sbGoldDk, tint: Color.sbChampagne)
-                ruleSubCard(label: "Preferences", count: preferenceRulesCount, accent: Color.sbCharcoal, tint: Color.sbSage.opacity(0.20))
+
+            // Stacked proportional bar
+            GeometryReader { geo in
+                let total = max(1, enabledRulesCount)
+                let reqW = geo.size.width * CGFloat(requiredRulesCount) / CGFloat(total)
+                let prefW = geo.size.width * CGFloat(preferenceRulesCount) / CGFloat(total)
+                HStack(spacing: 2) {
+                    if requiredRulesCount > 0 {
+                        Capsule().fill(Color.sbGoldDk).frame(width: max(0, reqW - (preferenceRulesCount > 0 ? 1 : 0)))
+                    }
+                    if preferenceRulesCount > 0 {
+                        Capsule().fill(Color.sbSage).frame(width: max(0, prefW - (requiredRulesCount > 0 ? 1 : 0)))
+                    }
+                }
+            }
+            .frame(height: 8)
+
+            // Legend
+            HStack(spacing: 16) {
+                legendChip(color: Color.sbGoldDk, count: requiredRulesCount, label: "Required")
+                legendChip(color: Color.sbSage,   count: preferenceRulesCount, label: "Preferences")
+                Spacer()
             }
         }
         .padding(14)
         .background(Color.sbIvory2)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
-    private func ruleSubCard(label: String, count: Int, accent: Color, tint: Color) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
+    private func legendChip(color: Color, count: Int, label: String) -> some View {
+        HStack(spacing: 6) {
+            Circle().fill(color).frame(width: 8, height: 8)
             Text("\(count)")
-                .font(SBFont.statNumberSmall)
-                .foregroundStyle(accent)
+                .font(SBFont.bodySmallBold)
+                .foregroundStyle(Color.sbCharcoal)
             Text(label)
                 .font(SBFont.caption)
                 .foregroundStyle(Color.sbWarm)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(10)
-        .background(tint)
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 
-    private var actionStack: some View {
-        VStack(spacing: 10) {
-            SBButton(title: "Generate Seating", icon: "sparkles", variant: .gold, fullWidth: true) {
-                Task { await runGenerate() }
-            }
-            SBButton(title: "Clear Unlocked Tables", variant: .ghost, fullWidth: true) {
-                clearConfirm = .unlockedOnly
-            }
-            Button {
-                clearConfirm = .all
-            } label: {
-                Text("Clear All Assignments")
-                    .font(SBFont.bodySmall)
-                    .foregroundStyle(Color.sbError)
-                    .padding(.top, 4)
-            }
+    /// Subtle hint that any locked tables will be preserved. Only renders
+    /// when there's at least one — otherwise it's noise.
+    private var lockedTablesHint: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "lock.fill")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(Color.sbGoldDk)
+            Text("\(lockedTablesCount) locked table\(lockedTablesCount == 1 ? "" : "s") will be preserved")
+                .font(SBFont.caption)
+                .foregroundStyle(Color.sbCharcoal2)
+            Spacer()
         }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Color.sbGold.opacity(0.10))
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+
+    /// Prominent Generate Seating button. Tall, gold, with sparkles icon.
+    /// This is the hero action — every other piece of the screen is
+    /// secondary to it.
+    private var generateButton: some View {
+        Button {
+            Task { await runGenerate() }
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 16, weight: .semibold))
+                Text("Generate Seating")
+                    .font(SBFont.inter(16, weight: .semibold))
+            }
+            .foregroundStyle(Color.white)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+            .background(
+                LinearGradient(
+                    colors: [Color.sbGold, Color.sbGoldDk],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .shadow(color: Color.sbGoldDk.opacity(0.25), radius: 10, x: 0, y: 4)
+        }
+        .buttonStyle(.plain)
+        .padding(.top, 4)
+    }
+
+    /// Reset button — only visible when there are seated guests to clear.
+    /// Opens an action sheet so the destructive options aren't a permanent
+    /// red label cluttering the screen.
+    private var resetButton: some View {
+        Button {
+            showResetSheet = true
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "arrow.counterclockwise")
+                    .font(.system(size: 12, weight: .semibold))
+                Text("Reset seating")
+                    .font(SBFont.bodySmall)
+            }
+            .foregroundStyle(Color.sbWarm)
+            .padding(.vertical, 8)
+        }
+        .buttonStyle(.plain)
     }
 
     private var tipText: some View {
-        Text("Tip: each generation uses a different random seed, so re-running can produce different arrangements.")
-            .font(SBFont.caption)
-            .foregroundStyle(Color.sbWarm)
+        Text("Each generation uses a different random seed — re-running can produce different arrangements.")
+            .font(SBFont.small)
+            .foregroundStyle(Color.sbWarm2)
             .multilineTextAlignment(.center)
-            .padding(.horizontal, 8)
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
     }
 
     // MARK: - Stats (mirror App.jsx:13119-13133)
@@ -505,6 +643,10 @@ struct AIGenerateView: View {
 
     private var preferenceRulesCount: Int {
         max(0, enabledRulesCount - requiredRulesCount)
+    }
+
+    private var lockedTablesCount: Int {
+        (appState.activePlan?.tables ?? []).filter { $0.locked == true }.count
     }
 
     // MARK: - Actions
