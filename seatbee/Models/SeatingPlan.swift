@@ -518,7 +518,7 @@ extension SeatingPlan {
                     display: g.display ?? g.displayName,
                     dietaryTags: g.dietaryTags, highChair: g.highChair, isChild: g.isChild,
                     groupIds: g.groupIds, isBride: g.isBride, isGroom: g.isGroom,
-                    meal: g.meal, createdAt: g.guestCreatedAt
+                    meal: g.meal.map { MealField($0) }, createdAt: g.guestCreatedAt
                 )
             },
             tables: tables.map { t in
@@ -554,6 +554,30 @@ extension SeatingPlan {
             seatOrders: rawSeatOrders,
             guestQR: rawGuestQR
         )
+    }
+}
+
+// MARK: - Meal display
+
+extension Guest {
+    /// Short label + emoji icon for displaying meal choice in lists.
+    /// Mirrors web's auto-derive logic at App.jsx:3421-3427 — keyword
+    /// match against the meal text, fallback to a generic plate.
+    /// Returns nil when the guest has no meal set.
+    var mealDisplay: (short: String, icon: String)? {
+        guard let raw = meal?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty else {
+            return nil
+        }
+        let m = raw.lowercased()
+        if m.contains("beef") || m.contains("tenderloin")        { return ("Beef", "🥩") }
+        if m.contains("salmon") || m.contains("prawn") || m.contains("fish") { return ("Salmon", "🐟") }
+        if m.contains("chicken")                                  { return ("Chicken", "🍗") }
+        if m.contains("mushroom") || m.contains("quinoa") || m.contains("vegan") || m.contains("vegetarian") {
+            return ("Vegan", "🥗")
+        }
+        // Fallback: keep the first two words as the short label.
+        let short = raw.split(separator: " ").prefix(2).joined(separator: " ")
+        return (short.isEmpty ? raw : short, "🍽️")
     }
 }
 

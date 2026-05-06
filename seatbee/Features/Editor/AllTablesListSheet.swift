@@ -182,6 +182,9 @@ struct AllTablesListSheet: View {
                 .font(SBFont.bodySmall)
                 .foregroundStyle(Color.sbCharcoal)
                 .lineLimit(1)
+            if let meal = guest.mealDisplay {
+                Text(meal.icon).font(.system(size: 11))
+            }
             Spacer()
             if guest.side != .none {
                 Text(guest.side.rawValue.prefix(1).uppercased())
