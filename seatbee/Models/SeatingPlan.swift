@@ -557,6 +557,51 @@ extension SeatingPlan {
     }
 }
 
+// MARK: - Category resolution
+
+extension SeatingPlan {
+    /// Returns a friendly display label for the guest's first usable
+    /// category, or nil if none exist / none can be resolved.
+    ///
+    /// Iterates `guest.categories` in order. For each entry:
+    ///   1. Try resolving as a category ID against `rawCategories` —
+    ///      use the canonical `name` field if found.
+    ///   2. If unresolved AND the raw value looks like a generated ID
+    ///      (6+ lowercase alphanumeric chars), skip it. These are
+    ///      orphaned references to deleted categories — leaking them
+    ///      into the UI shows "5eido12nz" next to a guest's name.
+    ///   3. Otherwise treat the raw value as a legacy plain-text
+    ///      category like "Family" or "VIP" and use it as-is.
+    func displayCategoryLabel(for guest: Guest) -> String? {
+        for raw in guest.categories {
+            if let resolved = canonicalCategoryName(forId: raw) {
+                return resolved
+            }
+            if !Self.looksLikeGeneratedId(raw) {
+                return raw
+            }
+        }
+        return nil
+    }
+
+    /// Look up `id` in rawCategories and return the canonical `name` if
+    /// the entry exists and has a non-empty name.
+    func canonicalCategoryName(forId id: String) -> String? {
+        guard let raw = rawCategories else { return nil }
+        let entry = raw.first { ($0["id"]?.value as? String) == id }
+        return (entry?["name"]?.value as? String).flatMap { $0.isEmpty ? nil : $0 }
+    }
+
+    /// Heuristic: short hashes like "5eido12nz" / "a5gb6pp2n" are 6+
+    /// chars of lowercase alphanumerics with no spaces or capitals. Real
+    /// category names ("Family", "Bride's side", "VIP") fail at least
+    /// one of those checks.
+    private static func looksLikeGeneratedId(_ s: String) -> Bool {
+        guard s.count >= 6 else { return false }
+        return s.allSatisfy { $0.isLowercase || $0.isNumber }
+    }
+}
+
 // MARK: - Guest QR helpers
 
 extension SeatingPlan {

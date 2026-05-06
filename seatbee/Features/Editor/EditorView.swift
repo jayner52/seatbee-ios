@@ -456,12 +456,7 @@ struct EditorView: View {
             SBAvatar(name: guest.displayName, size: 30)
             VStack(alignment: .leading, spacing: 1) {
                 Text(guest.displayName).font(SBFont.bodySmallBold).foregroundStyle(Color.sbCharcoal)
-                if !guest.categories.isEmpty {
-                    // Resolve category ID → name from rawCategories (web parity).
-                    // Falls back to the raw string only when no entry matches —
-                    // same behavior as GuestsView.
-                    let firstId = guest.categories.first ?? ""
-                    let label = categoryName(forId: firstId) ?? firstId
+                if let label = plan?.displayCategoryLabel(for: guest) {
                     Text(label).font(SBFont.capsLabel).foregroundStyle(Color.sbWarm)
                 }
             }
