@@ -52,6 +52,11 @@ struct AIGenerateView: View {
                 let plans = (try? await appState.database.fetchPlans()) ?? []
                 if let first = plans.first { appState.activePlan = first }
             }
+            // Make sure userPasses is populated so the tier gate can see
+            // passes redeemed on web. Cheap if already loaded recently.
+            if appState.userPasses.passes.isEmpty {
+                await appState.refreshPasses()
+            }
         }
         .alert(
             tierGateAlert?.title ?? "",

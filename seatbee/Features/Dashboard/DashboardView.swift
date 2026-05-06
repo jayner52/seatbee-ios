@@ -99,6 +99,12 @@ struct DashboardView: View {
         }
         .task {
             await loadPlans()
+            // Refresh pass inventory so tier gates anywhere in the app
+            // (AI Generate, guest add, CSV import) can see passes the
+            // user redeemed on web. Without this, plans where the tier
+            // column is null but a pass IS applied (web's fallback path)
+            // get treated as free on iOS.
+            await appState.refreshPasses()
         }
         .sheet(isPresented: $showEditPlan) {
             EditPlanSheet()

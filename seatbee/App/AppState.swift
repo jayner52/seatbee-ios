@@ -58,10 +58,49 @@ final class AppState {
         }
     }
 
-    /// Active plan's tier as enum (treats expired plans as free).
+    /// Active plan's effective tier — mirrors web's resolution chain
+    /// (App.jsx:6155-6191 + api/passes.js:250). Web learned the hard way
+    /// that plan.tier alone isn't authoritative: collaborated plans, plans
+    /// with stale tier columns, and plans where the pass was applied via
+    /// promo all rely on the fallback paths below.
+    ///
+    /// Resolution order:
+    ///   1. plan.tier if set to a paid tier AND not expired
+    ///   2. plan.eventPassExpiresAt in the future → assume event_pass
+    ///   3. userPasses contains a redeemed pass tied to this plan ID and
+    ///      not expired → use that pass's tier (catches signature/grand)
+    ///   4. free
     var activePlanTier: PlanTier {
-        if isActivePlanExpired { return .free }
-        return PlanTier.from(activePlan?.tier)
+        guard let plan = activePlan else { return .free }
+
+        // 1. Direct tier column, respecting expiry.
+        let raw = plan.tier ?? "free"
+        if raw != "free" {
+            if let exp = plan.eventPassExpiresAt, Date() > exp {
+                // Paid tier but pass has expired — fall through to other
+                // signals before giving up to free.
+            } else {
+                return PlanTier.from(raw)
+            }
+        }
+
+        // 2. event_pass_expires_at fallback (web's api/passes.js:250).
+        if let exp = plan.eventPassExpiresAt, Date() < exp {
+            return .eventPass
+        }
+
+        // 3. Cross-reference user's pass inventory (web's effect at
+        //    App.jsx:6155-6191) — most reliable for plans applied via
+        //    promo or where the tier column is stale.
+        if let pass = userPasses.passes.first(where: { p in
+            p.status == "redeemed"
+            && p.redeemedForPlanId == plan.id
+            && (p.expiresAt.map { Date() < $0 } ?? true)
+        }) {
+            return pass.tier
+        }
+
+        return .free
     }
 
     /// Effective tier limits for the active plan. Expired plans collapse
@@ -70,16 +109,27 @@ final class AppState {
         TierLimits.limits(for: activePlanTier)
     }
 
-    /// True if the active plan has a paid tier whose pass has expired.
-    /// Free plans are never expired. Plans without expiry data are treated
-    /// as not expired (defensive — server populates this when /api/passes
-    /// is redeemed).
+    /// True if the active plan was on a paid tier (per any of the
+    /// resolution paths above) but its pass is now in the past. Used to
+    /// distinguish "expired" from "never had a pass" in error messages.
     var isActivePlanExpired: Bool {
         guard let plan = activePlan else { return false }
         let raw = plan.tier ?? "free"
-        guard raw != "free" else { return false }
-        guard let expiresAt = plan.eventPassExpiresAt else { return false }
-        return Date() > expiresAt
+        let everHadPaidTier = raw != "free"
+            || plan.eventPassExpiresAt != nil
+            || userPasses.passes.contains { $0.status == "redeemed" && $0.redeemedForPlanId == plan.id }
+        guard everHadPaidTier else { return false }
+
+        // If any future-dated signal exists, not expired.
+        if let exp = plan.eventPassExpiresAt, Date() < exp { return false }
+        if userPasses.passes.contains(where: { p in
+            p.status == "redeemed"
+            && p.redeemedForPlanId == plan.id
+            && (p.expiresAt.map { Date() < $0 } ?? false)
+        }) {
+            return false
+        }
+        return true
     }
 
     /// Returns true if adding `count` more guests would exceed the active
