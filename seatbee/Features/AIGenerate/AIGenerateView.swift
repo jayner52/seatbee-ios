@@ -1,18 +1,21 @@
 import SwiftUI
 
+// AI Seating screen — calls the web's /api/seat endpoint (which runs the
+// SAME `generateSeating()` function the web client uses, src/lib/solve.js)
+// and applies the resulting assignments + seat orders to the active plan.
+// True parity with web: identical inputs always produce identical outputs.
+
 struct AIGenerateView: View {
     @Environment(AppState.self) private var appState
-    @State private var phase: GenerationPhase = .ready
-    @State private var seatedCount = 0
-    @State private var totalToSeat = 0
+
+    @State private var phase: Phase = .ready
+    @State private var resultMessage: String?
     @State private var harmonyScore: Int?
-    @State private var steps: [StepStatus] = [
-        .init(label: "Grouped families", status: .pending),
-        .init(label: "Respected dietary tables", status: .pending),
-        .init(label: "Placing +1s", status: .pending),
-        .init(label: "Final review", status: .pending),
-    ]
+    @State private var fellBackToRoundRobin = false
     @State private var tierGateAlert: TierGateAlert?
+    @State private var clearConfirm: ClearAction?
+
+    enum Phase { case ready, generating, complete, error }
 
     private struct TierGateAlert: Identifiable {
         let id = UUID()
@@ -20,37 +23,29 @@ struct AIGenerateView: View {
         let message: String
     }
 
-    enum GenerationPhase {
-        case ready, generating, complete
+    private enum ClearAction: Identifiable {
+        case unlockedOnly, all
+        var id: Int { self == .unlockedOnly ? 0 : 1 }
     }
 
-    struct StepStatus: Identifiable {
-        let id = UUID()
-        let label: String
-        var status: Status
-
-        enum Status { case pending, inProgress, done }
-    }
+    // MARK: - Body
 
     var body: some View {
         NavigationStack {
             ZStack {
                 Color.sbIvory.ignoresSafeArea()
-
                 if appState.activePlan == nil {
                     noPlanState
                 } else {
                     switch phase {
-                    case .ready:
-                        readyState.transition(.opacity)
-                    case .generating:
-                        generatingState.transition(.opacity)
-                    case .complete:
-                        completeState.transition(.opacity)
+                    case .ready:      readyState
+                    case .generating: generatingState
+                    case .complete:   completeState
+                    case .error:      errorState
                     }
                 }
             }
-            .animation(.seatbeeScreen, value: phase)
+            .animation(.easeInOut(duration: 0.25), value: phase)
         }
         .task {
             if appState.activePlan == nil {
@@ -70,7 +65,24 @@ struct AIGenerateView: View {
         } message: { gate in
             Text(gate.message)
         }
+        .alert(
+            clearConfirm == .unlockedOnly ? "Clear Unlocked Tables?" : "Clear All Assignments?",
+            isPresented: Binding(
+                get: { clearConfirm != nil },
+                set: { if !$0 { clearConfirm = nil } }
+            ),
+            presenting: clearConfirm
+        ) { action in
+            Button("Clear", role: .destructive) { performClear(action) }
+            Button("Cancel", role: .cancel) {}
+        } message: { action in
+            Text(action == .unlockedOnly
+                 ? "Clears assignments on every table that isn't locked. Locked tables keep their guests."
+                 : "Clears every guest from every table, including locked ones. This can't be undone from this screen.")
+        }
     }
+
+    // MARK: - States
 
     private var noPlanState: some View {
         VStack(spacing: 16) {
@@ -91,186 +103,74 @@ struct AIGenerateView: View {
         }
     }
 
-    // MARK: - Ready State
-
+    /// Ready: shows stats + active rules + the three action buttons.
+    /// Mirrors the web's "Generate Seating" panel layout.
     private var readyState: some View {
-        VStack(spacing: 24) {
-            Spacer()
-
-            Image(systemName: "sparkles")
-                .font(.system(size: 48))
-                .foregroundStyle(Color.sbGold)
-
-            VStack(spacing: 8) {
-                Text("AI Seating")
-                    .font(SBFont.displayLarge)
-                    .foregroundStyle(Color.sbCharcoal)
-                Text("Let AI find the perfect arrangement")
-                    .font(SBFont.body)
-                    .foregroundStyle(Color.sbWarm)
-            }
-
-            if let plan = appState.activePlan {
-                let unseated = plan.guests.count - plan.tables.reduce(0) { $0 + $1.filledCount }
-                VStack(spacing: 12) {
-                    SBStat(value: "\(max(0, unseated))", label: "Guests to seat", color: .sbGoldDk)
-
-                    SBButton(title: "Generate seating", icon: "sparkles", variant: .gold, fullWidth: true) {
-                        startGeneration(unseated: max(0, unseated))
-                    }
-                    .padding(.horizontal, 40)
-                }
-            }
-
-            Spacer()
-        }
-    }
-
-    // MARK: - Generating State
-
-    private var generatingState: some View {
-        VStack(spacing: 0) {
-            // Canvas with tables
-            if let plan = appState.activePlan {
-                canvasPreview(plan: plan)
-                    .frame(height: 300)
-            }
-
-            Spacer()
-
-            // Progress pill
-            progressPill
-
-            Spacer().frame(height: 24)
-
-            // Step list
-            VStack(alignment: .leading, spacing: 12) {
-                ForEach(steps) { step in
-                    stepRow(step)
-                }
+        ScrollView {
+            VStack(spacing: 20) {
+                header
+                statsRow
+                activeRulesCard
+                actionStack
+                tipText
+                Spacer(minLength: 60)
             }
             .padding(.horizontal, SBSpacing.screenMargin)
+            .padding(.top, 8)
+        }
+    }
 
+    private var generatingState: some View {
+        VStack(spacing: 16) {
+            Spacer()
+            ProgressView()
+                .scaleEffect(1.4)
+                .tint(Color.sbGoldDk)
+            Text("Generating seating…")
+                .font(SBFont.bodySemibold)
+                .foregroundStyle(Color.sbCharcoal)
+            Text("This usually takes a few seconds.")
+                .font(SBFont.caption)
+                .foregroundStyle(Color.sbWarm)
             Spacer()
         }
     }
-
-    private func canvasPreview(plan: SeatingPlan) -> some View {
-        ZStack {
-            Color.sbIvory2
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 14), count: 3), spacing: 14) {
-                ForEach(plan.tables) { table in
-                    SBTableGraphic(
-                        totalSeats: table.seats,
-                        filledSeats: min(table.filledCount + animatedFillForTable(table), table.seats),
-                        label: table.name,
-                        size: 60
-                    )
-                }
-            }
-            .padding(20)
-        }
-    }
-
-    private var progressPill: some View {
-        HStack(spacing: 8) {
-            Text("Seating guests — \(seatedCount) of \(totalToSeat)")
-                .font(SBFont.inter(13, weight: .semibold))
-                .foregroundStyle(Color.sbIvory)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .background(
-            Capsule()
-                .fill(Color.sbCharcoal)
-                .overlay(
-                    GeometryReader { geo in
-                        Capsule()
-                            .fill(Color.sbGold)
-                            .frame(width: geo.size.width * progress)
-                    }
-                    .clipShape(Capsule())
-                )
-        )
-    }
-
-    private func stepRow(_ step: StepStatus) -> some View {
-        HStack(spacing: 10) {
-            Group {
-                switch step.status {
-                case .done:
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(Color.sbSage)
-                case .inProgress:
-                    Image(systemName: "circle.dotted")
-                        .foregroundStyle(Color.sbGold)
-                        .symbolEffect(.pulse)
-                case .pending:
-                    Image(systemName: "circle")
-                        .foregroundStyle(Color.sbWarm2)
-                }
-            }
-            .font(.system(size: 16))
-
-            Text(step.label)
-                .font(SBFont.body)
-                .foregroundStyle(step.status == .pending ? Color.sbWarm2 : Color.sbCharcoal)
-        }
-    }
-
-    // MARK: - Complete State
 
     private var completeState: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: 16) {
             Spacer()
-
-            // Harmony score
+            Image(systemName: "checkmark.seal.fill")
+                .font(.system(size: 56))
+                .foregroundStyle(Color.sbSage)
+            Text("Seating generated")
+                .font(SBFont.displaySmall)
+                .foregroundStyle(Color.sbCharcoal)
             if let score = harmonyScore {
-                VStack(spacing: 8) {
-                    Text("\(score)")
-                        .font(SBFont.fraunces(60, weight: .medium))
-                        .foregroundStyle(Color.sbGold)
-                        .contentTransition(.numericText())
-
-                    Text("Harmony Score")
-                        .font(SBFont.label)
-                        .foregroundStyle(Color.sbWarm)
-                        .textCase(.uppercase)
-                }
-            }
-
-            // Summary
-            VStack(spacing: 6) {
-                Text("12 families together")
+                Text("Harmony score \(score)")
                     .font(SBFont.body)
-                    .foregroundStyle(Color.sbCharcoal)
-                Text("4 accessibility requests honored")
-                    .font(SBFont.body)
-                    .foregroundStyle(Color.sbCharcoal)
+                    .foregroundStyle(Color.sbGoldDk)
             }
-
+            if let msg = resultMessage {
+                Text(msg)
+                    .font(SBFont.caption)
+                    .foregroundStyle(Color.sbWarm)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 32)
+            }
+            if fellBackToRoundRobin {
+                Text("Note: solver returned 0; used round-robin fallback. Check your rules for conflicts.")
+                    .font(SBFont.caption)
+                    .foregroundStyle(Color.sbError)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 32)
+            }
             Spacer()
-
-            // Actions
             VStack(spacing: 12) {
-                SBButton(title: "Accept", icon: "checkmark", variant: .gold, fullWidth: true) {
-                    HapticEngine.success()
-                    // Persist AI arrangements to Supabase
-                    if let plan = appState.activePlan {
-                        Task {
-                            do {
-                                try await appState.database.savePlanData(plan: plan)
-                                print("[AI] Saved accepted arrangement")
-                            } catch {
-                                print("[AI] Failed to save: \(error)")
-                            }
-                        }
-                    }
+                SBButton(title: "View in canvas", icon: "rectangle.grid.3x2", variant: .gold, fullWidth: true) {
                     appState.selectedTab = .edit
                 }
-
-                SBButton(title: "Keep editing", variant: .ghost, fullWidth: true) {
-                    appState.selectedTab = .edit
+                SBButton(title: "Generate again", variant: .ghost, fullWidth: true) {
+                    phase = .ready
                 }
             }
             .padding(.horizontal, SBSpacing.screenMargin)
@@ -278,94 +178,238 @@ struct AIGenerateView: View {
         }
     }
 
-    // MARK: - Logic
-
-    private var progress: CGFloat {
-        guard totalToSeat > 0 else { return 0 }
-        return CGFloat(seatedCount) / CGFloat(totalToSeat)
+    private var errorState: some View {
+        VStack(spacing: 16) {
+            Spacer()
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 44))
+                .foregroundStyle(Color.sbError)
+            Text("Couldn't generate")
+                .font(SBFont.displaySmall)
+                .foregroundStyle(Color.sbCharcoal)
+            if let msg = resultMessage {
+                Text(msg)
+                    .font(SBFont.caption)
+                    .foregroundStyle(Color.sbWarm)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 32)
+            }
+            Spacer()
+            SBButton(title: "Try again", variant: .gold, fullWidth: true) {
+                phase = .ready
+            }
+            .padding(.horizontal, SBSpacing.screenMargin)
+            .padding(.bottom, 120)
+        }
     }
 
-    private func animatedFillForTable(_ table: SeatTable) -> Int {
-        // Simple distribution during animation
-        guard totalToSeat > 0 else { return 0 }
-        return Int(Double(table.seats - table.filledCount) * Double(seatedCount) / Double(totalToSeat))
+    // MARK: - Components
+
+    private var header: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Generate Seating")
+                    .font(SBFont.displaySmall)
+                    .foregroundStyle(Color.sbCharcoal)
+                Text("AI seating powered by your rules and parties")
+                    .font(SBFont.caption)
+                    .foregroundStyle(Color.sbWarm)
+            }
+            Spacer()
+        }
     }
 
-    private func startGeneration(unseated: Int) {
-        // Tier gate — mirrors web's checkTierLimit('ai_generate') at
-        // App.jsx:6217. Free tier blocked; expired pass tiers also blocked
-        // because activePlanLimits collapses to free when expired.
+    private var statsRow: some View {
+        HStack(spacing: 10) {
+            statCard(
+                title: "guests seated",
+                value: "\(guestsSeated)/\(activeGuestCount)",
+                tint: Color.sbChampagne
+            )
+            statCard(
+                title: "seats available",
+                value: "\(seatsAvailable)",
+                tint: Color.sbSage.opacity(0.20)
+            )
+        }
+    }
+
+    private func statCard(title: String, value: String, tint: Color) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(value)
+                .font(SBFont.statNumber)
+                .foregroundStyle(Color.sbGoldDk)
+            Text(title)
+                .font(SBFont.caption)
+                .foregroundStyle(Color.sbWarm)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .background(tint)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    private var activeRulesCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Active Rules")
+                    .font(SBFont.bodySmallBold)
+                    .foregroundStyle(Color.sbCharcoal)
+                Spacer()
+                Text("\(enabledRulesCount)")
+                    .font(SBFont.bodySemibold)
+                    .foregroundStyle(Color.sbGoldDk)
+            }
+            HStack(spacing: 10) {
+                ruleSubCard(label: "Required", count: requiredRulesCount, accent: Color.sbGoldDk, tint: Color.sbChampagne)
+                ruleSubCard(label: "Preferences", count: preferenceRulesCount, accent: Color.sbCharcoal, tint: Color.sbSage.opacity(0.20))
+            }
+        }
+        .padding(14)
+        .background(Color.sbIvory2)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    private func ruleSubCard(label: String, count: Int, accent: Color, tint: Color) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("\(count)")
+                .font(SBFont.statNumberSmall)
+                .foregroundStyle(accent)
+            Text(label)
+                .font(SBFont.caption)
+                .foregroundStyle(Color.sbWarm)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .background(tint)
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
+    private var actionStack: some View {
+        VStack(spacing: 10) {
+            SBButton(title: "Generate Seating", icon: "sparkles", variant: .gold, fullWidth: true) {
+                Task { await runGenerate() }
+            }
+            SBButton(title: "Clear Unlocked Tables", variant: .ghost, fullWidth: true) {
+                clearConfirm = .unlockedOnly
+            }
+            Button {
+                clearConfirm = .all
+            } label: {
+                Text("Clear All Assignments")
+                    .font(SBFont.bodySmall)
+                    .foregroundStyle(Color.sbError)
+                    .padding(.top, 4)
+            }
+        }
+    }
+
+    private var tipText: some View {
+        Text("Tip: each generation uses a different random seed, so re-running can produce different arrangements.")
+            .font(SBFont.caption)
+            .foregroundStyle(Color.sbWarm)
+            .multilineTextAlignment(.center)
+            .padding(.horizontal, 8)
+    }
+
+    // MARK: - Stats (mirror App.jsx:13119-13133)
+
+    private var activeGuests: [Guest] {
+        (appState.activePlan?.guests ?? []).filter { $0.rsvp != .no }
+    }
+
+    private var activeGuestIds: Set<String> {
+        Set(activeGuests.map { $0.id })
+    }
+
+    private var activeGuestCount: Int { activeGuests.count }
+
+    private var guestsSeated: Int {
+        guard let plan = appState.activePlan else { return 0 }
+        return plan.tables.reduce(0) { sum, t in
+            let seatedHere = t.assignments.keys.filter { activeGuestIds.contains($0) }.count
+            return sum + min(seatedHere, t.seats)
+        }
+    }
+
+    private var totalSeats: Int {
+        (appState.activePlan?.tables ?? []).reduce(0) { $0 + $1.seats }
+    }
+
+    private var seatsAvailable: Int { max(0, totalSeats - guestsSeated) }
+
+    private var enabledRulesCount: Int {
+        (appState.activePlan?.rules ?? []).filter { $0.enabled }.count
+    }
+
+    private var requiredRulesCount: Int {
+        (appState.activePlan?.rules ?? []).filter {
+            $0.enabled && ($0.hard || $0.source == "party" || $0.partyId != nil)
+        }.count
+    }
+
+    private var preferenceRulesCount: Int {
+        max(0, enabledRulesCount - requiredRulesCount)
+    }
+
+    // MARK: - Actions
+
+    private func runGenerate() async {
+        // Tier gate (mirrors web checkTierLimit('ai_generate') at App.jsx:6217).
         guard appState.activePlanLimits.aiGenerate else {
             HapticEngine.error()
-            if appState.isActivePlanExpired {
-                tierGateAlert = TierGateAlert(
-                    title: "Pass Expired",
-                    message: "This event's pass has expired. Apply a new Event Pass in Settings to use AI seating again."
-                )
-            } else {
-                tierGateAlert = TierGateAlert(
-                    title: "AI Seating Needs an Event Pass",
-                    message: "AI seating is included with Event Pass, Signature Pass, and Grand Event Pass. Apply a pass in Settings → Event Passes to unlock."
-                )
-            }
+            tierGateAlert = appState.isActivePlanExpired
+                ? TierGateAlert(title: "Pass Expired",
+                                message: "This event's pass has expired. Apply a new Event Pass in Settings to use AI seating again.")
+                : TierGateAlert(title: "AI Seating Needs an Event Pass",
+                                message: "AI seating is included with Event Pass, Signature Pass, and Grand Event Pass. Apply a pass in Settings → Event Passes to unlock.")
+            return
+        }
+        guard var plan = appState.activePlan else { return }
+        guard !plan.tables.isEmpty, !plan.guests.isEmpty else {
+            resultMessage = "Add at least one table and one guest before generating."
+            phase = .error
             return
         }
 
-        totalToSeat = unseated
-        seatedCount = 0
         phase = .generating
+        resultMessage = nil
+        fellBackToRoundRobin = false
+        harmonyScore = nil
 
-        // Simulate progressive generation
-        Task {
-            // Step 1: Grouped families
-            steps[0].status = .inProgress
-            try? await Task.sleep(for: .seconds(1.2))
-            steps[0].status = .done
-            seatedCount = totalToSeat / 4
-            HapticEngine.light()
-
-            // Step 2: Dietary
-            steps[1].status = .inProgress
-            try? await Task.sleep(for: .seconds(1.0))
-            steps[1].status = .done
-            seatedCount = totalToSeat / 2
-            HapticEngine.light()
-
-            // Step 3: +1s
-            steps[2].status = .inProgress
-
-            // Actually call the AI service
-            do {
-                if let plan = appState.activePlan {
-                    let result = try await appState.ai.getSeatingSuggestions(
-                        guests: plan.guests,
-                        tables: plan.tables,
-                        rules: plan.rules
-                    )
-                    harmonyScore = result.score
-                }
-            } catch {
-                // Fallback score
-                harmonyScore = 85
-            }
-
-            steps[2].status = .done
-            seatedCount = Int(Double(totalToSeat) * 0.8)
-            HapticEngine.light()
-
-            // Step 4: Final review
-            steps[3].status = .inProgress
-            try? await Task.sleep(for: .seconds(0.8))
-            steps[3].status = .done
-            seatedCount = totalToSeat
+        do {
+            let result = try await appState.seat.generateSeating(plan: plan)
+            plan.applyGeneratedSeating(result)
+            appState.activePlan = plan
+            try await appState.database.savePlanData(plan: plan)
+            harmonyScore = result.score
+            fellBackToRoundRobin = result.fallback ?? false
+            resultMessage = "Seated \(plan.tables.reduce(0) { $0 + $1.assignments.count }) of \(activeGuestCount) guests."
             HapticEngine.success()
-
-            try? await Task.sleep(for: .seconds(0.5))
-
-            withAnimation(.seatbeeSpring) {
-                phase = .complete
-            }
+            phase = .complete
+        } catch let error as SeatService.SeatError {
+            HapticEngine.error()
+            resultMessage = error.localizedDescription
+            phase = .error
+        } catch {
+            HapticEngine.error()
+            resultMessage = error.localizedDescription
+            phase = .error
         }
+    }
+
+    private func performClear(_ action: ClearAction) {
+        guard var plan = appState.activePlan else { return }
+        switch action {
+        case .unlockedOnly: plan.clearUnlockedTableAssignments()
+        case .all:          plan.clearAllAssignments()
+        }
+        appState.activePlan = plan
+        Task {
+            try? await appState.database.savePlanData(plan: plan)
+        }
+        HapticEngine.medium()
+        clearConfirm = nil
     }
 }
 

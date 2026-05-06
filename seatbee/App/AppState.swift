@@ -20,6 +20,7 @@ final class AppState {
     let database = DatabaseService()
     let ai = AIService()
     let passes = PassesService()
+    let seat = SeatService()
     let undoManager = SBUndoManager()
 
     // Pass inventory (web purchases — Apple IAP comes in Phase 2)
