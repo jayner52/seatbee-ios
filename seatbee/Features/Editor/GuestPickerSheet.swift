@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct GuestPickerSheet: View {
+    @Environment(AppState.self) private var appState
     let guests: [Guest]
     let tables: [SeatTable]
     let onSelect: (Guest) -> Void
@@ -55,8 +56,8 @@ struct GuestPickerSheet: View {
                                     Text(guest.displayName)
                                         .font(SBFont.bodySmallBold)
                                         .foregroundStyle(Color.sbCharcoal)
-                                    if !guest.categories.isEmpty {
-                                        Text(guest.categories.joined(separator: ", "))
+                                    if let label = appState.activePlan?.displayCategoryLabel(for: guest) {
+                                        Text(label)
                                             .font(SBFont.caption)
                                             .foregroundStyle(Color.sbWarm)
                                     }

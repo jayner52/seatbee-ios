@@ -83,8 +83,8 @@ struct DayOfView: View {
                     Text(guest.displayName)
                         .font(SBFont.fraunces(18, weight: .medium))
                         .foregroundStyle(Color.sbCharcoal)
-                    if !guest.categories.isEmpty {
-                        Text(guest.categories.first ?? "")
+                    if let label = appState.activePlan?.displayCategoryLabel(for: guest) {
+                        Text(label)
                             .font(SBFont.small)
                             .foregroundStyle(Color.sbWarm)
                     }
