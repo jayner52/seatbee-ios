@@ -4,11 +4,11 @@ struct TableDrawerView: View {
     let table: SeatTable
     @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
-    @State private var selectedTab = "Seats"
+    @State private var selectedTab = "Layout"
     @State private var showRenameAlert = false
     @State private var renameText = ""
 
-    private let tabs = ["Seats", "Layout", "Notes", "Tags"]
+    private let tabs = ["Layout", "Seats", "Notes", "Tags"]
 
     // Web parity (src/App.jsx): SCALE = 15 px / foot.
     private let pxPerFoot: Double = 15
