@@ -211,6 +211,7 @@ struct TableDTO: Codable {
     let diameter: Double?
     let sweetShape: String?
     let oneSide: Bool?
+    let notes: String?
 
     func toDomain() -> SeatTable {
         SeatTable(
@@ -228,7 +229,8 @@ struct TableDTO: Codable {
             height: height,
             diameter: diameter,
             sweetShape: sweetShape,
-            oneSide: oneSide
+            oneSide: oneSide,
+            notes: notes
         )
     }
 }

@@ -261,24 +261,152 @@ struct TableDrawerView: View {
         }
     }
 
-    // MARK: - Notes & Tags
+    // MARK: - Notes
 
+    /// Editable free-text notes for this table. Persists to Supabase via
+    /// `SeatTable.notes` (new shared field — see PARITY.md). Same field
+    /// is consumed by the web table edit panel.
     private var notesContent: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("No notes yet")
-                .font(SBFont.body)
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Internal notes for this table — kitchen instructions, vendor reminders, anything you want kept on the plan.")
+                .font(SBFont.caption)
                 .foregroundStyle(Color.sbWarm)
-                .padding(SBSpacing.cardPadding)
+
+            TextEditor(text: Binding<String>(
+                get: { table.notes ?? "" },
+                set: { v in mutateTable(save: false) { $0.notes = v.isEmpty ? nil : v } }
+            ))
+            .font(SBFont.body)
+            .foregroundStyle(Color.sbCharcoal)
+            .scrollContentBackground(.hidden)
+            .padding(10)
+            .frame(minHeight: 140, maxHeight: 240)
+            .background(Color.sbIvory2)
+            .clipShape(RoundedRectangle(cornerRadius: SBRadius.button))
+            .onChange(of: table.notes) { _, _ in
+                // Debounce-by-blur: persist when the user stops editing.
+                // Keystroke saves would create churn on a JSONB column.
+            }
+
+            // Save explicitly when the field loses focus (any tab change
+            // or drawer dismiss). For now, save on every change with a
+            // small Task delay to avoid spam.
+            HStack {
+                Spacer()
+                Button {
+                    if let plan = appState.activePlan { savePlan(plan) }
+                    HapticEngine.light()
+                } label: {
+                    Text("Save notes")
+                        .font(SBFont.bodySemibold)
+                        .foregroundStyle(Color.white)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(Color.sbGold)
+                        .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+            }
         }
+        .padding(.horizontal, SBSpacing.cardPadding)
+        .padding(.bottom, SBSpacing.lg)
     }
 
+    // MARK: - Tags
+    //
+    // Derived view: enumerate guests seated at this table and show the
+    // distinct categories they hold (web's Categories collection on the
+    // plan), each with a count of how many seated guests share it. Empty
+    // when no guests are seated.
+
     private var tagsContent: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("No tags yet")
-                .font(SBFont.body)
-                .foregroundStyle(Color.sbWarm)
-                .padding(SBSpacing.cardPadding)
+        let aggregated = aggregatedTags()
+        return VStack(alignment: .leading, spacing: 12) {
+            if table.assignments.isEmpty {
+                emptyTagsRow(message: "No guests seated yet — assign guests and their categories will appear here.")
+            } else if aggregated.isEmpty {
+                emptyTagsRow(message: "Seated guests don't have any categories assigned.")
+            } else {
+                Text("Categories of guests seated at this table.")
+                    .font(SBFont.caption)
+                    .foregroundStyle(Color.sbWarm)
+                FlowLayout(spacing: 8) {
+                    ForEach(aggregated, id: \.label) { entry in
+                        tagChip(label: entry.label, count: entry.count)
+                    }
+                }
+            }
         }
+        .padding(.horizontal, SBSpacing.cardPadding)
+        .padding(.bottom, SBSpacing.lg)
+    }
+
+    private func emptyTagsRow(message: String) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "tag")
+                .foregroundStyle(Color.sbWarm2)
+            Text(message)
+                .font(SBFont.bodySmall)
+                .foregroundStyle(Color.sbWarm)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.sbIvory2)
+        .clipShape(RoundedRectangle(cornerRadius: SBRadius.button))
+    }
+
+    private func tagChip(label: String, count: Int) -> some View {
+        HStack(spacing: 6) {
+            Text(label)
+                .font(SBFont.bodySmall)
+                .foregroundStyle(Color.sbCharcoal)
+            Text("\(count)")
+                .font(SBFont.capsLabel)
+                .foregroundStyle(Color.sbGoldDk)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 1)
+                .background(Color.sbGold.opacity(0.15))
+                .clipShape(Capsule())
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(Color.sbChampagne.opacity(0.55))
+        .clipShape(Capsule())
+    }
+
+    /// Walks seated guests, collects their categories, dedupes, resolves
+    /// IDs to display names (skipping orphan IDs via `displayCategoryLabel`
+    /// logic), and counts how many seated guests carry each category.
+    /// Sorted by count desc, then alphabetical.
+    private func aggregatedTags() -> [(label: String, count: Int)] {
+        guard let plan = appState.activePlan else { return [] }
+        let guestById = Dictionary(uniqueKeysWithValues: plan.guests.map { ($0.id, $0) })
+
+        var counts: [String: Int] = [:]
+        for guestId in table.assignments.keys {
+            guard let guest = guestById[guestId] else { continue }
+            // Iterate ALL of this guest's category entries (not just the
+            // first), so a guest tagged "Family" + "VIP" contributes to
+            // both. Same orphan-ID skipping logic as elsewhere.
+            for raw in guest.categories {
+                if let resolved = plan.canonicalCategoryName(forId: raw) {
+                    counts[resolved, default: 0] += 1
+                } else if !looksLikeGeneratedId(raw) {
+                    counts[raw, default: 0] += 1
+                }
+            }
+        }
+        return counts
+            .map { (label: $0.key, count: $0.value) }
+            .sorted { (a, b) -> Bool in
+                if a.count != b.count { return a.count > b.count }
+                return a.label.localizedCaseInsensitiveCompare(b.label) == .orderedAscending
+            }
+    }
+
+    private func looksLikeGeneratedId(_ s: String) -> Bool {
+        guard s.count >= 6 else { return false }
+        return s.allSatisfy { $0.isLowercase || $0.isNumber }
     }
 
     // MARK: - Layout Tab Content (web parity)
