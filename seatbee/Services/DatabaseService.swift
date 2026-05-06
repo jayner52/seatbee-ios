@@ -41,7 +41,7 @@ final class DatabaseService {
         let session = try await client.auth.session
 
         let planData = PlanDataDTO(
-            event: EventDataDTO(name: name, date: eventDate, venue: venue, eventType: eventType, roomWidth: nil, roomHeight: nil, roomShape: nil, measurementUnit: nil, customRoomPoints: nil, roomFlipH: nil, roomFlipV: nil, roomZones: nil, hasSweetheartTable: nil),
+            event: EventDataDTO(name: name, date: eventDate, venue: venue, eventType: eventType, roomWidth: nil, roomHeight: nil, roomShape: nil, measurementUnit: nil, customRoomPoints: nil, roomFlipH: nil, roomFlipV: nil, roomZones: nil, hasSweetheartTable: nil, coupleType: nil),
             guests: guests,
             tables: tables,
             rules: nil,

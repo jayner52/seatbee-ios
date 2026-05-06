@@ -27,6 +27,10 @@ struct SeatingPlan: Identifiable, Codable {
     var roomFlipV: Bool? = nil
     var roomZones: [RoomZone]? = nil
     var hasSweetheartTable: Bool? = nil
+    // Wedding-only: derived from each partner's role marker on onboarding.
+    // Values: "bride_groom" (default) | "bride_bride" | "groom_groom".
+    // Web stores the same string at App.jsx OnboardingWizard line ~19223.
+    var coupleType: String? = nil
     var createdAt: Date?
     var updatedAt: Date?
     var userId: String?
@@ -509,7 +513,8 @@ extension SeatingPlan {
                 roomFlipH: roomFlipH,
                 roomFlipV: roomFlipV,
                 roomZones: RoomGeometryCoder.encodeZones(roomZones),
-                hasSweetheartTable: hasSweetheartTable
+                hasSweetheartTable: hasSweetheartTable,
+                coupleType: coupleType
             ),
             guests: guests.map { g in
                 GuestDTO(

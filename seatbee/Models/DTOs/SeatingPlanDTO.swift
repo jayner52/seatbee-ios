@@ -88,6 +88,7 @@ struct SeatingPlanDTO: Codable {
             roomFlipV: d?.event?.roomFlipV,
             roomZones: RoomGeometryCoder.decodeZones(d?.event?.roomZones),
             hasSweetheartTable: d?.event?.hasSweetheartTable,
+            coupleType: d?.event?.coupleType,
             createdAt: created_at.flatMap { parseDate($0) },
             updatedAt: updated_at.flatMap { parseDate($0) },
             userId: user_id,
@@ -153,6 +154,7 @@ struct EventDataDTO: Codable {
     let roomFlipV: Bool?
     let roomZones: AnyCodable?
     let hasSweetheartTable: Bool?
+    let coupleType: String?
 }
 
 // MARK: - AssignmentDTO
