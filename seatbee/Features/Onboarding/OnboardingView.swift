@@ -384,7 +384,7 @@ struct OnboardingView: View {
                             dietaryTags: guest.dietaryTags, highChair: guest.highChair,
                             isChild: guest.isChild, groupIds: guest.groupIds,
                             isBride: guest.isBride, isGroom: guest.isGroom,
-                            meal: guest.meal, createdAt: guest.guestCreatedAt
+                            meal: guest.meal.map { MealField($0) }, createdAt: guest.guestCreatedAt
                         )
                     }
                     : nil

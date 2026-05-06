@@ -258,7 +258,7 @@ struct GuestDTO: Codable {
     let groupIds: [String]?
     let isBride: Bool?
     let isGroom: Bool?
-    let meal: String?
+    let meal: MealField?    // accepts string OR {short, icon, full} object
     let createdAt: String?
 
     func toDomain() -> Guest {
@@ -285,9 +285,52 @@ struct GuestDTO: Codable {
             groupIds: groupIds,
             isBride: isBride,
             isGroom: isGroom,
-            meal: meal,
+            meal: meal?.stringValue,
             guestCreatedAt: createdAt
         )
+    }
+}
+
+// MARK: - MealField
+//
+// Web stores `meal` as either a plain string ("Beef") or an object
+// ({short: "Beef", icon: "🥩", full: "Beef tenderloin"}). iOS used to
+// declare `meal: String?` which would crash the whole guest decode
+// when web sent an object. This wrapper accepts either shape on read,
+// extracts the most informative string (full → short → null), and
+// always writes back as a plain string. Web auto-derives the icon
+// from text on its own read path (App.jsx:3421-3427), so writing as
+// a string doesn't lose visible information.
+
+struct MealField: Codable {
+    let stringValue: String?
+
+    init(_ str: String?) { self.stringValue = str }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.singleValueContainer()
+        if c.decodeNil() {
+            self.stringValue = nil
+        } else if let s = try? c.decode(String.self) {
+            self.stringValue = s
+        } else if let dict = try? c.decode([String: AnyCodable].self) {
+            // Object shape from web. Prefer `full` (more descriptive)
+            // then fall back to `short`. Drop `icon` — iOS will
+            // re-derive it for display via Guest.mealDisplay().
+            self.stringValue = (dict["full"]?.value as? String)
+                ?? (dict["short"]?.value as? String)
+        } else {
+            self.stringValue = nil
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.singleValueContainer()
+        if let s = stringValue, !s.isEmpty {
+            try c.encode(s)
+        } else {
+            try c.encodeNil()
+        }
     }
 }
 

@@ -56,10 +56,17 @@ struct GuestPickerSheet: View {
                                     Text(guest.displayName)
                                         .font(SBFont.bodySmallBold)
                                         .foregroundStyle(Color.sbCharcoal)
-                                    if let label = appState.activePlan?.displayCategoryLabel(for: guest) {
-                                        Text(label)
-                                            .font(SBFont.caption)
-                                            .foregroundStyle(Color.sbWarm)
+                                    HStack(spacing: 6) {
+                                        if let label = appState.activePlan?.displayCategoryLabel(for: guest) {
+                                            Text(label)
+                                                .font(SBFont.caption)
+                                                .foregroundStyle(Color.sbWarm)
+                                        }
+                                        if let meal = guest.mealDisplay {
+                                            Text("\(meal.icon) \(meal.short)")
+                                                .font(SBFont.caption)
+                                                .foregroundStyle(Color.sbCharcoal2)
+                                        }
                                     }
                                 }
                                 Spacer()

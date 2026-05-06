@@ -455,7 +455,18 @@ struct EditorView: View {
             }
             SBAvatar(name: guest.displayName, size: 30)
             VStack(alignment: .leading, spacing: 1) {
-                Text(guest.displayName).font(SBFont.bodySmallBold).foregroundStyle(Color.sbCharcoal)
+                HStack(spacing: 4) {
+                    Text(guest.displayName).font(SBFont.bodySmallBold).foregroundStyle(Color.sbCharcoal)
+                    if let meal = guest.mealDisplay {
+                        Text("\(meal.icon) \(meal.short)")
+                            .font(SBFont.small)
+                            .foregroundStyle(Color.sbCharcoal2)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 1)
+                            .background(Color.sbChampagne.opacity(0.55))
+                            .clipShape(Capsule())
+                    }
+                }
                 if let label = plan?.displayCategoryLabel(for: guest) {
                     Text(label).font(SBFont.capsLabel).foregroundStyle(Color.sbWarm)
                 }

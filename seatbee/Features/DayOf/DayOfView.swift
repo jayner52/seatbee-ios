@@ -83,10 +83,17 @@ struct DayOfView: View {
                     Text(guest.displayName)
                         .font(SBFont.fraunces(18, weight: .medium))
                         .foregroundStyle(Color.sbCharcoal)
-                    if let label = appState.activePlan?.displayCategoryLabel(for: guest) {
-                        Text(label)
-                            .font(SBFont.small)
-                            .foregroundStyle(Color.sbWarm)
+                    HStack(spacing: 6) {
+                        if let label = appState.activePlan?.displayCategoryLabel(for: guest) {
+                            Text(label)
+                                .font(SBFont.small)
+                                .foregroundStyle(Color.sbWarm)
+                        }
+                        if let meal = guest.mealDisplay {
+                            Text("\(meal.icon) \(meal.short)")
+                                .font(SBFont.small)
+                                .foregroundStyle(Color.sbCharcoal2)
+                        }
                     }
                 }
             }
