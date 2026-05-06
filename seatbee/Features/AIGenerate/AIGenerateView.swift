@@ -10,7 +10,7 @@ struct AIGenerateView: View {
 
     @State private var phase: Phase = .ready
     @State private var resultMessage: String?
-    @State private var harmonyScore: Int?
+    @State private var lastResult: SeatService.GenerateResult?
     @State private var fellBackToRoundRobin = false
     @State private var tierGateAlert: TierGateAlert?
     @State private var clearConfirm: ClearAction?
@@ -126,61 +126,211 @@ struct AIGenerateView: View {
     }
 
     private var generatingState: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 24) {
             Spacer()
-            ProgressView()
-                .scaleEffect(1.4)
-                .tint(Color.sbGoldDk)
-            Text("Generating seating…")
-                .font(SBFont.bodySemibold)
-                .foregroundStyle(Color.sbCharcoal)
-            Text("This usually takes a few seconds.")
-                .font(SBFont.caption)
-                .foregroundStyle(Color.sbWarm)
+            HoneycombLoader()
+                .frame(width: 220, height: 220)
+            VStack(spacing: 4) {
+                Text("Generating seating…")
+                    .font(SBFont.bodySemibold)
+                    .foregroundStyle(Color.sbCharcoal)
+                Text("Placing guests, balancing rules, choosing tables.")
+                    .font(SBFont.caption)
+                    .foregroundStyle(Color.sbWarm)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 40)
+            }
             Spacer()
         }
     }
 
     private var completeState: some View {
-        VStack(spacing: 16) {
-            Spacer()
+        ScrollView {
+            VStack(spacing: 16) {
+                completeHeader
+                if let scorecard = lastResult?.scorecard {
+                    scorecardPanel(scorecard)
+                    if scorecard.hardConstraints.total > 0 {
+                        rulesSection(
+                            title: "Required Rules",
+                            bucket: scorecard.hardConstraints,
+                            accent: Color.sbGoldDk
+                        )
+                    }
+                    if scorecard.softPreferences.total > 0 {
+                        rulesSection(
+                            title: "Preferences",
+                            bucket: scorecard.softPreferences,
+                            accent: Color.sbSage
+                        )
+                    }
+                }
+                if fellBackToRoundRobin {
+                    Text("Solver returned 0 — used round-robin fallback. Check your rules for conflicts.")
+                        .font(SBFont.caption)
+                        .foregroundStyle(Color.sbError)
+                        .multilineTextAlignment(.center)
+                        .padding(12)
+                        .frame(maxWidth: .infinity)
+                        .background(Color.sbError.opacity(0.08))
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                }
+                actionStackComplete
+                Spacer(minLength: 100)
+            }
+            .padding(.horizontal, SBSpacing.screenMargin)
+            .padding(.top, 12)
+        }
+    }
+
+    private var completeHeader: some View {
+        VStack(spacing: 6) {
             Image(systemName: "checkmark.seal.fill")
-                .font(.system(size: 56))
+                .font(.system(size: 40))
                 .foregroundStyle(Color.sbSage)
             Text("Seating generated")
                 .font(SBFont.displaySmall)
                 .foregroundStyle(Color.sbCharcoal)
-            if let score = harmonyScore {
-                Text("Harmony score \(score)")
-                    .font(SBFont.body)
-                    .foregroundStyle(Color.sbGoldDk)
-            }
             if let msg = resultMessage {
                 Text(msg)
                     .font(SBFont.caption)
                     .foregroundStyle(Color.sbWarm)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 32)
             }
-            if fellBackToRoundRobin {
-                Text("Note: solver returned 0; used round-robin fallback. Check your rules for conflicts.")
-                    .font(SBFont.caption)
-                    .foregroundStyle(Color.sbError)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 32)
+        }
+        .padding(.top, 4)
+    }
+
+    private func scorecardPanel(_ s: SeatService.GenerateResult.Scorecard) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("\(s.overallPercent)%")
+                        .font(SBFont.fraunces(36, weight: .medium))
+                        .foregroundStyle(Color.sbCharcoal)
+                    if !s.overallLabel.isEmpty {
+                        Text(s.overallLabel)
+                            .font(SBFont.bodySemibold)
+                            .foregroundStyle(Color.sbSage)
+                    }
+                }
+                Spacer()
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text("\(s.totalSatisfied)/\(s.totalRules)")
+                        .font(SBFont.statNumberSmall)
+                        .foregroundStyle(Color.sbCharcoal)
+                    Text("rules satisfied")
+                        .font(SBFont.caption)
+                        .foregroundStyle(Color.sbWarm)
+                }
+            }
+            // Progress bar — fill width = overallPercent / 100.
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Color.sbWarm2.opacity(0.25))
+                    Capsule()
+                        .fill(Color.sbSage)
+                        .frame(width: geo.size.width * (CGFloat(max(0, min(100, s.overallPercent))) / 100))
+                }
+            }
+            .frame(height: 8)
+        }
+        .padding(14)
+        .background(Color.sbChampagne.opacity(0.4))
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    private func rulesSection(
+        title: String,
+        bucket: SeatService.GenerateResult.RuleBucket,
+        accent: Color
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Circle()
+                    .fill(accent)
+                    .frame(width: 8, height: 8)
+                Text(title.uppercased())
+                    .font(SBFont.label)
+                    .foregroundStyle(Color.sbCharcoal)
+                Spacer()
+                let suffix = title.lowercased().contains("preference") ? "met" : "✓"
+                Text("\(bucket.satisfied)/\(bucket.total) \(suffix)")
+                    .font(SBFont.bodySmallBold)
+                    .foregroundStyle(accent)
+            }
+            VStack(spacing: 6) {
+                ForEach(bucket.rules) { rule in
+                    ruleRow(rule)
+                }
+            }
+        }
+        .padding(14)
+        .background(Color.sbIvory2)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    private func ruleRow(_ rule: SeatService.GenerateResult.RuleEntry) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: ruleIconName(rule.status))
+                .foregroundStyle(ruleIconColor(rule.status))
+                .frame(width: 18, alignment: .center)
+                .padding(.top, 2)
+            VStack(alignment: .leading, spacing: 2) {
+                let title = rule.partial.map { "\(rule.description) (\($0))" } ?? rule.description
+                Text(title.isEmpty ? "—" : title)
+                    .font(SBFont.bodySmall)
+                    .foregroundStyle(Color.sbCharcoal)
+                if let details = rule.details, !details.isEmpty {
+                    Text(details)
+                        .font(SBFont.caption)
+                        .foregroundStyle(Color.sbWarm)
+                }
             }
             Spacer()
-            VStack(spacing: 12) {
-                SBButton(title: "View in canvas", icon: "rectangle.grid.3x2", variant: .gold, fullWidth: true) {
-                    appState.selectedTab = .edit
-                }
-                SBButton(title: "Generate again", variant: .ghost, fullWidth: true) {
-                    phase = .ready
-                }
-            }
-            .padding(.horizontal, SBSpacing.screenMargin)
-            .padding(.bottom, 120)
         }
+        .padding(.vertical, 4)
+        .padding(.horizontal, 8)
+        .background(ruleRowBackground(rule.status))
+        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+    }
+
+    private func ruleIconName(_ status: String) -> String {
+        switch status {
+        case "satisfied": return "checkmark"
+        case "violated":  return "xmark"
+        case "partial":   return "circle.lefthalf.filled"
+        default:          return "minus"
+        }
+    }
+
+    private func ruleIconColor(_ status: String) -> Color {
+        switch status {
+        case "satisfied": return Color.sbSage
+        case "violated":  return Color.sbError
+        case "partial":   return Color.sbGoldDk
+        default:          return Color.sbWarm
+        }
+    }
+
+    private func ruleRowBackground(_ status: String) -> Color {
+        switch status {
+        case "satisfied": return Color.sbSage.opacity(0.10)
+        case "violated":  return Color.sbError.opacity(0.10)
+        case "partial":   return Color.sbChampagne.opacity(0.50)
+        default:          return Color.clear
+        }
+    }
+
+    private var actionStackComplete: some View {
+        VStack(spacing: 10) {
+            SBButton(title: "View in canvas", icon: "rectangle.grid.3x2", variant: .gold, fullWidth: true) {
+                appState.selectedTab = .edit
+            }
+            SBButton(title: "Generate again", variant: .ghost, fullWidth: true) {
+                phase = .ready
+            }
+        }
+        .padding(.top, 4)
     }
 
     private var errorState: some View {
@@ -360,16 +510,6 @@ struct AIGenerateView: View {
     // MARK: - Actions
 
     private func runGenerate() async {
-        // Diagnostic: when the tier gate fires unexpectedly, print why so we
-        // can tell whether iOS thinks the plan is free, has a pass, or has
-        // an expired pass. Remove once tier-gate parity is confirmed solid.
-        let rawTier = appState.activePlan?.tier ?? "(nil)"
-        let expiry = appState.activePlan?.eventPassExpiresAt.map { String(describing: $0) } ?? "(nil)"
-        let computed = appState.activePlanTier
-        let allowsAI = appState.activePlanLimits.aiGenerate
-        let expired = appState.isActivePlanExpired
-        print("[AI Tier Gate] plan.tier=\(rawTier)  eventPassExpiresAt=\(expiry)  computedTier=\(computed.rawValue)  isExpired=\(expired)  aiGenerate=\(allowsAI)")
-
         // Tier gate (mirrors web checkTierLimit('ai_generate') at App.jsx:6217).
         guard appState.activePlanLimits.aiGenerate else {
             HapticEngine.error()
@@ -390,14 +530,14 @@ struct AIGenerateView: View {
         phase = .generating
         resultMessage = nil
         fellBackToRoundRobin = false
-        harmonyScore = nil
+        lastResult = nil
 
         do {
             let result = try await appState.seat.generateSeating(plan: plan)
             plan.applyGeneratedSeating(result)
             appState.activePlan = plan
             try await appState.database.savePlanData(plan: plan)
-            harmonyScore = result.score
+            lastResult = result
             fellBackToRoundRobin = result.fallback ?? false
             resultMessage = "Seated \(plan.tables.reduce(0) { $0 + $1.assignments.count }) of \(activeGuestCount) guests."
             HapticEngine.success()

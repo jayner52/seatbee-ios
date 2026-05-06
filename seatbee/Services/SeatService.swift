@@ -34,9 +34,78 @@ final class SeatService {
         let seatOrders: [String: [String?]]            // tableId → seatMap[]
         let score: Int?
         let fallback: Bool?
+        let scorecard: Scorecard?
+
+        struct Scorecard: Decodable {
+            let overallPercent: Int
+            let overallLabel: String          // "Excellent" | "Great" | …
+            let totalRules: Int
+            let totalSatisfied: Int
+            let hardConstraints: RuleBucket
+            let softPreferences: RuleBucket
+
+            init(from decoder: Decoder) throws {
+                let c = try decoder.container(keyedBy: CodingKeys.self)
+                overallPercent  = (try? c.decode(Int.self, forKey: .overallPercent)) ?? Int((try? c.decode(Double.self, forKey: .overallPercent)) ?? 0)
+                overallLabel    = (try? c.decode(String.self, forKey: .overallLabel)) ?? ""
+                totalRules      = (try? c.decode(Int.self, forKey: .totalRules)) ?? 0
+                totalSatisfied  = (try? c.decode(Int.self, forKey: .totalSatisfied)) ?? 0
+                hardConstraints = (try? c.decode(RuleBucket.self, forKey: .hardConstraints)) ?? .empty
+                softPreferences = (try? c.decode(RuleBucket.self, forKey: .softPreferences)) ?? .empty
+            }
+
+            enum CodingKeys: String, CodingKey {
+                case overallPercent, overallLabel, totalRules, totalSatisfied
+                case hardConstraints, softPreferences
+            }
+        }
+
+        struct RuleBucket: Decodable {
+            let total: Int
+            let satisfied: Int
+            let partial: Int
+            let violated: Int
+            let rules: [RuleEntry]
+
+            static let empty = RuleBucket(total: 0, satisfied: 0, partial: 0, violated: 0, rules: [])
+
+            init(total: Int, satisfied: Int, partial: Int, violated: Int, rules: [RuleEntry]) {
+                self.total = total; self.satisfied = satisfied
+                self.partial = partial; self.violated = violated; self.rules = rules
+            }
+
+            init(from decoder: Decoder) throws {
+                let c = try decoder.container(keyedBy: CodingKeys.self)
+                total = (try? c.decode(Int.self, forKey: .total)) ?? 0
+                satisfied = (try? c.decode(Int.self, forKey: .satisfied)) ?? 0
+                partial = (try? c.decode(Int.self, forKey: .partial)) ?? 0
+                violated = (try? c.decode(Int.self, forKey: .violated)) ?? 0
+                rules = (try? c.decode([RuleEntry].self, forKey: .rules)) ?? []
+            }
+
+            enum CodingKeys: String, CodingKey { case total, satisfied, partial, violated, rules }
+        }
+
+        struct RuleEntry: Decodable, Identifiable, Hashable {
+            let id = UUID()
+            let status: String          // "satisfied" | "violated" | "partial" | "neutral"
+            let description: String
+            let details: String?
+            let partial: String?        // e.g. "4/4 seated"
+
+            init(from decoder: Decoder) throws {
+                let c = try decoder.container(keyedBy: CodingKeys.self)
+                status      = (try? c.decode(String.self, forKey: .status)) ?? "neutral"
+                description = (try? c.decode(String.self, forKey: .description)) ?? ""
+                details     = try? c.decode(String.self, forKey: .details)
+                partial     = try? c.decode(String.self, forKey: .partial)
+            }
+
+            enum CodingKeys: String, CodingKey { case status, description, details, partial }
+        }
 
         enum CodingKeys: String, CodingKey {
-            case assignments, seatOrders, score, fallback
+            case assignments, seatOrders, score, fallback, scorecard
         }
 
         init(from decoder: Decoder) throws {
@@ -53,6 +122,7 @@ final class SeatService {
                 score = nil
             }
             fallback = try? c.decode(Bool.self, forKey: .fallback)
+            scorecard = try? c.decode(Scorecard.self, forKey: .scorecard)
         }
     }
 
@@ -124,11 +194,6 @@ final class SeatService {
             do {
                 return try JSONDecoder().decode(GenerateResult.self, from: data)
             } catch {
-                // Diagnostic: show first 500 bytes of the response so we can
-                // see the shape mismatch. Remove once parity is confirmed.
-                let preview = String(data: data.prefix(500), encoding: .utf8) ?? "(non-utf8)"
-                print("[SeatService] decode failed: \(error)")
-                print("[SeatService] response preview: \(preview)")
                 throw SeatError.server("Could not parse response: \(error.localizedDescription)")
             }
         case 401:
