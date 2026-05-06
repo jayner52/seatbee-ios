@@ -1,5 +1,7 @@
 import SwiftUI
+import PhotosUI
 import UniformTypeIdentifiers
+import PDFKit
 
 // 5-step onboarding wizard. Mirrors the essentials of web's
 // OnboardingWizard (App.jsx:19180) while staying mobile-friendly.
@@ -48,8 +50,16 @@ struct OnboardingView: View {
 
     // MARK: - Step 3
     @State private var useMetric = false
-    @State private var roomPreset: RoomPreset = .medium
+    @State private var roomPreset: RoomPreset? = .medium    // nil when user types custom dims
     @State private var roomShape: RoomShapeOption = .rect
+    @State private var roomWidthFt: Double = 80
+    @State private var roomHeightFt: Double = 60
+    @State private var roomFlipH = false
+    @State private var roomFlipV = false
+    @State private var floorPlanImage: UIImage? = nil
+    @State private var showFloorPlanPhotoPicker = false
+    @State private var showFloorPlanFilePicker = false
+    @State private var floorPlanPickerItem: PhotosPickerItem? = nil
 
     // MARK: - Step 4
     @State private var tableStyle: TableStyle = .round
@@ -110,6 +120,12 @@ struct OnboardingView: View {
             case .convention: return (4500, 3000)
             }
         }
+        /// Same dims expressed in feet (15 px = 1 ft). Used by the
+        /// preset cards and to seed roomWidthFt/roomHeightFt.
+        var dimensionsFt: (w: Double, h: Double) {
+            let dim = dimensionsPx
+            return (dim.width / 15, dim.height / 15)
+        }
         var guestRange: String {
             switch self {
             case .small:      return "up to 50 guests"
@@ -122,30 +138,36 @@ struct OnboardingView: View {
         }
     }
 
-    /// 6 shape options (Web's SHAPES enum trimmed to common ones).
-    /// "custom" defers to the canvas RoomSetupSheet for tracing.
+    /// 8 shape options — matches RoomSetupSheet's `shapes` array exactly
+    /// so onboarding and the canvas room editor pick from the same set.
+    /// "custom" stores the choice; the actual polygon trace happens in
+    /// the canvas RoomSetupSheet after creation.
     enum RoomShapeOption: String, CaseIterable {
-        case rect, l, t, u, oval, circle
+        case rect, l, lRev = "l_rev", t, u, oval, circle, custom
         var displayName: String {
             switch self {
             case .rect:   return "Rectangle"
             case .l:      return "L-Shape"
+            case .lRev:   return "L-Reversed"
             case .t:      return "T-Shape"
             case .u:      return "U-Shape"
             case .oval:   return "Oval"
             case .circle: return "Circle"
+            case .custom: return "Custom"
             }
         }
         var iconName: String {
             switch self {
             case .rect:   return "rectangle"
-            case .l:      return "l.rectangle.roundedbottom"
+            case .l, .lRev: return "l.rectangle.roundedbottom"
             case .t:      return "t.square"
             case .u:      return "u.square"
             case .oval:   return "oval"
             case .circle: return "circle"
+            case .custom: return "scribble.variable"
             }
         }
+        var iconShouldMirror: Bool { self == .lRev }
     }
 
     /// 8 curated venue items (web has 60+ across 8 categories — this is
@@ -205,6 +227,24 @@ struct OnboardingView: View {
         return eventType == .wedding ? "My Wedding" : "My Event"
     }
 
+    /// User's room dims converted to canvas px. 15 px/ft is the web's
+/// standard scale; metric converts via 3.28084 ft per metre first.
+    private var currentRoomPx: (width: Double, height: Double) {
+        let pxPerUnit: Double = useMetric ? (15.0 * 3.28084) : 15.0
+        return (max(roomWidthFt, 1) * pxPerUnit, max(roomHeightFt, 1) * pxPerUnit)
+    }
+
+    private var roomSummaryLabel: String {
+        let unit = useMetric ? "m" : "ft"
+        let w = Int(roomWidthFt.rounded())
+        let h = Int(roomHeightFt.rounded())
+        let dims = "\(w)×\(h)\(unit)"
+        if let preset = roomPreset {
+            return "\(preset.displayName) · \(roomShape.displayName) · \(dims)"
+        }
+        return "\(roomShape.displayName) · \(dims)"
+    }
+
     private var estimatedTableCount: Int {
         let regular = max(1, Int(ceil(Double(expectedGuests) / Double(seatsPerTable))))
         var extras = 0
@@ -244,7 +284,7 @@ struct OnboardingView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     if step > 1 && !isCreating {
-                        Button { withAnimation(.seatbee) { step -= 1 } } label: {
+                        Button { advance(to: step - 1) } label: {
                             HStack(spacing: 4) {
                                 Image(systemName: "chevron.left")
                                 Text("Back")
@@ -406,6 +446,7 @@ struct OnboardingView: View {
                 }
                 TextEditor(text: $guestListText)
                     .font(SBFont.body).scrollContentBackground(.hidden).padding(8)
+                    .onChange(of: guestListText) { _, _ in parsePastedGuests() }
             }
             .frame(height: 140)
             .background(Color.sbIvory2)
@@ -467,64 +508,147 @@ struct OnboardingView: View {
 
     // MARK: - Step 3: Room setup
 
+    /// Step 3 mirrors the canvas `RoomSetupSheet` design: quick presets,
+    /// 8-shape grid, flip H/V, dimensions inputs, photo + file pickers
+    /// for floor-plan upload. Custom polygon tracing happens in the
+    /// canvas RoomSetupSheet after the plan is created.
     private var roomSetupStep: some View {
-        VStack(alignment: .leading, spacing: 18) {
+        VStack(alignment: .leading, spacing: 22) {
             VStack(spacing: 8) {
                 Image(systemName: "square.dashed").font(.system(size: 28)).foregroundStyle(Color.sbGoldDk)
                 Text("Your room").font(SBFont.displayMedium).foregroundStyle(Color.sbCharcoal)
-                Text("Pick a starting size and shape — you can refine on the canvas later.")
+                Text("Pick a starting size + shape, or upload a floor plan to trace later in the canvas.")
                     .font(SBFont.body).foregroundStyle(Color.sbWarm).multilineTextAlignment(.center)
             }
             .frame(maxWidth: .infinity)
 
-            sectionLabel("MEASUREMENTS")
-            Picker("Unit", selection: $useMetric) {
-                Text("Feet").tag(false)
-                Text("Meters").tag(true)
-            }
-            .pickerStyle(.segmented)
-            .tint(Color.sbGold)
-
-            sectionLabel("ROOM SIZE")
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+            sectionLabel("QUICK PRESETS")
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
                 ForEach(RoomPreset.allCases, id: \.self) { preset in
                     roomPresetCard(preset)
                 }
             }
 
             sectionLabel("ROOM SHAPE")
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
                 ForEach(RoomShapeOption.allCases, id: \.self) { shape in
                     roomShapeButton(shape)
                 }
             }
 
-            HStack(spacing: 8) {
-                Image(systemName: "info.circle")
-                    .foregroundStyle(Color.sbGoldDk)
-                Text("Floor plan upload, custom polygon tracing, and labelled zones are available from the canvas after creation.")
-                    .font(SBFont.caption).foregroundStyle(Color.sbCharcoal2)
+            if roomShape == .custom {
+                HStack(spacing: 8) {
+                    Image(systemName: "info.circle").foregroundStyle(Color.sbGoldDk)
+                    Text("Trace your custom shape from the canvas after creation. We'll start with a rectangle.")
+                        .font(SBFont.caption).foregroundStyle(Color.sbCharcoal2)
+                }
+                .padding(12)
+                .background(Color.sbGold.opacity(0.10))
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             }
-            .padding(12)
-            .background(Color.sbGold.opacity(0.10))
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+
+            sectionLabel("ORIENTATION")
+            HStack(spacing: 8) {
+                flipButton("Flip H", icon: "arrow.left.and.right", isOn: $roomFlipH)
+                flipButton("Flip V", icon: "arrow.up.and.down", isOn: $roomFlipV)
+            }
+
+            sectionLabel("DIMENSIONS")
+            HStack(spacing: 8) {
+                dimensionField(label: "W", value: $roomWidthFt)
+                Text("×").font(SBFont.bodySemibold).foregroundStyle(Color.sbWarm)
+                dimensionField(label: "H", value: $roomHeightFt)
+            }
+            HStack {
+                Text("Use metric (meters)")
+                    .font(SBFont.bodySmall).foregroundStyle(Color.sbCharcoal)
+                Spacer()
+                Toggle("", isOn: $useMetric).labelsHidden().tint(Color.sbGold)
+            }
+
+            sectionLabel("FLOOR PLAN (OPTIONAL)")
+            HStack(spacing: 8) {
+                Button {
+                    showFloorPlanPhotoPicker = true
+                } label: {
+                    floorPlanPickerLabel(icon: "photo.on.rectangle", text: "Photos")
+                }
+                .buttonStyle(.plain)
+                Button {
+                    showFloorPlanFilePicker = true
+                } label: {
+                    floorPlanPickerLabel(icon: "doc.badge.plus", text: "Files / PDF")
+                }
+                .buttonStyle(.plain)
+            }
+            Text("Pick a floor plan from your photo library or a PDF / image from Files. You can trace its outline from the canvas after creation.")
+                .font(SBFont.caption).foregroundStyle(Color.sbWarm)
+
+            if let img = floorPlanImage {
+                ZStack(alignment: .topTrailing) {
+                    Image(uiImage: img).resizable().scaledToFit()
+                        .frame(maxHeight: 180)
+                        .clipShape(RoundedRectangle(cornerRadius: SBRadius.button))
+                    Button {
+                        floorPlanImage = nil
+                        floorPlanPickerItem = nil
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 22))
+                            .foregroundStyle(Color.white)
+                            .background(Circle().fill(Color.sbCharcoal.opacity(0.6)))
+                    }
+                    .padding(8)
+                }
+            }
 
             Spacer(minLength: 40)
+        }
+        .photosPicker(isPresented: $showFloorPlanPhotoPicker, selection: $floorPlanPickerItem, matching: .images)
+        .onChange(of: floorPlanPickerItem) { _, newItem in
+            guard let newItem else { return }
+            Task {
+                if let data = try? await newItem.loadTransferable(type: Data.self),
+                   let img = UIImage(data: data) {
+                    await MainActor.run { floorPlanImage = img }
+                }
+            }
+        }
+        .fileImporter(
+            isPresented: $showFloorPlanFilePicker,
+            allowedContentTypes: [.image, .pdf],
+            allowsMultipleSelection: false
+        ) { result in
+            switch result {
+            case .success(let urls):
+                guard let url = urls.first else { return }
+                loadFloorPlanFromURL(url)
+            case .failure:
+                break
+            }
         }
     }
 
     private func roomPresetCard(_ preset: RoomPreset) -> some View {
         let active = roomPreset == preset
+        let dim = preset.dimensionsFt
+        let unitSuffix = useMetric ? "m" : "ft"
+        let displayW = useMetric ? Int((dim.w / 3.28084).rounded()) : Int(dim.w)
+        let displayH = useMetric ? Int((dim.h / 3.28084).rounded()) : Int(dim.h)
         return Button {
             roomPreset = preset
+            roomShape = .rect      // presets imply rectangle
+            roomWidthFt = dim.w
+            roomHeightFt = dim.h
             HapticEngine.selection()
         } label: {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(preset.displayName).font(SBFont.bodySemibold).foregroundStyle(Color.sbCharcoal)
-                Text(preset.guestRange).font(SBFont.caption).foregroundStyle(Color.sbWarm)
+            VStack(spacing: 4) {
+                Text(preset.displayName).font(SBFont.bodySmallBold).foregroundStyle(Color.sbCharcoal)
+                Text("\(displayW)×\(displayH)\(unitSuffix)")
+                    .font(SBFont.caption).foregroundStyle(Color.sbWarm)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(12)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 10)
             .background(active ? Color.sbChampagne.opacity(0.7) : Color.sbIvory2)
             .clipShape(RoundedRectangle(cornerRadius: SBRadius.small))
             .overlay(
@@ -542,9 +666,15 @@ struct OnboardingView: View {
             HapticEngine.selection()
         } label: {
             VStack(spacing: 4) {
-                Image(systemName: shape.iconName).font(.system(size: 22))
+                Image(systemName: shape.iconName)
+                    .font(.system(size: 22))
                     .foregroundStyle(active ? Color.sbGoldDk : Color.sbCharcoal)
-                Text(shape.displayName).font(SBFont.caption).foregroundStyle(Color.sbCharcoal)
+                    .scaleEffect(x: shape.iconShouldMirror ? -1 : 1, y: 1)
+                Text(shape.displayName)
+                    .font(SBFont.small)
+                    .foregroundStyle(Color.sbCharcoal)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 12)
@@ -556,6 +686,80 @@ struct OnboardingView: View {
             )
         }
         .buttonStyle(.plain)
+    }
+
+    private func flipButton(_ label: String, icon: String, isOn: Binding<Bool>) -> some View {
+        Button {
+            isOn.wrappedValue.toggle()
+            HapticEngine.selection()
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                Text(label).font(SBFont.bodySemibold)
+            }
+            .foregroundStyle(isOn.wrappedValue ? Color.sbGoldDk : Color.sbCharcoal)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 10)
+            .background(isOn.wrappedValue ? Color.sbChampagne.opacity(0.7) : Color.sbIvory2)
+            .clipShape(RoundedRectangle(cornerRadius: SBRadius.small))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func dimensionField(label: String, value: Binding<Double>) -> some View {
+        let unitSuffix = useMetric ? "m" : "ft"
+        return HStack(spacing: 6) {
+            Text(label).font(SBFont.capsLabel).foregroundStyle(Color.sbWarm)
+            TextField("0", value: value, format: .number.precision(.fractionLength(0)))
+                .keyboardType(.numberPad)
+                .font(SBFont.bodySemibold)
+                .padding(10)
+                .frame(maxWidth: .infinity)
+                .background(Color.sbIvory2)
+                .clipShape(RoundedRectangle(cornerRadius: SBRadius.small))
+                .onChange(of: value.wrappedValue) { _, _ in
+                    // User typing a custom value clears the active preset
+                    roomPreset = nil
+                }
+            Text(unitSuffix).font(SBFont.caption).foregroundStyle(Color.sbWarm)
+        }
+    }
+
+    private func floorPlanPickerLabel(icon: String, text: String) -> some View {
+        VStack(spacing: 6) {
+            Image(systemName: icon).font(.system(size: 22)).foregroundStyle(Color.sbGoldDk)
+            Text(text).font(SBFont.bodySemibold).foregroundStyle(Color.sbCharcoal)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 14)
+        .overlay(
+            RoundedRectangle(cornerRadius: SBRadius.button)
+                .strokeBorder(Color.sbWarm2, style: StrokeStyle(lineWidth: 1, dash: [6, 4]))
+        )
+    }
+
+    private func loadFloorPlanFromURL(_ url: URL) {
+        guard url.startAccessingSecurityScopedResource() else { return }
+        defer { url.stopAccessingSecurityScopedResource() }
+        if let data = try? Data(contentsOf: url) {
+            // Image first; fall back to PDF first-page render.
+            if let img = UIImage(data: data) {
+                floorPlanImage = img
+                return
+            }
+            if let pdf = PDFDocument(data: data), let page = pdf.page(at: 0) {
+                let bounds = page.bounds(for: .mediaBox)
+                let renderer = UIGraphicsImageRenderer(size: bounds.size)
+                let img = renderer.image { ctx in
+                    UIColor.white.setFill()
+                    ctx.fill(bounds)
+                    ctx.cgContext.translateBy(x: 0, y: bounds.size.height)
+                    ctx.cgContext.scaleBy(x: 1, y: -1)
+                    page.draw(with: .mediaBox, to: ctx.cgContext)
+                }
+                floorPlanImage = img
+            }
+        }
     }
 
     // MARK: - Step 4: Tables & venue
@@ -714,7 +918,7 @@ struct OnboardingView: View {
                     summaryRow("Venue", value: venueName)
                 }
                 summaryRow("Expected guests", value: "\(expectedGuests)")
-                summaryRow("Room", value: "\(roomPreset.displayName) · \(roomShape.displayName)")
+                summaryRow("Room", value: roomSummaryLabel)
                 summaryRow("Tables", value: "~\(estimatedTableCount) (\(tableStyle.displayName), \(seatsPerTable) seats each)")
                 if !venueItems.isEmpty {
                     let names = Self.venueItemCatalog.filter { venueItems.contains($0.type) }.map(\.name).joined(separator: ", ")
@@ -779,31 +983,23 @@ struct OnboardingView: View {
             switch step {
             case 1:
                 SBButton(title: "Continue", icon: "arrow.right", variant: .gold, fullWidth: true) {
-                    withAnimation(.seatbee) { step = 2 }
+                    advance(to: 2)
                 }
                 .disabled(!step1Valid).opacity(step1Valid ? 1 : 0.5)
             case 2:
-                if guestListText.isEmpty && detectedGuests.isEmpty {
-                    SBButton(title: "Skip — add guests later", icon: "arrow.right", variant: .gold, fullWidth: true) {
-                        withAnimation(.seatbee) { step = 3 }
-                    }
-                } else if detectedGuests.isEmpty && !guestListText.isEmpty {
-                    SBButton(title: "Detect guests", icon: "sparkles", variant: .gold, fullWidth: true) {
-                        detectGuests()
-                    }
-                    .disabled(isProcessing)
-                } else {
-                    SBButton(title: "Continue with \(detectedGuests.count) guests", icon: "arrow.right", variant: .gold, fullWidth: true) {
-                        withAnimation(.seatbee) { step = 3 }
-                    }
+                let title = detectedGuests.isEmpty
+                    ? "Skip — add guests later"
+                    : "Continue with \(detectedGuests.count) guest\(detectedGuests.count == 1 ? "" : "s")"
+                SBButton(title: title, icon: "arrow.right", variant: .gold, fullWidth: true) {
+                    advance(to: 3)
                 }
             case 3:
                 SBButton(title: "Continue", icon: "arrow.right", variant: .gold, fullWidth: true) {
-                    withAnimation(.seatbee) { step = 4 }
+                    advance(to: 4)
                 }
             case 4:
                 SBButton(title: "Continue", icon: "arrow.right", variant: .gold, fullWidth: true) {
-                    withAnimation(.seatbee) { step = 5 }
+                    advance(to: 5)
                 }
             case 5:
                 SBButton(title: "Create plan", icon: "sparkles", variant: .gold, fullWidth: true) {
@@ -816,6 +1012,14 @@ struct OnboardingView: View {
     }
 
     // MARK: - Helpers
+
+    /// Step transition with stale-error cleanup so messages from a
+    /// previous step (like "Couldn't read CSV") don't bleed across.
+    private func advance(to next: Int) {
+        errorMessage = nil
+        csvImportError = nil
+        withAnimation(.seatbee) { step = next }
+    }
 
     private func sectionLabel(_ text: String) -> some View {
         Text(text)
@@ -911,21 +1115,69 @@ struct OnboardingView: View {
 
     // MARK: - Actions
 
-    private func detectGuests() {
-        isProcessing = true
-        errorMessage = nil
-        Task {
-            do {
-                detectedGuests = try await appState.ai.parseGuestList(text: guestListText)
-                detectedPartiesCount = countParties(in: detectedGuests)
-                detectedPlatform = "AI parsed"
-                HapticEngine.success()
-            } catch {
-                errorMessage = "Couldn't detect guests. You can still create the plan."
-                HapticEngine.error()
-            }
-            isProcessing = false
+    /// Parse pasted guest text. CSV-shaped input (header row with
+    /// recognised column names) goes through `GuestCSVParser`; plain
+    /// line-by-line lists are treated as one name per line, with optional
+    /// `, dietary text` and `, +1` after the name on the same line.
+    /// No AI involvement — runs synchronously on every text change.
+    private func parsePastedGuests() {
+        let text = guestListText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else {
+            detectedGuests = []
+            detectedPartiesCount = 0
+            detectedPlatform = nil
+            return
         }
+        // Header-row sniff — if the first line has commas AND a "name"/
+        // "email"/"guest" header, treat the whole blob as a CSV.
+        let firstLine = (text.components(separatedBy: .newlines).first ?? "").lowercased()
+        let looksLikeCSV = firstLine.contains(",") && (
+            firstLine.contains("name") || firstLine.contains("email") ||
+            firstLine.contains("guest") || firstLine.contains("rsvp")
+        )
+        if looksLikeCSV {
+            let result = GuestCSVParser.parse(text)
+            detectedGuests = result.guests
+            detectedPartiesCount = countParties(in: result.guests)
+            detectedPlatform = result.detectedPlatform
+            return
+        }
+
+        // Plain text: split by newlines, each line is one guest.
+        var guests: [Guest] = []
+        for rawLine in text.components(separatedBy: .newlines) {
+            let line = rawLine.trimmingCharacters(in: .whitespaces)
+            if line.isEmpty { continue }
+            let parts = line.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }
+            guard let name = parts.first, !name.isEmpty else { continue }
+
+            var dietary: String? = nil
+            var plusOne: Bool? = nil
+            for extra in parts.dropFirst() {
+                let lower = extra.lowercased()
+                if lower.contains("+1") || lower.contains("plus one") || lower.contains("plus-one") {
+                    plusOne = true
+                } else if !extra.isEmpty {
+                    dietary = (dietary == nil ? extra : "\(dietary!), \(extra)")
+                }
+            }
+
+            let nameParts = name.split(separator: " ", maxSplits: 1)
+            guests.append(Guest(
+                id: UUID().uuidString,
+                name: name,
+                firstName: String(nameParts.first ?? ""),
+                lastName: nameParts.count > 1 ? String(nameParts.last ?? "") : nil,
+                email: nil, categories: [], dietary: dietary, notes: nil,
+                rsvp: .unknown, side: .none, vip: false,
+                accessibility: nil, plusOne: plusOne, party: nil, display: nil,
+                dietaryTags: nil, highChair: nil, isChild: nil, groupIds: nil,
+                isBride: nil, isGroom: nil, meal: nil, guestCreatedAt: nil
+            ))
+        }
+        detectedGuests = guests
+        detectedPartiesCount = 0
+        detectedPlatform = guests.isEmpty ? nil : "Pasted names"
     }
 
     private func importCSVFromURL(_ url: URL) {
@@ -994,15 +1246,22 @@ struct OnboardingView: View {
                     tables: tableDTOs.isEmpty ? nil : tableDTOs
                 )
 
-                let dim = roomPreset.dimensionsPx
+                let dim = currentRoomPx
                 plan.roomWidth = dim.width
                 plan.roomHeight = dim.height
                 plan.roomShape = roomShape.rawValue
+                plan.roomFlipH = roomFlipH
+                plan.roomFlipV = roomFlipV
                 plan.measurementUnit = useMetric ? "metric" : "imperial"
                 plan.coupleType = eventType == .wedding ? coupleType : nil
                 plan.hasSweetheartTable = eventType == .wedding && includeSweetheartTable
                 plan.rules = buildInitialRules(coupleAutoGuests: coupleAutoGuests)
                 plan.rawCategories = defaultCategoriesAsRaw(for: eventType)
+                if let img = floorPlanImage,
+                   let png = img.pngData() {
+                    let b64 = png.base64EncodedString()
+                    plan.rawFloorPlanImage = AnyCodable("data:image/png;base64,\(b64)")
+                }
                 // Objects go into rawCategories' sibling — there's no
                 // typed `objects` on iOS Plan; mutate by re-encoding via
                 // a small helper. Easier path: SeatingPlan model has
@@ -1119,7 +1378,7 @@ struct OnboardingView: View {
     /// the user's choices in Steps 3+4. Mirrors the spirit of web's
     /// `generatePresetLayout()` (App.jsx:16423) — simplified for iOS.
     private func buildLayout() -> (tables: [TableDTO], objects: [ObjectDTO]) {
-        let dim = roomPreset.dimensionsPx
+        let dim = currentRoomPx
         let regularCount = max(1, Int(ceil(Double(expectedGuests) / Double(seatsPerTable))))
         var tables: [TableDTO] = []
 
