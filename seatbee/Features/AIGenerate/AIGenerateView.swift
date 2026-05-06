@@ -355,6 +355,16 @@ struct AIGenerateView: View {
     // MARK: - Actions
 
     private func runGenerate() async {
+        // Diagnostic: when the tier gate fires unexpectedly, print why so we
+        // can tell whether iOS thinks the plan is free, has a pass, or has
+        // an expired pass. Remove once tier-gate parity is confirmed solid.
+        let rawTier = appState.activePlan?.tier ?? "(nil)"
+        let expiry = appState.activePlan?.eventPassExpiresAt.map { String(describing: $0) } ?? "(nil)"
+        let computed = appState.activePlanTier
+        let allowsAI = appState.activePlanLimits.aiGenerate
+        let expired = appState.isActivePlanExpired
+        print("[AI Tier Gate] plan.tier=\(rawTier)  eventPassExpiresAt=\(expiry)  computedTier=\(computed.rawValue)  isExpired=\(expired)  aiGenerate=\(allowsAI)")
+
         // Tier gate (mirrors web checkTierLimit('ai_generate') at App.jsx:6217).
         guard appState.activePlanLimits.aiGenerate else {
             HapticEngine.error()
