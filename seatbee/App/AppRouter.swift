@@ -32,5 +32,9 @@ struct AppRouter: View {
             OnboardingView()
                 .environment(appState)
         }
+        .sheet(isPresented: $state.showUpgrade) {
+            UpgradeView()
+                .environment(appState)
+        }
     }
 }
