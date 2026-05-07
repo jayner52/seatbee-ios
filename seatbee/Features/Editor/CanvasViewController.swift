@@ -542,16 +542,15 @@ class CanvasViewController: UIViewController, UIScrollViewDelegate {
         struct Anchor { let cx, cy, w, h: CGFloat }
         var anchors: [Anchor] = []
         for t in currentTables where t.id != id || isObject {
-            let w = CGFloat(t.width ?? t.diameter ?? 0)
-            let h = CGFloat(t.height ?? t.diameter ?? 0)
-            anchors.append(Anchor(cx: CGFloat(t.x), cy: CGFloat(t.y), w: w, h: h))
+            let body = CanvasTableView.bodySize(for: t)
+            let w = body.width, h = body.height
+            // x,y is top-left; compute centre for snap comparisons.
+            anchors.append(Anchor(cx: CGFloat(t.x) + w / 2, cy: CGFloat(t.y) + h / 2, w: w, h: h))
         }
         for o in currentObjects where o.id != id || !isObject {
-            // iOS stores RoomObject.x/y as the centre (same convention
-            // as SeatTable) — see how CanvasObjectView's UIView.center
-            // is wired in updateObjects().
-            anchors.append(Anchor(cx: CGFloat(o.x), cy: CGFloat(o.y),
-                                  w: CGFloat(o.width), h: CGFloat(o.height)))
+            let w = CGFloat(o.width), h = CGFloat(o.height)
+            // x,y is top-left; compute centre for snap comparisons.
+            anchors.append(Anchor(cx: CGFloat(o.x) + w / 2, cy: CGFloat(o.y) + h / 2, w: w, h: h))
         }
 
         for a in anchors {
@@ -701,13 +700,20 @@ class CanvasViewController: UIViewController, UIScrollViewDelegate {
         }
 
         // Add or update
+        // Web parity: x,y is the TOP-LEFT corner of the table bounding box
+        // (web startDrag stores ox=p.x-item.x, resize writes nx=cx-w/2).
+        // UIView.center must be at x + halfW, y + halfH. Drag write-back
+        // subtracts the half-dimensions so Supabase always stores top-left.
         for table in tables {
+            let body = CanvasTableView.bodySize(for: table)
+            let centerX = canvasOrigin.x + CGFloat(table.x) + body.width  / 2
+            let centerY = canvasOrigin.y + CGFloat(table.y) + body.height / 2
             if let existing = tableViews[table.id] {
                 existing.update(table: table, guests: guests, isSelected: table.id == selectedId)
-                existing.center = CGPoint(x: canvasOrigin.x + table.x, y: canvasOrigin.y + table.y)
+                existing.center = CGPoint(x: centerX, y: centerY)
             } else {
                 let tv = CanvasTableView(table: table, guests: guests, isSelected: table.id == selectedId, zoom: scrollView.zoomScale)
-                tv.center = CGPoint(x: canvasOrigin.x + table.x, y: canvasOrigin.y + table.y)
+                tv.center = CGPoint(x: centerX, y: centerY)
                 tv.onTap = { [weak self] in
                     self?.selectTable(table.id)
                 }
@@ -717,8 +723,11 @@ class CanvasViewController: UIViewController, UIScrollViewDelegate {
                 }
                 tv.onDragEnd = { [weak self] center in
                     self?.clearAlignmentGuides()
-                    let x = Double(center.x - (self?.canvasOrigin.x ?? 0))
-                    let y = Double(center.y - (self?.canvasOrigin.y ?? 0))
+                    // Store top-left: subtract canvasOrigin and half-body
+                    let halfW = Double(body.width)  / 2
+                    let halfH = Double(body.height) / 2
+                    let x = Double(center.x - (self?.canvasOrigin.x ?? 0)) - halfW
+                    let y = Double(center.y - (self?.canvasOrigin.y ?? 0)) - halfH
                     self?.delegate?.canvasDidMoveTable(table.id, x: x, y: y)
                 }
                 contentView.addSubview(tv)
@@ -738,12 +747,18 @@ class CanvasViewController: UIViewController, UIScrollViewDelegate {
         }
 
         for obj in objects {
+            // Same top-left convention as tables — x,y is the bounding-box
+            // top-left on web; UIView.center is at x + halfW, y + halfH.
+            let halfW = CGFloat(obj.width)  / 2
+            let halfH = CGFloat(obj.height) / 2
+            let centerX = canvasOrigin.x + CGFloat(obj.x) + halfW
+            let centerY = canvasOrigin.y + CGFloat(obj.y) + halfH
             if let existing = objectViews[obj.id] {
                 existing.update(object: obj, isSelected: obj.id == selectedId)
-                existing.center = CGPoint(x: canvasOrigin.x + obj.x, y: canvasOrigin.y + obj.y)
+                existing.center = CGPoint(x: centerX, y: centerY)
             } else {
                 let ov = CanvasObjectView(object: obj, isSelected: obj.id == selectedId)
-                ov.center = CGPoint(x: canvasOrigin.x + obj.x, y: canvasOrigin.y + obj.y)
+                ov.center = CGPoint(x: centerX, y: centerY)
                 ov.onTap = { [weak self] in
                     self?.selectObject(obj.id)
                 }
@@ -753,8 +768,9 @@ class CanvasViewController: UIViewController, UIScrollViewDelegate {
                 }
                 ov.onDragEnd = { [weak self] center in
                     self?.clearAlignmentGuides()
-                    let x = Double(center.x - (self?.canvasOrigin.x ?? 0))
-                    let y = Double(center.y - (self?.canvasOrigin.y ?? 0))
+                    // Store top-left: subtract canvasOrigin and half-body
+                    let x = Double(center.x - (self?.canvasOrigin.x ?? 0)) - Double(halfW)
+                    let y = Double(center.y - (self?.canvasOrigin.y ?? 0)) - Double(halfH)
                     self?.delegate?.canvasDidMoveObject(obj.id, x: x, y: y)
                 }
                 contentView.addSubview(ov)
@@ -1246,7 +1262,7 @@ class CanvasTableView: UIView {
 
     // MARK: - Shape geometry (mirrors web `Table` component in src/App.jsx)
 
-    private static func bodySize(for table: SeatTable) -> CGSize {
+    static func bodySize(for table: SeatTable) -> CGSize {
         switch table.type {
         case .round:
             let d = CGFloat(table.diameter ?? 90)
