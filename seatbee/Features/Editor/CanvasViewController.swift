@@ -1307,7 +1307,12 @@ class CanvasObjectView: UIView {
         addSubview(iconView)
 
         nameLabel.textAlignment = .center
-        nameLabel.font = UIFont.systemFont(ofSize: 9, weight: .medium)
+        // Web parity (App.jsx ce0ed39): venue object labels use italic
+        // serif. Georgia is the closest cut iOS ships built-in.
+        nameLabel.font = UIFont(name: "Georgia-Italic", size: 9)
+            ?? UIFont.italicSystemFont(ofSize: 9)
+        nameLabel.adjustsFontSizeToFitWidth = true
+        nameLabel.minimumScaleFactor = 0.7
         addSubview(nameLabel)
     }
 
@@ -1323,7 +1328,10 @@ class CanvasObjectView: UIView {
         let isDark = colorHex == "#2D2D2D"
         let textColor: UIColor = isDark ? .white : UIColor(red: 45/255, green: 45/255, blue: 45/255, alpha: 0.7)
 
-        let symbolName = def?.icon ?? "questionmark.circle"
+        // Resolve via VenueIconMap so web-style icon names ("music",
+        // "glass", etc.) and any pre-existing SF-symbol-style names both
+        // render to a real glyph instead of falling through to a ?.
+        let symbolName = VenueIconMap.sfSymbol(for: def?.icon ?? object.icon)
         let config = UIImage.SymbolConfiguration(pointSize: 18, weight: .regular)
         iconView.image = UIImage(systemName: symbolName, withConfiguration: config)?
             .withRenderingMode(.alwaysTemplate)
