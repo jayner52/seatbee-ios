@@ -49,6 +49,21 @@ class CanvasViewController: UIViewController, UIScrollViewDelegate {
     private let roomOutlineLayer = CAShapeLayer()
     private let zoneShapesLayer = CAShapeLayer()
 
+    // Alignment guides — drawn while the user drags a table/object. Web
+    // parity (App.jsx calcGuides at line 8110): two layers so the room/
+    // item-center guides render in red and edge alignments in blue, both
+    // 1pt dashed strokes spanning the room.
+    private let alignmentCenterGuides = CAShapeLayer()
+    private let alignmentEdgeGuides   = CAShapeLayer()
+    private static let alignSnapThreshold: CGFloat = 8
+
+    // Snapshots of the most recent table / object data so the guide
+    // calculator can iterate without poking through the visual views.
+    private var currentTables: [SeatTable] = []
+    private var currentObjects: [RoomObject] = []
+    private var currentRoomWidth: CGFloat = 0
+    private var currentRoomHeight: CGFloat = 0
+
     override func viewDidLoad() {
         super.viewDidLoad()
 
@@ -105,6 +120,19 @@ class CanvasViewController: UIViewController, UIScrollViewDelegate {
         zoneShapesLayer.lineDashPattern = [4, 3]
         contentView.layer.insertSublayer(zoneShapesLayer, above: roomOutlineLayer)
 
+        // Alignment guides — sit above the room outline so they read on
+        // top of the floor plan and any tables underneath them. Hidden
+        // until a drag is in progress.
+        for guide in [alignmentCenterGuides, alignmentEdgeGuides] {
+            guide.fillColor = UIColor.clear.cgColor
+            guide.lineWidth = 1
+            guide.lineDashPattern = [4, 4]
+            guide.path = nil
+            contentView.layer.insertSublayer(guide, above: zoneShapesLayer)
+        }
+        alignmentCenterGuides.strokeColor = UIColor(red: 232/255, green: 124/255, blue: 124/255, alpha: 1).cgColor // #E87C7C
+        alignmentEdgeGuides.strokeColor   = UIColor(red: 124/255, green: 184/255, blue: 232/255, alpha: 1).cgColor // #7CB8E8
+
         // Tap to deselect
         let tap = UITapGestureRecognizer(target: self, action: #selector(handleBackgroundTap(_:)))
         contentView.addGestureRecognizer(tap)
@@ -148,6 +176,8 @@ class CanvasViewController: UIViewController, UIScrollViewDelegate {
     ) {
         let w = CGFloat(roomWidth ?? 0)
         let h = CGFloat(roomHeight ?? 0)
+        currentRoomWidth = w
+        currentRoomHeight = h
 
         // Grow the canvas to fit the room with comfortable padding on every
         // side. Big presets like Convention (4500×3000) need ~5300×3800 of
@@ -463,6 +493,148 @@ class CanvasViewController: UIViewController, UIScrollViewDelegate {
         }
     }
 
+    // MARK: - Alignment guides
+    //
+    // Web parity (App.jsx calcGuides at line 8110). Called from
+    // CanvasTableView / CanvasObjectView during drag. Given the proposed
+    // *centre* in contentView coords + the dragged item's body size,
+    // computes alignment snaps against every other table/object plus the
+    // room centre, draws dashed guide lines on the contentView, and
+    // returns the snapped centre to the dragging view.
+    //
+    // The 8pt threshold is in canvas-local (room) coords so the snap
+    // zone scales with zoom — easier to land on a guide when zoomed in.
+    func computeAlignmentSnap(forDragID id: String, isObject: Bool,
+                              proposedCenter: CGPoint, size: CGSize) -> CGPoint {
+        let cx = proposedCenter.x - canvasOrigin.x
+        let cy = proposedCenter.y - canvasOrigin.y
+        let dw = size.width
+        let dh = size.height
+        let dLeft   = cx - dw / 2
+        let dRight  = cx + dw / 2
+        let dTop    = cy - dh / 2
+        let dBottom = cy + dh / 2
+
+        let threshold = Self.alignSnapThreshold
+        var snapCx: CGFloat? = nil
+        var snapCy: CGFloat? = nil
+        var centerLines: [(isVertical: Bool, pos: CGFloat)] = []
+        var edgeLines:   [(isVertical: Bool, pos: CGFloat)] = []
+
+        // Room centre — checked first so it wins ties over item alignments.
+        if currentRoomWidth > 0 {
+            let roomCx = currentRoomWidth / 2
+            if abs(cx - roomCx) < threshold {
+                centerLines.append((true, roomCx))
+                snapCx = roomCx
+            }
+        }
+        if currentRoomHeight > 0 {
+            let roomCy = currentRoomHeight / 2
+            if abs(cy - roomCy) < threshold {
+                centerLines.append((false, roomCy))
+                snapCy = roomCy
+            }
+        }
+
+        // Pre-build a flat (centre, w, h) list of all OTHER items so the
+        // table/object distinction doesn't matter for snapping purposes.
+        struct Anchor { let cx, cy, w, h: CGFloat }
+        var anchors: [Anchor] = []
+        for t in currentTables where t.id != id || isObject {
+            let w = CGFloat(t.width ?? t.diameter ?? 0)
+            let h = CGFloat(t.height ?? t.diameter ?? 0)
+            anchors.append(Anchor(cx: CGFloat(t.x), cy: CGFloat(t.y), w: w, h: h))
+        }
+        for o in currentObjects where o.id != id || !isObject {
+            // iOS stores RoomObject.x/y as the centre (same convention
+            // as SeatTable) — see how CanvasObjectView's UIView.center
+            // is wired in updateObjects().
+            anchors.append(Anchor(cx: CGFloat(o.x), cy: CGFloat(o.y),
+                                  w: CGFloat(o.width), h: CGFloat(o.height)))
+        }
+
+        for a in anchors {
+            let aLeft = a.cx - a.w / 2, aRight = a.cx + a.w / 2
+            let aTop  = a.cy - a.h / 2, aBottom = a.cy + a.h / 2
+
+            // Centre alignments — vertical guide at item centre when our
+            // centre is close to it; horizontal likewise.
+            if snapCx == nil, abs(cx - a.cx) < threshold {
+                centerLines.append((true, a.cx))
+                snapCx = a.cx
+            }
+            if snapCy == nil, abs(cy - a.cy) < threshold {
+                centerLines.append((false, a.cy))
+                snapCy = a.cy
+            }
+
+            // Edge alignments. Match left/right/top/bottom edges, plus
+            // edge-to-opposite-edge so dragging up against a neighbour
+            // also snaps cleanly.
+            if snapCx == nil {
+                if abs(dLeft - aLeft) < threshold       { edgeLines.append((true, aLeft));   snapCx = aLeft  + dw/2 }
+                else if abs(dLeft - aRight) < threshold { edgeLines.append((true, aRight));  snapCx = aRight + dw/2 }
+                else if abs(dRight - aRight) < threshold{ edgeLines.append((true, aRight));  snapCx = aRight - dw/2 }
+                else if abs(dRight - aLeft) < threshold { edgeLines.append((true, aLeft));   snapCx = aLeft  - dw/2 }
+            }
+            if snapCy == nil {
+                if abs(dTop - aTop) < threshold         { edgeLines.append((false, aTop));    snapCy = aTop    + dh/2 }
+                else if abs(dTop - aBottom) < threshold { edgeLines.append((false, aBottom)); snapCy = aBottom + dh/2 }
+                else if abs(dBottom - aBottom) < threshold { edgeLines.append((false, aBottom)); snapCy = aBottom - dh/2 }
+                else if abs(dBottom - aTop) < threshold    { edgeLines.append((false, aTop));    snapCy = aTop    - dh/2 }
+            }
+        }
+
+        // Build the guide paths. Lines span the full room so the user
+        // sees the alignment going edge-to-edge, like web.
+        let centerPath = UIBezierPath()
+        let edgePath = UIBezierPath()
+        for line in centerLines {
+            appendGuide(line.isVertical, pos: line.pos, into: centerPath)
+        }
+        for line in edgeLines {
+            appendGuide(line.isVertical, pos: line.pos, into: edgePath)
+        }
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        alignmentCenterGuides.path = centerPath.isEmpty ? nil : centerPath.cgPath
+        alignmentEdgeGuides.path   = edgePath.isEmpty   ? nil : edgePath.cgPath
+        CATransaction.commit()
+
+        // Convert the snapped canvas-local centre back to contentView
+        // coords. Either axis may be unsnapped — fall back to the
+        // proposed value on that axis.
+        return CGPoint(
+            x: canvasOrigin.x + (snapCx ?? cx),
+            y: canvasOrigin.y + (snapCy ?? cy)
+        )
+    }
+
+    /// Builds a vertical or horizontal guide line spanning the full room
+    /// (in contentView coords) and appends it to the given path.
+    private func appendGuide(_ isVertical: Bool, pos: CGFloat, into path: UIBezierPath) {
+        if isVertical {
+            let x = canvasOrigin.x + pos
+            path.move(to: CGPoint(x: x, y: canvasOrigin.y))
+            path.addLine(to: CGPoint(x: x, y: canvasOrigin.y + currentRoomHeight))
+        } else {
+            let y = canvasOrigin.y + pos
+            path.move(to: CGPoint(x: canvasOrigin.x, y: y))
+            path.addLine(to: CGPoint(x: canvasOrigin.x + currentRoomWidth, y: y))
+        }
+    }
+
+    /// Called when a drag ends so the guide lines disappear. No-op when
+    /// nothing is currently drawn.
+    func clearAlignmentGuides() {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        alignmentCenterGuides.path = nil
+        alignmentEdgeGuides.path = nil
+        CATransaction.commit()
+    }
+
     func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
         saveViewport()
     }
@@ -517,6 +689,7 @@ class CanvasViewController: UIViewController, UIScrollViewDelegate {
 
     func updateTables(_ tables: [SeatTable], guests: [Guest], selectedId: String?) {
         self.selectedId = selectedId
+        self.currentTables = tables
 
         let currentIds = Set(tableViews.keys)
         let newIds = Set(tables.map(\.id))
@@ -538,7 +711,12 @@ class CanvasViewController: UIViewController, UIScrollViewDelegate {
                 tv.onTap = { [weak self] in
                     self?.selectTable(table.id)
                 }
+                tv.onDragMove = { [weak self] proposed, body in
+                    self?.computeAlignmentSnap(forDragID: table.id, isObject: false,
+                                               proposedCenter: proposed, size: body) ?? proposed
+                }
                 tv.onDragEnd = { [weak self] center in
+                    self?.clearAlignmentGuides()
                     let x = Double(center.x - (self?.canvasOrigin.x ?? 0))
                     let y = Double(center.y - (self?.canvasOrigin.y ?? 0))
                     self?.delegate?.canvasDidMoveTable(table.id, x: x, y: y)
@@ -550,6 +728,7 @@ class CanvasViewController: UIViewController, UIScrollViewDelegate {
     }
 
     func updateObjects(_ objects: [RoomObject], selectedId: String?) {
+        self.currentObjects = objects
         let currentIds = Set(objectViews.keys)
         let newIds = Set(objects.map(\.id))
 
@@ -568,7 +747,12 @@ class CanvasViewController: UIViewController, UIScrollViewDelegate {
                 ov.onTap = { [weak self] in
                     self?.selectObject(obj.id)
                 }
+                ov.onDragMove = { [weak self] proposed, body in
+                    self?.computeAlignmentSnap(forDragID: obj.id, isObject: true,
+                                               proposedCenter: proposed, size: body) ?? proposed
+                }
                 ov.onDragEnd = { [weak self] center in
+                    self?.clearAlignmentGuides()
                     let x = Double(center.x - (self?.canvasOrigin.x ?? 0))
                     let y = Double(center.y - (self?.canvasOrigin.y ?? 0))
                     self?.delegate?.canvasDidMoveObject(obj.id, x: x, y: y)
@@ -646,6 +830,10 @@ class DotPatternLayer: CALayer {
 
 class CanvasTableView: UIView {
     var onTap: (() -> Void)?
+    /// Called on each pan tick with the proposed centre + body size.
+    /// Receiver can return a snapped centre (alignment guides) which
+    /// the view will adopt instead of the raw finger position.
+    var onDragMove: ((CGPoint, CGSize) -> CGPoint)?
     var onDragEnd: ((CGPoint) -> Void)?
 
     private var table: SeatTable
@@ -1266,8 +1454,18 @@ class CanvasTableView: UIView {
 
         switch gesture.state {
         case .changed:
-            center = CGPoint(x: center.x + translation.x, y: center.y + translation.y)
-            gesture.setTranslation(.zero, in: superview)
+            let proposed = CGPoint(x: center.x + translation.x,
+                                   y: center.y + translation.y)
+            // Ask the parent for an alignment-snapped centre. When snap
+            // engages the view position lags the finger; we feed the
+            // unconsumed delta back into the gesture so the snap releases
+            // smoothly once the finger moves past the threshold.
+            let body = CanvasTableView.bodySize(for: table)
+            let snapped = onDragMove?(proposed, body) ?? proposed
+            center = snapped
+            gesture.setTranslation(CGPoint(x: proposed.x - snapped.x,
+                                           y: proposed.y - snapped.y),
+                                   in: superview)
         case .ended, .cancelled:
             onDragEnd?(center)
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -1280,6 +1478,7 @@ class CanvasTableView: UIView {
 
 class CanvasObjectView: UIView {
     var onTap: (() -> Void)?
+    var onDragMove: ((CGPoint, CGSize) -> CGPoint)?
     var onDragEnd: ((CGPoint) -> Void)?
 
     private var object: RoomObject
@@ -1386,8 +1585,13 @@ class CanvasObjectView: UIView {
 
         switch gesture.state {
         case .changed:
-            center = CGPoint(x: center.x + translation.x, y: center.y + translation.y)
-            gesture.setTranslation(.zero, in: superview)
+            let proposed = CGPoint(x: center.x + translation.x,
+                                   y: center.y + translation.y)
+            let snapped = onDragMove?(proposed, frame.size) ?? proposed
+            center = snapped
+            gesture.setTranslation(CGPoint(x: proposed.x - snapped.x,
+                                           y: proposed.y - snapped.y),
+                                   in: superview)
         case .ended, .cancelled:
             onDragEnd?(center)
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
