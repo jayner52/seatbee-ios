@@ -15,6 +15,11 @@ struct EditorView: View {
     @State private var assigningSeatIndex: Int?
     @State private var fitToken: Int = 0
     @State private var showEditObject = false
+    /// One-shot soft-warning nudge — fires once per session when a free
+    /// plan crosses 80% of its seated cap. Tapping Upgrade routes to
+    /// the paywall; Dismiss just closes the alert (count keeps climbing
+    /// silently until the hard 100-cap blocks further seating).
+    @State private var showSoftSeatedNudge = false
     // Floor plan visibility — defaults to hidden so a fresh plan doesn't
     // crowd the canvas with the source image. Persists per-plan in
     // UserDefaults keyed by plan ID so user preference survives switches.
@@ -144,6 +149,13 @@ struct EditorView: View {
                 if let id = selectedObjectId { deleteObjectById(id) }
             }
             Button("Cancel", role: .cancel) {}
+        }
+        .alert("You're at \(appState.seatedGuestCount) of \(appState.activePlanLimits.seatedGuests) seated guests",
+               isPresented: $showSoftSeatedNudge) {
+            Button("Upgrade") { appState.showUpgrade = true }
+            Button("Keep going", role: .cancel) {}
+        } message: {
+            Text("The free plan caps seating at \(appState.activePlanLimits.seatedGuests) guests. Upgrade for a larger plan and watermark-free exports.")
         }
         .task {
             if appState.activePlan == nil {
@@ -628,12 +640,21 @@ struct EditorView: View {
         guard let tableId = selectedTableId,
               var p = appState.activePlan,
               let ti = p.tables.firstIndex(where: { $0.id == tableId }) else { return }
+        // Tier gate (web parity: App.jsx checkTierLimit('seat_guest')).
+        // Free plan is capped at 100 SEATED guests — adding to the list
+        // is free, but assigning to a table counts.
+        guard appState.canSeatGuest(guest.id) else {
+            appState.showUpgrade = true
+            HapticEngine.error()
+            return
+        }
         let table = p.tables[ti]
         let occupiedSeats = Set(table.assignments.values)
         guard let emptyIndex = (0..<table.seats).first(where: { !occupiedSeats.contains($0) }) else { return }
         p.tables[ti].assignments[guest.id] = emptyIndex
         appState.activePlan = p
         HapticEngine.success()
+        maybeFireSoftSeatedNudge()
         Task { try? await appState.database.savePlanData(plan: p) }
     }
 
@@ -695,10 +716,29 @@ struct EditorView: View {
               let tableId = selectedTableId,
               var p = appState.activePlan,
               let ti = p.tables.firstIndex(where: { $0.id == tableId }) else { return }
+        // Same tier gate as assignGuestToNextEmpty — every seat-assignment
+        // path on the free plan must respect the 100-guest cap.
+        guard appState.canSeatGuest(guest.id) else {
+            appState.showUpgrade = true
+            HapticEngine.error()
+            return
+        }
         p.tables[ti].assignments[guest.id] = seatIndex
         appState.activePlan = p
         HapticEngine.success()
+        maybeFireSoftSeatedNudge()
         Task { try? await appState.database.savePlanData(plan: p) }
+    }
+
+    /// Fires the once-per-session 80% soft-warning toast on free tier
+    /// when the user has just crossed into the danger zone. We reuse
+    /// `appState.hasShownGuestSoftWarning` so users don't get nagged on
+    /// every subsequent seat.
+    private func maybeFireSoftSeatedNudge() {
+        guard appState.isAtSoftSeatedWarning,
+              !appState.hasShownGuestSoftWarning else { return }
+        appState.hasShownGuestSoftWarning = true
+        showSoftSeatedNudge = true
     }
 
     // MARK: - Floor plan visibility

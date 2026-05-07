@@ -137,19 +137,36 @@ final class AppState {
         return true
     }
 
-    /// Returns true if adding `count` more guests would exceed the active
-    /// plan's seated-guest cap. Used to gate add/import flows.
-    func wouldExceedGuestLimit(adding count: Int) -> Bool {
-        guard let plan = activePlan else { return false }
-        return plan.guests.count + count > activePlanLimits.seatedGuests
+    /// Number of unique guests currently seated at any table. Web parity
+    /// (App.jsx ~4463 `seatedCount`) — only this number matters for the
+    /// tier cap; the unsorted guest list itself is unmetered.
+    var seatedGuestCount: Int {
+        guard let plan = activePlan else { return 0 }
+        var seen = Set<String>()
+        for t in plan.tables {
+            for gid in t.assignments.keys { seen.insert(gid) }
+        }
+        return seen.count
     }
 
-    /// True when free-tier plan has crossed the 80% guest soft warning
-    /// threshold. Mirrors web's nudge at App.jsx:6211.
-    var isAtSoftGuestWarning: Bool {
-        guard activePlanTier == .free, let plan = activePlan else { return false }
+    /// Can this guest be seated under the current tier? Returns true for
+    /// existing-seated guests (a re-seat / move never counts against the
+    /// cap), and for fresh seatings only when the cap has slack.
+    func canSeatGuest(_ guestId: String) -> Bool {
+        guard let plan = activePlan else { return false }
+        let seated = plan.tables.flatMap { $0.assignments.keys }
+        if seated.contains(guestId) { return true }
+        return seated.count < activePlanLimits.seatedGuests
+    }
+
+    /// True when seating the next *new* guest will cross the 80% soft
+    /// nudge threshold on a free plan. The toast fires once per session
+    /// (gated by `hasShownGuestSoftWarning`) — mirrors web's nudge at
+    /// App.jsx:4470 which only fires for free tier.
+    var isAtSoftSeatedWarning: Bool {
+        guard activePlanTier == .free else { return false }
         let limit = activePlanLimits.seatedGuests
-        return plan.guests.count >= Int(Double(limit) * 0.8)
+        return seatedGuestCount >= Int(Double(limit) * 0.8)
     }
 
     // Push current state before a mutation
