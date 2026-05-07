@@ -252,6 +252,7 @@ struct EditorView: View {
                     .clipShape(Circle())
             }
 
+
             Button { showRoomSetup = true } label: {
                 Image(systemName: "square.dashed")
                     .font(.system(size: 14, weight: .medium))
