@@ -237,27 +237,29 @@ struct TableDrawerView: View {
                 .padding(.horizontal, SBSpacing.cardPadding)
             }
 
-            // Add seat button
-            Button {
-                addSeat()
-                HapticEngine.light()
-            } label: {
-                HStack {
-                    Image(systemName: "plus")
-                    Text("Add seat")
+            // Add seat button (hidden when table is locked)
+            if table.locked != true {
+                Button {
+                    addSeat()
+                    HapticEngine.light()
+                } label: {
+                    HStack {
+                        Image(systemName: "plus")
+                        Text("Add seat")
+                    }
+                    .font(SBFont.bodySemibold)
+                    .foregroundStyle(Color.sbGoldDk)
+                    .frame(maxWidth: .infinity)
+                    .padding(12)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: SBRadius.button)
+                            .strokeBorder(Color.sbLine2, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+                    )
                 }
-                .font(SBFont.bodySemibold)
-                .foregroundStyle(Color.sbGoldDk)
-                .frame(maxWidth: .infinity)
-                .padding(12)
-                .overlay(
-                    RoundedRectangle(cornerRadius: SBRadius.button)
-                        .strokeBorder(Color.sbLine2, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
-                )
+                .buttonStyle(.plain)
+                .padding(.horizontal, SBSpacing.cardPadding)
+                .padding(.top, SBSpacing.lg)
             }
-            .buttonStyle(.plain)
-            .padding(.horizontal, SBSpacing.cardPadding)
-            .padding(.top, SBSpacing.lg)
         }
     }
 
@@ -411,8 +413,25 @@ struct TableDrawerView: View {
 
     // MARK: - Layout Tab Content (web parity)
 
+    private var lockedLayoutBanner: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "lock.fill")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(Color.sbSage)
+            Text("Locked — unlock to edit shape, size, and seating")
+                .font(SBFont.caption)
+                .foregroundStyle(Color.sbSage)
+            Spacer()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Color.sbSage.opacity(0.12))
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+
     private var layoutContent: some View {
         VStack(alignment: .leading, spacing: SBSpacing.lg) {
+            if table.locked == true { lockedLayoutBanner }
             shapeSection
             if table.type == .sweetheart {
                 sweetheartShapeSection
@@ -423,6 +442,7 @@ struct TableDrawerView: View {
             sizeSection
             rotationSection
         }
+        .disabled(table.locked == true)
         .padding(.horizontal, SBSpacing.cardPadding)
         .padding(.bottom, SBSpacing.lg)
     }

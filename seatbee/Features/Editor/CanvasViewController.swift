@@ -1449,6 +1449,7 @@ class CanvasTableView: UIView {
     }
 
     @objc private func handlePan(_ gesture: UIPanGestureRecognizer) {
+        guard table.locked != true else { return }
         guard let superview = superview else { return }
         let translation = gesture.translation(in: superview)
 

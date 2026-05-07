@@ -437,20 +437,21 @@ struct EditorView: View {
     // MARK: - Seat List
 
     private func seatList(table: SeatTable) -> some View {
-        VStack(spacing: 6) {
+        let isLocked = table.locked == true
+        return VStack(spacing: 6) {
             ForEach(0..<table.seats, id: \.self) { index in
                 let guestId = table.assignments.first { $0.value == index }?.key
                 let guest = plan?.guests.first { $0.id == guestId }
                 if let guest {
-                    filledSeatRow(index: index, guest: guest)
+                    filledSeatRow(index: index, guest: guest, isLocked: isLocked)
                 } else {
-                    emptySeatRow(index: index)
+                    emptySeatRow(index: index, isLocked: isLocked)
                 }
             }
         }
     }
 
-    private func filledSeatRow(index: Int, guest: Guest) -> some View {
+    private func filledSeatRow(index: Int, guest: Guest, isLocked: Bool = false) -> some View {
         HStack(spacing: 10) {
             ZStack {
                 Circle().fill(Color.sbGold).frame(width: 22, height: 22)
@@ -475,18 +476,21 @@ struct EditorView: View {
                 }
             }
             Spacer()
-            Button { unassignGuest(guest) } label: {
-                Image(systemName: "xmark.circle.fill").font(.system(size: 16)).foregroundStyle(Color.sbWarm2)
+            if !isLocked {
+                Button { unassignGuest(guest) } label: {
+                    Image(systemName: "xmark.circle.fill").font(.system(size: 16)).foregroundStyle(Color.sbWarm2)
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
         }
         .padding(8)
         .background(guest.side == .bride || guest.side == .groom ? Color.sbChampagne.opacity(0.4) : Color.clear)
         .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 
-    private func emptySeatRow(index: Int) -> some View {
+    private func emptySeatRow(index: Int, isLocked: Bool = false) -> some View {
         Button {
+            guard !isLocked else { return }
             assigningSeatIndex = index
             showGuestPicker = true
             HapticEngine.light()
