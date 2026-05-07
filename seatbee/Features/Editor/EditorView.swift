@@ -405,35 +405,37 @@ struct EditorView: View {
             // LEFT — seats
             VStack(alignment: .leading, spacing: 0) {
                 // Column header
-                HStack(spacing: 8) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(table.name)
-                            .font(SBFont.bodySmallBold)
-                            .foregroundStyle(Color.sbCharcoal)
-                            .lineLimit(1)
-                        Text("\(table.filledCount)/\(table.seats) seated · \(table.type.rawValue)")
-                            .font(SBFont.caption)
-                            .foregroundStyle(Color.sbWarm)
-                    }
-                    Spacer()
-                    Button {
-                        showDetailSheet = false
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { showDrawer = true }
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: "slider.horizontal.3").font(.system(size: 10))
-                            Text("Edit").font(SBFont.inter(11, weight: .semibold))
-                        }
-                        .foregroundStyle(Color.sbGoldDk)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(Color.sbChampagne)
-                        .clipShape(RoundedRectangle(cornerRadius: SBRadius.small))
-                    }
-                    .buttonStyle(.plain)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(table.name)
+                        .font(SBFont.bodySmallBold)
+                        .foregroundStyle(Color.sbCharcoal)
+                        .lineLimit(1)
+                    Text("\(table.filledCount)/\(table.seats) seated · \(table.type.rawValue)")
+                        .font(SBFont.caption)
+                        .foregroundStyle(Color.sbWarm)
                 }
                 .padding(.horizontal, 14)
-                .padding(.vertical, 12)
+                .padding(.top, 12)
+                .padding(.bottom, 10)
+
+                // Prominent Edit Table button
+                Button {
+                    showDetailSheet = false
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { showDrawer = true }
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "pencil").font(.system(size: 12, weight: .semibold))
+                        Text("Edit Table").font(SBFont.inter(13, weight: .semibold))
+                    }
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 9)
+                    .background(Color.sbGoldDk)
+                    .clipShape(RoundedRectangle(cornerRadius: SBRadius.small))
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 14)
+                .padding(.bottom, 12)
 
                 Divider()
 
