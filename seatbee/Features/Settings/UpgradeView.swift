@@ -8,6 +8,8 @@ struct UpgradeView: View {
     @State private var selectedProduct: SeatbeeProduct = .eventPass
     @State private var isPurchasing = false
     @State private var showSuccess = false
+    @State private var shimmerOffset: CGFloat = -200
+    @State private var appearAnimation = false
 
     private var daysUntilWedding: Int? {
         guard let date = appState.activePlan?.eventDate else { return nil }
@@ -16,41 +18,87 @@ struct UpgradeView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        ZStack {
+            // Background gradient
+            LinearGradient(
+                stops: [
+                    .init(color: Color.sbChampagne.opacity(0.6), location: 0),
+                    .init(color: Color.sbIvory, location: 0.35),
+                    .init(color: Color.sbIvory, location: 1),
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 0) {
-                    heroSection
-                    planSelector.padding(.top, 28)
-                    featureComparison.padding(.top, 24)
-                    ctaButton.padding(.top, 28)
-                    errorBanner.padding(.top, 8)
-                    trustSignals.padding(.top, 20)
-                    restoreButton.padding(.top, 16)
-                    Spacer(minLength: 40)
-                }
-                .padding(.horizontal, 20)
-            }
-            .background(Color.sbIvory)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button { dismiss() } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(Color.sbWarm)
-                            .frame(width: 32, height: 32)
-                            .background(Color.sbIvory2)
-                            .clipShape(Circle())
+                    // Close button
+                    HStack {
+                        Spacer()
+                        Button { dismiss() } label: {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundStyle(Color.sbWarm)
+                                .frame(width: 30, height: 30)
+                                .background(.ultraThinMaterial)
+                                .clipShape(Circle())
+                        }
                     }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 16)
+
+                    // Hero
+                    heroSection
+                        .opacity(appearAnimation ? 1 : 0)
+                        .offset(y: appearAnimation ? 0 : 20)
+
+                    // Plans
+                    planSelector
+                        .padding(.top, 32)
+                        .opacity(appearAnimation ? 1 : 0)
+                        .offset(y: appearAnimation ? 0 : 30)
+
+                    // CTA
+                    ctaButton
+                        .padding(.top, 24)
+                        .padding(.horizontal, 20)
+
+                    // Error
+                    errorBanner
+                        .padding(.top, 8)
+                        .padding(.horizontal, 20)
+
+                    // What's included
+                    whatsIncluded
+                        .padding(.top, 28)
+                        .padding(.horizontal, 20)
+
+                    // Trust
+                    trustSignals
+                        .padding(.top, 24)
+
+                    // Restore + legal
+                    restoreAndLegal
+                        .padding(.top, 16)
+                        .padding(.bottom, 50)
                 }
             }
-            .overlay { if showSuccess { successOverlay } }
-            .onChange(of: storeKit.purchaseSuccess) { _, success in
-                if success {
-                    Task { await appState.refreshPasses() }
-                    withAnimation(.seatbeeSpring) { showSuccess = true }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) { dismiss() }
-                }
+
+            // Success overlay
+            if showSuccess { successOverlay }
+        }
+        .onAppear {
+            withAnimation(.easeOut(duration: 0.6).delay(0.1)) {
+                appearAnimation = true
+            }
+            startShimmer()
+        }
+        .onChange(of: storeKit.purchaseSuccess) { _, success in
+            if success {
+                Task { await appState.refreshPasses() }
+                withAnimation(.seatbeeSpring) { showSuccess = true }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { dismiss() }
             }
         }
     }
@@ -58,50 +106,70 @@ struct UpgradeView: View {
     // MARK: - Hero
 
     private var heroSection: some View {
-        VStack(spacing: 16) {
-            Spacer().frame(height: 8)
+        VStack(spacing: 20) {
+            // Floating logo with glow
+            ZStack {
+                Circle()
+                    .fill(Color.sbGold.opacity(0.15))
+                    .frame(width: 100, height: 100)
+                    .blur(radius: 20)
 
-            Image("SeatbeeLogo")
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(width: 52, height: 52)
-
-            VStack(spacing: 6) {
-                Text("Let AI handle the\nseating drama")
-                    .font(SBFont.fraunces(28, weight: .medium))
-                    .foregroundStyle(Color.sbCharcoal)
-                    .multilineTextAlignment(.center)
-                    .lineSpacing(2)
-
-                Text("One purchase. No subscription. No stress.")
-                    .font(SBFont.body)
-                    .foregroundStyle(Color.sbWarm)
+                Image("SeatbeeLogo")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 60, height: 60)
             }
 
+            VStack(spacing: 10) {
+                Text("Unlock the magic")
+                    .font(SBFont.fraunces(32, weight: .medium))
+                    .foregroundStyle(Color.sbCharcoal)
+
+                Text("of AI seating")
+                    .font(SBFont.fraunces(32, weight: .medium))
+                    .foregroundStyle(Color.sbGoldDk)
+                    .italic()
+            }
+            .multilineTextAlignment(.center)
+
+            Text("One purchase · No subscription · Yours forever")
+                .font(SBFont.inter(14, weight: .medium))
+                .foregroundStyle(Color.sbWarm)
+
+            // Wedding countdown
             if let days = daysUntilWedding {
-                HStack(spacing: 6) {
-                    Image(systemName: "calendar")
-                        .font(.system(size: 12))
-                    Text("Your wedding is \(days) days away")
+                HStack(spacing: 8) {
+                    Image(systemName: "heart.fill")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Color.sbBlush)
+                    Text("\(days) days until your wedding")
                         .font(SBFont.inter(13, weight: .semibold))
+                        .foregroundStyle(Color.sbGoldDk)
                 }
-                .foregroundStyle(Color.sbGoldDk)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                .background(Color.sbChampagne)
-                .clipShape(Capsule())
+                .padding(.horizontal, 20)
+                .padding(.vertical, 10)
+                .background(
+                    Capsule()
+                        .fill(Color.sbChampagne)
+                        .overlay(
+                            Capsule()
+                                .strokeBorder(Color.sbGold.opacity(0.3), lineWidth: 1)
+                        )
+                )
             }
         }
+        .padding(.top, 8)
     }
 
-    // MARK: - Plan Selector
+    // MARK: - Plan Cards
 
     private var planSelector: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 12) {
             ForEach(SeatbeeProduct.allCases, id: \.rawValue) { product in
                 planCard(product)
             }
         }
+        .padding(.horizontal, 20)
     }
 
     private func planCard(_ seatbeeProduct: SeatbeeProduct) -> some View {
@@ -110,59 +178,84 @@ struct UpgradeView: View {
         let storeProduct = storeKit.product(for: seatbeeProduct)
 
         return Button {
-            withAnimation(.seatbee) { selectedProduct = seatbeeProduct }
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                selectedProduct = seatbeeProduct
+            }
             HapticEngine.selection()
         } label: {
-            HStack(spacing: 14) {
-                ZStack {
-                    Circle()
-                        .strokeBorder(isSelected ? Color.sbGold : Color.sbWarm2, lineWidth: 2)
-                        .frame(width: 22, height: 22)
-                    if isSelected {
-                        Circle()
-                            .fill(Color.sbGold)
-                            .frame(width: 12, height: 12)
-                    }
+            VStack(spacing: 0) {
+                // "MOST POPULAR" ribbon
+                if isPopular {
+                    Text("MOST POPULAR")
+                        .font(.system(size: 10, weight: .heavy, design: .rounded))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 6)
+                        .background(Color.sbGold)
                 }
 
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: 8) {
+                HStack(spacing: 16) {
+                    // Icon
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(
+                                isSelected
+                                    ? LinearGradient(colors: [Color.sbGold, Color.sbGoldDk], startPoint: .topLeading, endPoint: .bottomTrailing)
+                                    : LinearGradient(colors: [Color.sbIvory2, Color.sbIvory2], startPoint: .topLeading, endPoint: .bottomTrailing)
+                            )
+                            .frame(width: 48, height: 48)
+
+                        Image(systemName: seatbeeProduct == .grandPass ? "crown.fill" : (seatbeeProduct == .signaturePass ? "star.fill" : "sparkles"))
+                            .font(.system(size: 20))
+                            .foregroundStyle(isSelected ? .white : Color.sbGold)
+                    }
+
+                    // Details
+                    VStack(alignment: .leading, spacing: 4) {
                         Text(seatbeeProduct.displayName)
                             .font(SBFont.bodySemibold)
                             .foregroundStyle(Color.sbCharcoal)
-                        if isPopular {
-                            Text("BEST VALUE")
-                                .font(.system(size: 9, weight: .bold))
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 7)
-                                .padding(.vertical, 2)
-                                .background(Color.sbGold)
-                                .clipShape(Capsule())
-                        }
+
+                        Text("Up to \(seatbeeProduct.guestLimit) guests")
+                            .font(SBFont.caption)
+                            .foregroundStyle(Color.sbWarm)
                     }
-                    Text("Up to \(seatbeeProduct.guestLimit) guests · AI seating · 6 months")
-                        .font(SBFont.caption)
-                        .foregroundStyle(Color.sbWarm)
-                }
 
-                Spacer()
+                    Spacer()
 
-                VStack(alignment: .trailing, spacing: 1) {
-                    Text(storeProduct?.displayPrice ?? fallbackPrice(seatbeeProduct))
-                        .font(SBFont.fraunces(20, weight: .medium))
-                        .foregroundStyle(isSelected ? Color.sbGoldDk : Color.sbCharcoal)
-                    Text("one-time")
-                        .font(.system(size: 10))
-                        .foregroundStyle(Color.sbWarm)
+                    // Price
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text(storeProduct?.displayPrice ?? fallbackPrice(seatbeeProduct))
+                            .font(SBFont.fraunces(22, weight: .medium))
+                            .foregroundStyle(isSelected ? Color.sbGoldDk : Color.sbCharcoal)
+
+                        Text("one-time")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(Color.sbWarm)
+                    }
                 }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 16)
             }
-            .padding(16)
-            .background(isSelected ? Color.sbChampagne.opacity(0.4) : Color.sbIvory2)
-            .clipShape(RoundedRectangle(cornerRadius: 14))
-            .overlay(
-                RoundedRectangle(cornerRadius: 14)
-                    .strokeBorder(isSelected ? Color.sbGold : Color.sbLine, lineWidth: isSelected ? 2 : 1)
+            .background(
+                RoundedRectangle(cornerRadius: isPopular ? 16 : 14)
+                    .fill(isSelected ? Color.sbChampagne.opacity(0.35) : Color.white)
             )
+            .clipShape(RoundedRectangle(cornerRadius: isPopular ? 16 : 14))
+            .overlay(
+                RoundedRectangle(cornerRadius: isPopular ? 16 : 14)
+                    .strokeBorder(
+                        isSelected ? Color.sbGold : Color.sbLine,
+                        lineWidth: isSelected ? 2.5 : 1
+                    )
+            )
+            .shadow(
+                color: isSelected ? Color.sbGold.opacity(0.15) : Color.clear,
+                radius: isSelected ? 12 : 0,
+                x: 0,
+                y: isSelected ? 6 : 0
+            )
+            .scaleEffect(isSelected ? 1.02 : 1.0)
         }
         .buttonStyle(.plain)
     }
@@ -175,139 +268,153 @@ struct UpgradeView: View {
         }
     }
 
-    // MARK: - Feature Comparison
-
-    private var featureComparison: some View {
-        VStack(spacing: 0) {
-            HStack {
-                Text("What you get")
-                    .font(SBFont.label)
-                    .foregroundStyle(Color.sbWarm)
-                    .textCase(.uppercase)
-                Spacer()
-                Text("Free")
-                    .font(SBFont.capsLabel)
-                    .foregroundStyle(Color.sbWarm)
-                    .frame(width: 44)
-                Text("Pass")
-                    .font(SBFont.capsLabel)
-                    .foregroundStyle(Color.sbGoldDk)
-                    .frame(width: 44)
-            }
-            .padding(.horizontal, 16)
-            .padding(.bottom, 12)
-
-            featureRow("Seated guests", free: "100", pass: "250–1K")
-            featureRow("AI seating", free: false, pass: true)
-            featureRow("Floor plan AI", free: true, pass: true)
-            featureRow("Arrangements", free: "1", pass: "5–10")
-            featureRow("CSV import", free: true, pass: true)
-            featureRow("PDF export", free: true, pass: true)
-            featureRow("Collaboration", free: true, pass: true)
-            featureRow("Day-of mode", free: true, pass: true)
-        }
-        .padding(.vertical, 16)
-        .background(Color.sbIvory2)
-        .clipShape(RoundedRectangle(cornerRadius: 14))
-    }
-
-    private func featureRow(_ label: String, free: Any, pass: Any) -> some View {
-        HStack {
-            Text(label)
-                .font(SBFont.bodySmall)
-                .foregroundStyle(Color.sbCharcoal)
-            Spacer()
-            cellView(free, accent: false).frame(width: 44)
-            cellView(pass, accent: true).frame(width: 44)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 7)
-    }
-
-    @ViewBuilder
-    private func cellView(_ value: Any, accent: Bool) -> some View {
-        if let b = value as? Bool {
-            Image(systemName: b ? "checkmark.circle.fill" : "xmark.circle")
-                .font(.system(size: 15))
-                .foregroundStyle(b ? (accent ? Color.sbGold : Color.sbSage) : Color.sbWarm2)
-        } else if let t = value as? String {
-            Text(t)
-                .font(SBFont.inter(12, weight: accent ? .semibold : .regular))
-                .foregroundStyle(accent ? Color.sbGoldDk : Color.sbWarm)
-        }
-    }
-
-    // MARK: - CTA
+    // MARK: - CTA Button with Shimmer
 
     private var ctaButton: some View {
         Button { purchase() } label: {
-            HStack(spacing: 8) {
-                if isPurchasing {
-                    ProgressView().tint(.white)
-                } else {
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 15, weight: .semibold))
+            ZStack {
+                // Base gradient
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.sbGold, Color.sbGoldDk],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .frame(height: 56)
+                    .shadow(color: Color.sbGold.opacity(0.4), radius: 16, x: 0, y: 8)
+
+                // Shimmer overlay
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(
+                        LinearGradient(
+                            colors: [.clear, .white.opacity(0.25), .clear],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .frame(height: 56)
+                    .offset(x: shimmerOffset)
+                    .mask(RoundedRectangle(cornerRadius: 16).frame(height: 56))
+
+                // Content
+                HStack(spacing: 10) {
+                    if isPurchasing {
+                        ProgressView().tint(.white)
+                    } else {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 16, weight: .semibold))
+                    }
+                    Text(isPurchasing ? "Processing..." : "Unlock \(selectedProduct.displayName)")
+                        .font(SBFont.inter(16, weight: .bold))
                 }
-                Text(isPurchasing ? "Processing..." : "Unlock \(selectedProduct.displayName)")
-                    .font(SBFont.bodySemibold)
+                .foregroundStyle(.white)
             }
-            .foregroundStyle(.white)
-            .frame(maxWidth: .infinity)
-            .frame(height: 54)
-            .background(
-                LinearGradient(colors: [Color.sbGold, Color.sbGoldDk], startPoint: .leading, endPoint: .trailing)
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-            .shadow(color: Color.sbGold.opacity(0.3), radius: 12, x: 0, y: 6)
         }
         .buttonStyle(.plain)
         .disabled(isPurchasing)
     }
 
-    // MARK: - Trust
+    // MARK: - What's Included
 
-    private var trustSignals: some View {
-        VStack(spacing: 12) {
-            HStack(spacing: 20) {
-                trustBadge(icon: "lock.shield", text: "Secure\npayment")
-                trustBadge(icon: "arrow.counterclockwise", text: "No auto\nrenewal")
-                trustBadge(icon: "gift", text: "Shareable\ngift code")
-            }
-            Text("One-time purchase · No subscription · Works on web too")
-                .font(SBFont.caption)
+    private var whatsIncluded: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("EVERYTHING YOU GET")
+                .font(SBFont.capsLabel)
                 .foregroundStyle(Color.sbWarm)
-                .multilineTextAlignment(.center)
+                .letterSpacing(2)
+
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                featureItem(icon: "sparkles", title: "AI Seating", subtitle: "Auto-arrange guests")
+                featureItem(icon: "person.3.fill", title: "\(selectedProduct.guestLimit) Guests", subtitle: "Seated capacity")
+                featureItem(icon: "doc.viewfinder", title: "Floor Plan AI", subtitle: "Scan your venue")
+                featureItem(icon: "rectangle.on.rectangle", title: "Arrangements", subtitle: "Multiple layouts")
+                featureItem(icon: "doc.text", title: "PDF Export", subtitle: "Print-ready charts")
+                featureItem(icon: "person.2", title: "Collaborate", subtitle: "Share with planner")
+            }
         }
     }
 
-    private func trustBadge(icon: String, text: String) -> some View {
-        VStack(spacing: 6) {
+    private func featureItem(icon: String, title: String, subtitle: String) -> some View {
+        HStack(spacing: 12) {
             Image(systemName: icon)
-                .font(.system(size: 18))
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(Color.sbGold)
+                .frame(width: 36, height: 36)
+                .background(Color.sbGold.opacity(0.1))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title)
+                    .font(SBFont.inter(13, weight: .semibold))
+                    .foregroundStyle(Color.sbCharcoal)
+                Text(subtitle)
+                    .font(.system(size: 11))
+                    .foregroundStyle(Color.sbWarm)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    // MARK: - Trust
+
+    private var trustSignals: some View {
+        HStack(spacing: 0) {
+            trustBadge(icon: "lock.shield.fill", label: "Secure")
+            dividerLine
+            trustBadge(icon: "clock.arrow.circlepath", label: "No renewal")
+            dividerLine
+            trustBadge(icon: "gift.fill", label: "Giftable")
+            dividerLine
+            trustBadge(icon: "globe", label: "Web + iOS")
+        }
+        .padding(.vertical, 14)
+        .padding(.horizontal, 12)
+        .background(Color.sbIvory2)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .padding(.horizontal, 20)
+    }
+
+    private var dividerLine: some View {
+        Rectangle()
+            .fill(Color.sbLine)
+            .frame(width: 1, height: 28)
+    }
+
+    private func trustBadge(icon: String, label: String) -> some View {
+        VStack(spacing: 5) {
+            Image(systemName: icon)
+                .font(.system(size: 16))
                 .foregroundStyle(Color.sbGoldDk)
-            Text(text)
+            Text(label)
                 .font(.system(size: 10, weight: .medium))
                 .foregroundStyle(Color.sbWarm)
-                .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
     }
 
-    // MARK: - Restore
+    // MARK: - Restore & Legal
 
-    private var restoreButton: some View {
-        Button {
-            Task {
-                await storeKit.restorePurchases()
-                await appState.refreshPasses()
+    private var restoreAndLegal: some View {
+        VStack(spacing: 8) {
+            Button {
+                Task {
+                    await storeKit.restorePurchases()
+                    await appState.refreshPasses()
+                }
+            } label: {
+                Text("Restore Purchases")
+                    .font(SBFont.inter(13, weight: .medium))
+                    .foregroundStyle(Color.sbWarm)
+                    .underline()
             }
-        } label: {
-            Text("Restore Purchases")
-                .font(SBFont.bodySmall)
-                .foregroundStyle(Color.sbWarm)
-                .underline()
+            .buttonStyle(.plain)
+
+            Text("Also available at seatbee.app")
+                .font(.system(size: 11))
+                .foregroundStyle(Color.sbWarm2)
         }
-        .buttonStyle(.plain)
     }
 
     // MARK: - Error
@@ -315,38 +422,58 @@ struct UpgradeView: View {
     @ViewBuilder
     var errorBanner: some View {
         if let error = storeKit.purchaseError {
-            Text(error)
-                .font(SBFont.caption)
-                .foregroundStyle(Color.sbError)
-                .padding(10)
-                .frame(maxWidth: .infinity)
-                .background(Color.sbError.opacity(0.1))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+            HStack(spacing: 8) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(Color.sbError)
+                Text(error)
+                    .font(SBFont.caption)
+                    .foregroundStyle(Color.sbError)
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity)
+            .background(Color.sbError.opacity(0.08))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
         }
     }
 
-    // MARK: - Success
+    // MARK: - Success Overlay
 
     private var successOverlay: some View {
         ZStack {
-            Color.sbCharcoal.opacity(0.4).ignoresSafeArea()
+            Color.sbCharcoal.opacity(0.5)
+                .ignoresSafeArea()
 
-            VStack(spacing: 16) {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 56))
-                    .foregroundStyle(Color.sbGold)
-                Text("You're upgraded!")
-                    .font(SBFont.displayLarge)
+            VStack(spacing: 20) {
+                ZStack {
+                    Circle()
+                        .fill(Color.sbGold.opacity(0.15))
+                        .frame(width: 120, height: 120)
+                        .blur(radius: 20)
+
+                    Image(systemName: "checkmark.seal.fill")
+                        .font(.system(size: 64))
+                        .foregroundStyle(Color.sbGold)
+                        .symbolEffect(.bounce, value: showSuccess)
+                }
+
+                Text("Welcome to\n\(selectedProduct.displayName)!")
+                    .font(SBFont.fraunces(28, weight: .medium))
                     .foregroundStyle(Color.sbCharcoal)
-                Text("AI seating is now unlocked")
+                    .multilineTextAlignment(.center)
+
+                Text("AI seating is now unlocked.\nYour perfect arrangement awaits.")
                     .font(SBFont.body)
                     .foregroundStyle(Color.sbWarm)
+                    .multilineTextAlignment(.center)
             }
-            .padding(40)
-            .background(Color.sbIvory)
-            .clipShape(RoundedRectangle(cornerRadius: 24))
-            .shadow(color: Color.black.opacity(0.15), radius: 30, x: 0, y: 10)
-            .transition(.scale.combined(with: .opacity))
+            .padding(44)
+            .background(
+                RoundedRectangle(cornerRadius: 28)
+                    .fill(Color.sbIvory)
+                    .shadow(color: Color.black.opacity(0.2), radius: 40, x: 0, y: 15)
+            )
+            .padding(.horizontal, 32)
+            .transition(.scale(scale: 0.85).combined(with: .opacity))
         }
     }
 
@@ -363,6 +490,14 @@ struct UpgradeView: View {
         Task {
             _ = await storeKit.purchase(product)
             isPurchasing = false
+        }
+    }
+
+    // MARK: - Shimmer Animation
+
+    private func startShimmer() {
+        withAnimation(.linear(duration: 2.5).repeatForever(autoreverses: false)) {
+            shimmerOffset = 400
         }
     }
 }
