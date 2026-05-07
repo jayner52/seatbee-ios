@@ -94,9 +94,9 @@ struct EditorView: View {
         .sheet(isPresented: $showDetailSheet) {
             if let table = selectedTable {
                 tableDetailSheet(table)
-                    .presentationDetents([.fraction(0.45), .large])
+                    .presentationDetents([.fraction(0.50), .large])
                     .presentationDragIndicator(.visible)
-                    .presentationBackgroundInteraction(.enabled(upThrough: .fraction(0.45)))
+                    .presentationBackgroundInteraction(.enabled(upThrough: .fraction(0.50)))
                     .presentationCornerRadius(24)
             }
         }
@@ -391,49 +391,111 @@ struct EditorView: View {
         }
     }
 
-    // MARK: - Table Detail Sheet
+    // MARK: - Table Detail Sheet (split panel)
+    //
+    // Two equal columns: left = seat list, right = unseated guests.
+    // Tapping a guest on the right assigns them to the next empty seat at
+    // this table — no extra picker sheet needed. Tapping an empty seat on
+    // the left opens the full GuestPickerSheet (unchanged).
 
     private func tableDetailSheet(_ table: SeatTable) -> some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
-                    HStack {
+        let isLocked = table.locked == true
+        return HStack(alignment: .top, spacing: 0) {
+
+            // LEFT — seats
+            VStack(alignment: .leading, spacing: 0) {
+                // Column header
+                HStack(spacing: 8) {
+                    VStack(alignment: .leading, spacing: 2) {
                         Text(table.name)
-                            .font(SBFont.displaySmall)
+                            .font(SBFont.bodySmallBold)
                             .foregroundStyle(Color.sbCharcoal)
-                        Spacer()
-                        Text("\(table.type.rawValue) · \(table.seats) seats")
-                            .font(SBFont.small)
+                            .lineLimit(1)
+                        Text("\(table.filledCount)/\(table.seats) seated · \(table.type.rawValue)")
+                            .font(SBFont.caption)
                             .foregroundStyle(Color.sbWarm)
                     }
-
+                    Spacer()
                     Button {
                         showDetailSheet = false
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { showDrawer = true }
                     } label: {
                         HStack(spacing: 4) {
-                            Image(systemName: "slider.horizontal.3")
-                            Text("Edit Table")
+                            Image(systemName: "slider.horizontal.3").font(.system(size: 10))
+                            Text("Edit").font(SBFont.inter(11, weight: .semibold))
                         }
-                        .font(SBFont.inter(12, weight: .semibold))
                         .foregroundStyle(Color.sbGoldDk)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
                         .background(Color.sbChampagne)
                         .clipShape(RoundedRectangle(cornerRadius: SBRadius.small))
                     }
                     .buttonStyle(.plain)
-
-                    seatList(table: table)
                 }
-                .padding(.horizontal, SBSpacing.screenMargin)
-                .padding(.top, 12)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+
+                Divider()
+
+                ScrollView {
+                    seatList(table: table)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 10)
+                }
             }
-            .background(Color.sbIvory)
+            .frame(maxWidth: .infinity)
+
+            Divider()
+
+            // RIGHT — unseated guests
+            VStack(alignment: .leading, spacing: 0) {
+                let unseated = unassignedGuests
+                // Column header
+                HStack {
+                    Text("Guests")
+                        .font(SBFont.bodySmallBold)
+                        .foregroundStyle(Color.sbCharcoal)
+                    Spacer()
+                    if !unseated.isEmpty {
+                        Text("\(unseated.count) unseated")
+                            .font(SBFont.caption)
+                            .foregroundStyle(Color.sbWarm)
+                    }
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+
+                Divider()
+
+                if unseated.isEmpty {
+                    VStack(spacing: 8) {
+                        Spacer()
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 26))
+                            .foregroundStyle(Color.sbSage)
+                        Text("All guests seated")
+                            .font(SBFont.meta)
+                            .foregroundStyle(Color.sbWarm)
+                        Spacer()
+                    }
+                    .frame(maxWidth: .infinity)
+                } else {
+                    ScrollView {
+                        VStack(spacing: 4) {
+                            ForEach(unseated, id: \.id) { guest in
+                                quickAssignRow(guest, table: table, isLocked: isLocked)
+                            }
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 10)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity)
         }
-        // Nest the guest picker inside this sheet — sibling `.sheet`
-        // modifiers on EditorView can't stack (SwiftUI only presents the
-        // first true binding), so the empty-seat tap was a silent no-op.
+        .background(Color.sbIvory)
+        // Nest the guest picker here — sibling .sheet modifiers on
+        // EditorView can't stack; the seat-tap picker would be a no-op.
         .sheet(isPresented: $showGuestPicker) {
             if let plan {
                 GuestPickerSheet(guests: plan.guests, tables: plan.tables) { guest in
@@ -444,6 +506,39 @@ struct EditorView: View {
                 .presentationDragIndicator(.visible)
             }
         }
+    }
+
+    // Compact guest row for the right column. Tapping assigns the guest
+    // to the next available empty seat at the current table.
+    private func quickAssignRow(_ guest: Guest, table: SeatTable, isLocked: Bool) -> some View {
+        Button {
+            guard !isLocked else { return }
+            assignGuestToNextEmpty(guest)
+        } label: {
+            HStack(spacing: 8) {
+                SBAvatar(name: guest.displayName, size: 26)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(guest.displayName)
+                        .font(SBFont.bodySmall)
+                        .foregroundStyle(Color.sbCharcoal)
+                        .lineLimit(1)
+                    if let label = plan?.displayCategoryLabel(for: guest) {
+                        Text(label)
+                            .font(SBFont.capsLabel)
+                            .foregroundStyle(Color.sbWarm)
+                    }
+                }
+                Spacer()
+                Image(systemName: "plus.circle")
+                    .font(.system(size: 14))
+                    .foregroundStyle(isLocked ? Color.sbWarm2 : Color.sbGoldDk)
+            }
+            .padding(8)
+            .background(Color.sbIvory2)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+        }
+        .buttonStyle(.plain)
+        .disabled(isLocked)
     }
 
     // MARK: - Seat List
@@ -520,6 +615,25 @@ struct EditorView: View {
     }
 
     // MARK: - Data Mutations
+
+    private var unassignedGuests: [Guest] {
+        guard let plan else { return [] }
+        let assignedIds = Set(plan.tables.flatMap { $0.assignments.keys })
+        return plan.guests.filter { !assignedIds.contains($0.id) }
+    }
+
+    private func assignGuestToNextEmpty(_ guest: Guest) {
+        guard let tableId = selectedTableId,
+              var p = appState.activePlan,
+              let ti = p.tables.firstIndex(where: { $0.id == tableId }) else { return }
+        let table = p.tables[ti]
+        let occupiedSeats = Set(table.assignments.values)
+        guard let emptyIndex = (0..<table.seats).first(where: { !occupiedSeats.contains($0) }) else { return }
+        p.tables[ti].assignments[guest.id] = emptyIndex
+        appState.activePlan = p
+        HapticEngine.success()
+        Task { try? await appState.database.savePlanData(plan: p) }
+    }
 
     private var unseatedCount: Int {
         guard let plan else { return 0 }
