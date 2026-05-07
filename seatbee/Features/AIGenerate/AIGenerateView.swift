@@ -15,6 +15,7 @@ struct AIGenerateView: View {
     @State private var tierGateAlert: TierGateAlert?
     @State private var clearConfirm: ClearAction?
     @State private var showResetSheet = false
+    @State private var showLastRunDetail = false
 
     enum Phase { case ready, generating, complete, error }
 
@@ -119,6 +120,11 @@ struct AIGenerateView: View {
                 activeRulesCard
                 if lockedTablesCount > 0 {
                     lockedTablesHint
+                }
+                if let gen = appState.lastGenResult,
+                   gen.planId == appState.activePlan?.id,
+                   let scorecard = gen.result.scorecard {
+                    lastRunCard(scorecard)
                 }
                 generateButton
                 if guestsSeated > 0 {
@@ -596,6 +602,58 @@ struct AIGenerateView: View {
         .buttonStyle(.plain)
     }
 
+    private func lastRunCard(_ s: SeatService.GenerateResult.Scorecard) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    showLastRunDetail.toggle()
+                }
+            } label: {
+                HStack(spacing: 10) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("LAST RUN")
+                            .font(SBFont.capsLabel)
+                            .foregroundStyle(Color.sbWarm2)
+                        HStack(alignment: .firstTextBaseline, spacing: 6) {
+                            Text("\(s.overallPercent)%")
+                                .font(SBFont.fraunces(22, weight: .medium))
+                                .foregroundStyle(Color.sbCharcoal)
+                            Text(s.overallLabel)
+                                .font(SBFont.bodySmall)
+                                .foregroundStyle(Color.sbSage)
+                        }
+                    }
+                    Spacer()
+                    Text("\(s.totalSatisfied)/\(s.totalRules) rules")
+                        .font(SBFont.caption)
+                        .foregroundStyle(Color.sbWarm)
+                    Image(systemName: showLastRunDetail ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Color.sbWarm2)
+                }
+                .padding(14)
+            }
+            .buttonStyle(.plain)
+
+            if showLastRunDetail {
+                VStack(spacing: 8) {
+                    Divider().padding(.horizontal, 14)
+                    if s.hardConstraints.total > 0 {
+                        rulesSection(title: "Required Rules", bucket: s.hardConstraints, accent: Color.sbGoldDk)
+                            .padding(.horizontal, 14)
+                    }
+                    if s.softPreferences.total > 0 {
+                        rulesSection(title: "Preferences", bucket: s.softPreferences, accent: Color.sbSage)
+                            .padding(.horizontal, 14)
+                    }
+                }
+                .padding(.bottom, 14)
+            }
+        }
+        .background(Color.sbIvory2)
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
     private var tipText: some View {
         Text("Each generation uses a different random seed — re-running can produce different arrangements.")
             .font(SBFont.small)
@@ -680,6 +738,7 @@ struct AIGenerateView: View {
             appState.activePlan = plan
             try await appState.database.savePlanData(plan: plan)
             lastResult = result
+            appState.lastGenResult = (planId: plan.id, result: result)
             fellBackToRoundRobin = result.fallback ?? false
             resultMessage = "Seated \(plan.tables.reduce(0) { $0 + $1.assignments.count }) of \(activeGuestCount) guests."
             HapticEngine.success()

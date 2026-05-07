@@ -39,6 +39,10 @@ final class AppState {
     // this flag in onChange.
     var pendingShowRules = false
 
+    // Last AI generation result, keyed by plan ID so it auto-invalidates
+    // when the user switches plans. Survives tab navigation within a session.
+    var lastGenResult: (planId: String, result: SeatService.GenerateResult)?
+
     /// Refresh the user's pass inventory from /api/passes.
     /// Safe to call on app foreground and after sign-in.
     func refreshPasses() async {
