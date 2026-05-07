@@ -242,8 +242,10 @@ struct SettingsSheet: View {
                 if let p = await appState.auth.loadProfile() {
                     emailMarketingOptIn = p.email_marketing_opt_in ?? false
                     selectedRoles = Set(p.user_roles ?? [])
-                    profileDisplayName = p.full_name
                 }
+                // Fetch name separately so a missing DB column never
+                // breaks role/marketing loading above.
+                profileDisplayName = await appState.auth.loadFullName()
                 profileLoaded = true
             }
             .alert("Sign Out?", isPresented: $showSignOutConfirm) {

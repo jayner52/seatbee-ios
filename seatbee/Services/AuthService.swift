@@ -114,17 +114,18 @@ final class AuthService {
     struct UserProfile: Decodable {
         let user_roles: [String]?
         let email_marketing_opt_in: Bool?
-        let full_name: String?
     }
 
     /// Fetches the active user's profile row. Returns nil when there
     /// is no signed-in user or the row doesn't exist (legacy / pre-trigger).
+    /// Intentionally omits full_name — fetched separately via loadFullName()
+    /// so a missing column never breaks role/marketing loading.
     func loadProfile() async -> UserProfile? {
         guard let user = currentUser else { return nil }
         do {
             let p: UserProfile = try await supabase
                 .from("profiles")
-                .select("user_roles, email_marketing_opt_in, full_name")
+                .select("user_roles, email_marketing_opt_in")
                 .eq("id", value: user.id.uuidString)
                 .single()
                 .execute()
@@ -132,6 +133,26 @@ final class AuthService {
             return p
         } catch {
             print("[Auth] loadProfile failed: \(error)")
+            return nil
+        }
+    }
+
+    /// Fetches full_name from the profiles table. Separate from loadProfile
+    /// so a missing column (before migration) never breaks role/marketing loading.
+    func loadFullName() async -> String? {
+        guard let user = currentUser else { return nil }
+        struct NameRow: Decodable { let full_name: String? }
+        do {
+            let row: NameRow = try await supabase
+                .from("profiles")
+                .select("full_name")
+                .eq("id", value: user.id.uuidString)
+                .single()
+                .execute()
+                .value
+            return row.full_name
+        } catch {
+            // Column may not exist yet — fail silently, use OAuth metadata instead.
             return nil
         }
     }
