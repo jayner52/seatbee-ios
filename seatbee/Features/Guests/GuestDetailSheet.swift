@@ -252,20 +252,22 @@ struct GuestDetailSheet: View {
                 Text("This will remove \(guest?.displayName ?? "this guest") from the plan.")
             }
             .alert("Guest Limit Reached", isPresented: $showTierLimitAlert) {
-                Button("OK", role: .cancel) {}
+                Button("Upgrade") { appState.showUpgrade = true }
+                Button("Not now", role: .cancel) {}
             } message: {
                 let limits = appState.activePlanLimits
                 let tier = appState.activePlanTier
                 if appState.isActivePlanExpired {
-                    Text("This event's pass has expired. You can keep editing existing guests, but adding new ones requires applying a fresh Event Pass in Settings.")
+                    Text("This event's pass has expired. Upgrade to keep seating guests.")
                 } else {
-                    Text("Your \(tier.displayName) plan supports up to \(limits.seatedGuests) guests. Apply an Event Pass in Settings to seat more.")
+                    Text("Your \(tier.displayName) plan supports seating up to \(limits.seatedGuests) guests. Upgrade for more.")
                 }
             }
             .alert("You're at \(appState.activePlanLimits.seatedGuests * 8 / 10) of \(appState.activePlanLimits.seatedGuests) free guests", isPresented: $showSoftWarningAlert) {
+                Button("Upgrade") { appState.showUpgrade = true }
                 Button("Got it", role: .cancel) {}
             } message: {
-                Text("Apply an Event Pass before you hit the cap to seat up to 250 guests with AI seating included.")
+                Text("Upgrade to seat up to 250 guests with AI seating included.")
             }
         }
         .onAppear { loadGuest() }

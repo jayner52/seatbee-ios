@@ -157,7 +157,8 @@ struct CSVImportSheet: View {
                 "Guest Limit Reached",
                 isPresented: Binding(get: { tierLimitMessage != nil }, set: { if !$0 { tierLimitMessage = nil } })
             ) {
-                Button("OK", role: .cancel) {}
+                Button("Upgrade") { appState.showUpgrade = true }
+                Button("Not now", role: .cancel) {}
             } message: {
                 Text(tierLimitMessage ?? "")
             }
