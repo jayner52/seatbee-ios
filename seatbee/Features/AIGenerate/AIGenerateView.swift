@@ -711,14 +711,10 @@ struct AIGenerateView: View {
     // MARK: - Actions
 
     private func runGenerate() async {
-        // Tier gate (mirrors web checkTierLimit('ai_generate') at App.jsx:6217).
+        // Tier gate — skip the alert, go straight to the paywall
         guard appState.activePlanLimits.aiGenerate else {
             HapticEngine.error()
-            tierGateAlert = appState.isActivePlanExpired
-                ? TierGateAlert(title: "Pass Expired",
-                                message: "This event's pass has expired. Apply a new Event Pass in Settings to use AI seating again.")
-                : TierGateAlert(title: "AI Seating Needs an Event Pass",
-                                message: "AI seating is included with Event Pass, Signature Pass, and Grand Event Pass. Apply a pass in Settings → Event Passes to unlock.")
+            appState.showUpgrade = true
             return
         }
         guard var plan = appState.activePlan else { return }
