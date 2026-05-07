@@ -8,6 +8,25 @@ final class AuthService {
     var isAuthenticated: Bool { currentUser != nil }
     var isLoading = false
     var error: String?
+
+    /// Best available display name: OAuth provider name → stored profile name → nil.
+    /// Google stores `full_name` in userMetadata; Apple stores `full_name` only on
+    /// first auth, so we persist it to profiles and read it back via `loadProfile`.
+    var displayName: String? {
+        guard let user = currentUser else { return nil }
+        if case .string(let n) = user.userMetadata["full_name"], !n.isEmpty { return n }
+        if case .string(let n) = user.userMetadata["name"], !n.isEmpty { return n }
+        return nil
+    }
+
+    /// Google profile photo URL. Supabase normalises the Google `picture` claim
+    /// to `avatar_url` in userMetadata. Returns nil for Apple / email users.
+    var avatarURL: URL? {
+        guard let user = currentUser else { return nil }
+        if case .string(let s) = user.userMetadata["avatar_url"] { return URL(string: s) }
+        if case .string(let s) = user.userMetadata["picture"]    { return URL(string: s) }
+        return nil
+    }
     /// True when the user just signed up on this device and the consent
     /// sheet (role multi-select + marketing toggle + TOS) hasn't been
     /// completed yet. RootView gates on this between AuthView and
@@ -49,7 +68,7 @@ final class AuthService {
     // Gated by `accountAgeSec < 60` so re-auth on returning sessions never
     // resets the user's later settings choices. Mirrors useAuth.jsx
     // `isNewUser` check (~60 s window).
-    private func writeIOSSignupProfileIfNew() async {
+    private func writeIOSSignupProfileIfNew(appleFullName: String? = nil) async {
         guard let user = currentUser else { return }
         let ageSec = Date().timeIntervalSince(user.createdAt)
         guard ageSec < 60 else { return }
@@ -57,17 +76,23 @@ final class AuthService {
         // the user sees role / marketing / TOS questions next.
         await MainActor.run { self.needsSignupConsent = true }
 
+        // Prefer Apple credential name (first-auth only), fall back to
+        // Google/OAuth metadata already in userMetadata.
+        let nameToStore: String? = appleFullName ?? displayName
+
         struct ProfilePayload: Encodable {
             let signup_platform: String
             let tos_agreed_at: String
             let email_marketing_opt_in: Bool
             let user_roles: [String]
+            let full_name: String?
         }
         let payload = ProfilePayload(
             signup_platform: "ios",
             tos_agreed_at: ISO8601DateFormatter().string(from: Date()),
             email_marketing_opt_in: false,
-            user_roles: []
+            user_roles: [],
+            full_name: nameToStore
         )
         do {
             try await supabase
@@ -89,6 +114,7 @@ final class AuthService {
     struct UserProfile: Decodable {
         let user_roles: [String]?
         let email_marketing_opt_in: Bool?
+        let full_name: String?
     }
 
     /// Fetches the active user's profile row. Returns nil when there
@@ -98,7 +124,7 @@ final class AuthService {
         do {
             let p: UserProfile = try await supabase
                 .from("profiles")
-                .select("user_roles, email_marketing_opt_in")
+                .select("user_roles, email_marketing_opt_in, full_name")
                 .eq("id", value: user.id.uuidString)
                 .single()
                 .execute()
@@ -107,6 +133,20 @@ final class AuthService {
         } catch {
             print("[Auth] loadProfile failed: \(error)")
             return nil
+        }
+    }
+
+    func updateDisplayName(_ name: String) async {
+        guard let user = currentUser, !name.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+        struct Payload: Encodable { let full_name: String }
+        do {
+            try await supabase
+                .from("profiles")
+                .update(Payload(full_name: name))
+                .eq("id", value: user.id.uuidString)
+                .execute()
+        } catch {
+            print("[Auth] display name save failed: \(error)")
         }
     }
 
@@ -145,15 +185,18 @@ final class AuthService {
     /// Called by SignupConsentView's Continue button. Pushes the user's
     /// role + marketing-opt-in choices into the profiles row and clears
     /// the consent gate so the rest of the app loads.
-    func completeSignupConsent(userRoles: [String], emailMarketingOptIn: Bool) async {
+    func completeSignupConsent(userRoles: [String], emailMarketingOptIn: Bool, displayName: String? = nil) async {
         guard let user = currentUser else { return }
         struct ConsentPayload: Encodable {
             let user_roles: [String]
             let email_marketing_opt_in: Bool
+            let full_name: String?
         }
+        let nameToStore = displayName.flatMap { $0.trimmingCharacters(in: .whitespaces).isEmpty ? nil : $0 }
         let payload = ConsentPayload(
             user_roles: userRoles,
-            email_marketing_opt_in: emailMarketingOptIn
+            email_marketing_opt_in: emailMarketingOptIn,
+            full_name: nameToStore
         )
         do {
             try await supabase
@@ -190,7 +233,14 @@ final class AuthService {
                 )
             )
             currentUser = session.user
-            await writeIOSSignupProfileIfNew()
+            // Apple only provides fullName on the first authentication.
+            // Capture it immediately and persist to the profile row.
+            let appleName: String? = {
+                guard let fn = credential.fullName else { return nil }
+                let parts = [fn.givenName, fn.familyName].compactMap { $0 }.filter { !$0.isEmpty }
+                return parts.isEmpty ? nil : parts.joined(separator: " ")
+            }()
+            await writeIOSSignupProfileIfNew(appleFullName: appleName)
         } catch let e {
             self.error = e.localizedDescription
         }
