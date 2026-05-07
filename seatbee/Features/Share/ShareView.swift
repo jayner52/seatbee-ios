@@ -355,6 +355,29 @@ struct ShareView: View {
                     exportCard(icon: "square.grid.3x2", title: "Tables CSV")
                 }
             }
+
+            // Pointer at the polished web export catalogue. iOS print
+            // exports use a stripped-down native renderer; the full place
+            // card / table card / seating chart designs live on web until
+            // the WKWebView pipeline lands (see PARITY.md).
+            Link(destination: URL(string: "https://www.seatbee.app")!) {
+                HStack(spacing: 6) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 11))
+                    Text("Need name cards, table cards, or a printable seating chart?")
+                        .font(SBFont.caption)
+                    Text("Visit seatbee.app")
+                        .font(SBFont.bodySmallBold)
+                    Image(systemName: "arrow.up.right")
+                        .font(.system(size: 10, weight: .semibold))
+                }
+                .foregroundStyle(Color.sbGoldDk)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+                .background(Color.sbChampagne.opacity(0.5))
+                .clipShape(RoundedRectangle(cornerRadius: SBRadius.small))
+            }
+            .padding(.top, 4)
         }
     }
 
@@ -628,7 +651,17 @@ struct ShareView: View {
     }
 
     private func exportCard(icon: String, title: String) -> some View {
-        Button {
+        // Free-tier CSV exports are paywalled to match web (App.jsx
+        // ExpPanel) and PARITY.md. PDFs / images stay free for now —
+        // the larger watermark + WKWebView export pipeline is parked.
+        let isCSV = title == "Guest CSV" || title == "Tables CSV"
+        let isPaid = appState.activePlanTier != .free && !appState.isActivePlanExpired
+        let locked = isCSV && !isPaid
+        return Button {
+            if locked {
+                appState.showUpgrade = true
+                return
+            }
             if let plan = appState.activePlan {
                 switch title {
                 case "PDF":
@@ -646,21 +679,32 @@ struct ShareView: View {
                 }
             }
         } label: {
-            VStack(spacing: 8) {
-                Image(systemName: icon)
-                    .font(.system(size: 24))
-                    .foregroundStyle(Color.sbGoldDk)
-                Text(title)
-                    .font(SBFont.caption)
-                    .foregroundStyle(Color.sbCharcoal)
+            ZStack(alignment: .topTrailing) {
+                VStack(spacing: 8) {
+                    Image(systemName: icon)
+                        .font(.system(size: 24))
+                        .foregroundStyle(locked ? Color.sbWarm : Color.sbGoldDk)
+                    Text(title)
+                        .font(SBFont.caption)
+                        .foregroundStyle(Color.sbCharcoal)
+                }
+                .frame(width: 100, height: 80)
+                .background(Color.sbIvory2)
+                .clipShape(RoundedRectangle(cornerRadius: SBRadius.chip))
+                .overlay(
+                    RoundedRectangle(cornerRadius: SBRadius.chip)
+                        .strokeBorder(Color.sbLine, lineWidth: 1)
+                )
+                if locked {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(Color.sbGoldDk)
+                        .padding(5)
+                        .background(Color.sbChampagne)
+                        .clipShape(Circle())
+                        .padding(6)
+                }
             }
-            .frame(width: 100, height: 80)
-            .background(Color.sbIvory2)
-            .clipShape(RoundedRectangle(cornerRadius: SBRadius.chip))
-            .overlay(
-                RoundedRectangle(cornerRadius: SBRadius.chip)
-                    .strokeBorder(Color.sbLine, lineWidth: 1)
-            )
         }
         .buttonStyle(.plain)
     }

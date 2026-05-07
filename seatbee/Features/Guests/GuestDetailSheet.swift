@@ -23,7 +23,6 @@ struct GuestDetailSheet: View {
     @State private var selectedDietaryTags: Set<String> = []
     @State private var showDeleteConfirm = false
     @State private var showTierLimitAlert = false
-    @State private var showSoftWarningAlert = false
 
     private var isEditing: Bool { guest != nil }
 
@@ -254,9 +253,6 @@ struct GuestDetailSheet: View {
             .onChange(of: showTierLimitAlert) { _, show in
                 if show { showTierLimitAlert = false; appState.showUpgrade = true }
             }
-            .onChange(of: showSoftWarningAlert) { _, show in
-                if show { showSoftWarningAlert = false; appState.showUpgrade = true }
-            }
         }
         .onAppear { loadGuest() }
     }
@@ -402,16 +398,11 @@ struct GuestDetailSheet: View {
         appState.activePlan = plan
         HapticEngine.success()
 
-        // After a successful add, fire the 80% soft-warning nudge once per
-        // session if the user has crossed the threshold on a free-tier plan.
-        // Mirrors web's nudge at App.jsx:6211.
-        if !isEditing
-            && appState.activePlanTier == .free
-            && plan.guests.count >= Int(Double(appState.activePlanLimits.seatedGuests) * 0.8)
-            && !appState.hasShownGuestSoftWarning {
-            appState.hasShownGuestSoftWarning = true
-            showSoftWarningAlert = true
-        }
+        // The 80% soft-warning nudge previously lived here, tied to
+        // adding guests to the list. Web parity (App.jsx:4470) gates on
+        // the SEATED count instead — the unsorted list is unmetered.
+        // EditorView fires the nudge from `assignGuest` /
+        // `assignGuestToNextEmpty` when the seated count crosses 80%.
 
         Task {
             try? await appState.database.savePlanData(plan: plan)
