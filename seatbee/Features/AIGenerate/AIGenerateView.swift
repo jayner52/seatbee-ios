@@ -68,7 +68,8 @@ struct AIGenerateView: View {
             ),
             presenting: tierGateAlert
         ) { _ in
-            Button("OK", role: .cancel) {}
+            Button("Upgrade") { appState.showUpgrade = true }
+            Button("Not now", role: .cancel) {}
         } message: { gate in
             Text(gate.message)
         }

@@ -92,6 +92,18 @@ struct SettingsSheet: View {
                                 }
                             }
                         }
+                        Button {
+                            appState.showUpgrade = true
+                            dismiss()
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: "sparkles")
+                                    .foregroundStyle(Color.sbGold)
+                                    .frame(width: 24)
+                                Text("Upgrade Plan")
+                                    .foregroundStyle(Color.sbGold)
+                            }
+                        }
                     } header: {
                         Text("Passes")
                     }
