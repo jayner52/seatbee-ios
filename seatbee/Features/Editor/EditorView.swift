@@ -310,6 +310,17 @@ struct EditorView: View {
                         .foregroundStyle(Color.sbCharcoal)
                     Spacer()
                     Button {
+                        toggleObjectLock(id: objId)
+                        HapticEngine.selection()
+                    } label: {
+                        Image(systemName: obj.locked == true ? "lock.fill" : "lock")
+                            .font(.system(size: 14))
+                            .foregroundStyle(obj.locked == true ? Color.sbGold : Color.sbWarm)
+                            .frame(width: 34, height: 34)
+                            .background(.regularMaterial)
+                            .clipShape(Circle())
+                    }
+                    Button {
                         showEditObject = true
                         HapticEngine.selection()
                     } label: {
@@ -528,6 +539,14 @@ struct EditorView: View {
         p.objects[idx].x = x
         p.objects[idx].y = y
         appState.activePlan = p
+    }
+
+    private func toggleObjectLock(id: String) {
+        guard var p = appState.activePlan,
+              let idx = p.objects.firstIndex(where: { $0.id == id }) else { return }
+        p.objects[idx].locked = !(p.objects[idx].locked ?? false)
+        appState.activePlan = p
+        Task { try? await appState.database.savePlanData(plan: p) }
     }
 
     private func deleteObjectById(_ id: String) {

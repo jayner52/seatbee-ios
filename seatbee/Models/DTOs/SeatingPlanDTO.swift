@@ -397,6 +397,7 @@ struct ObjectDTO: Codable {
     let category: String?
     let icon: String?
     let isObstacle: Bool?
+    let locked: Bool?
 
     func toDomain() -> RoomObject {
         RoomObject(
@@ -411,7 +412,8 @@ struct ObjectDTO: Codable {
             color: color,
             category: category,
             icon: icon,
-            isObstacle: isObstacle
+            isObstacle: isObstacle,
+            locked: locked
         )
     }
 }

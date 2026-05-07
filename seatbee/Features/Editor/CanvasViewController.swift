@@ -1487,6 +1487,7 @@ class CanvasObjectView: UIView {
 
     private let iconView = UIImageView()
     private let nameLabel = UILabel()
+    private let lockBadge = UIImageView()
 
     init(object: RoomObject, isSelected: Bool) {
         self.object = object
@@ -1514,6 +1515,16 @@ class CanvasObjectView: UIView {
         nameLabel.adjustsFontSizeToFitWidth = true
         nameLabel.minimumScaleFactor = 0.7
         addSubview(nameLabel)
+
+        lockBadge.image = UIImage(systemName: "lock.fill")
+        lockBadge.tintColor = UIColor(red: 168/255, green: 136/255, blue: 67/255, alpha: 1)
+        lockBadge.contentMode = .scaleAspectFit
+        lockBadge.backgroundColor = UIColor(red: 255/255, green: 254/255, blue: 249/255, alpha: 0.95)
+        lockBadge.layer.cornerRadius = 8
+        lockBadge.layer.borderColor = UIColor(red: 168/255, green: 136/255, blue: 67/255, alpha: 0.35).cgColor
+        lockBadge.layer.borderWidth = 0.5
+        lockBadge.isHidden = true
+        addSubview(lockBadge)
     }
 
     func update(object: RoomObject, isSelected: Bool) {
@@ -1555,6 +1566,10 @@ class CanvasObjectView: UIView {
         layer.shadowOpacity = isSelected ? 0.2 : 0.1
         layer.shadowRadius = isSelected ? 8 : 4
         layer.shadowOffset = CGSize(width: 0, height: 2)
+
+        let badgeSize: CGFloat = 16
+        lockBadge.frame = CGRect(x: bounds.width - badgeSize - 4, y: 4, width: badgeSize, height: badgeSize)
+        lockBadge.isHidden = (object.locked != true)
     }
 
     func setSelected(_ selected: Bool) {
@@ -1581,6 +1596,7 @@ class CanvasObjectView: UIView {
     }
 
     @objc private func handlePan(_ gesture: UIPanGestureRecognizer) {
+        guard object.locked != true else { return }
         guard let superview = superview else { return }
         let translation = gesture.translation(in: superview)
 

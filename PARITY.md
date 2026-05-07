@@ -140,7 +140,7 @@ iOS encodes/decodes via the `RuleType` enum which has matching `rawValue` string
 
 ### RoomObject (venue object)
 
-Core: `id`, `type`, `name`, `x`, `y`, `width`, `height`, `rotation`
+Core: `id`, `type`, `name`, `x`, `y`, `width`, `height`, `rotation`, `locked`
 
 Web-parity (preserved on iOS round-trip): `color`, `category` (e.g. "entertainment"/"food"/"services"), `icon` (icon name), `isObstacle` (boolean)
 

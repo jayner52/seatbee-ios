@@ -342,14 +342,37 @@ struct EditVenueObjectSheet: View {
     private var unitLabel: String { RoomScale.unitLabel(for: unit) }
     private var pxPerUnit: Double { RoomScale.factor(for: unit) }
 
+    private var isLocked: Bool { object?.locked == true }
+
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
+                    if isLocked {
+                        HStack(spacing: 8) {
+                            Image(systemName: "lock.fill")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(Color.sbSage)
+                            Text("Locked — unlock to edit size and rotation")
+                                .font(SBFont.caption)
+                                .foregroundStyle(Color.sbSage)
+                            Spacer()
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(Color.sbSage.opacity(0.12))
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    }
                     nameField
                     sizeFields
+                        .disabled(isLocked)
+                        .opacity(isLocked ? 0.5 : 1)
                     rotationField
+                        .disabled(isLocked)
+                        .opacity(isLocked ? 0.5 : 1)
                     quickSizeGrid
+                        .disabled(isLocked)
+                        .opacity(isLocked ? 0.5 : 1)
                     Spacer(minLength: 20)
                 }
                 .padding(.horizontal, SBSpacing.screenMargin)

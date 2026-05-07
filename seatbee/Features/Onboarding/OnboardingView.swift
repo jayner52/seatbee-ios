@@ -1623,7 +1623,7 @@ struct OnboardingView: View {
                 id: "obj_\(type)_\(UUID().uuidString.prefix(6))",
                 type: type, name: item?.name ?? type.capitalized,
                 x: pos.x, y: pos.y, width: pos.w, height: pos.h, rotation: 0,
-                color: pos.color, category: nil, icon: item?.icon, isObstacle: false
+                color: pos.color, category: nil, icon: item?.icon, isObstacle: false, locked: nil
             ))
         }
 

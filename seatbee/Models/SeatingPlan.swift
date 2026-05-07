@@ -445,6 +445,7 @@ struct RoomObject: Identifiable, Codable {
     var category: String?    // e.g. "entertainment", "food"
     var icon: String?        // icon name from web
     var isObstacle: Bool?
+    var locked: Bool?
 }
 
 // MARK: - AnyCodable (type-erased JSON value for passthrough)
@@ -549,7 +550,8 @@ extension SeatingPlan {
                 ObjectDTO(
                     id: o.id, type: o.type, name: o.name, x: o.x, y: o.y,
                     width: o.width, height: o.height, rotation: o.rotation,
-                    color: o.color, category: o.category, icon: o.icon, isObstacle: o.isObstacle
+                    color: o.color, category: o.category, icon: o.icon, isObstacle: o.isObstacle,
+                    locked: o.locked
                 )
             },
             categories: rawCategories,
