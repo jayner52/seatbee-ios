@@ -14,13 +14,14 @@ struct SignupConsentView: View {
     @State private var selectedRoles: Set<String> = []
     @State private var emailMarketingOptIn = true   // matches web default
     @State private var isSubmitting = false
+    @State private var enteredName = ""
 
-    /// Web parity: the four user-role options on PlannerAuthModal.
+    // Web parity: role IDs must match App.jsx line 22633 exactly.
     private static let roleOptions: [(id: String, label: String, icon: String)] = [
-        ("bride_groom", "Bride or Groom",                "heart.fill"),
-        ("host",        "Event Host",                    "person.fill"),
-        ("planner",     "Professional Wedding Planner",  "briefcase.fill"),
-        ("vendor",      "Wedding Vendor",                "storefront.fill"),
+        ("bride_groom",    "Bride or Groom",               "heart.fill"),
+        ("event_host",     "Event Host",                   "person.fill"),
+        ("wedding_planner","Professional Wedding Planner",  "briefcase.fill"),
+        ("wedding_vendor", "Wedding Vendor",               "storefront.fill"),
     ]
 
     var body: some View {
@@ -28,6 +29,7 @@ struct SignupConsentView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
                     header
+                    nameSection
                     roleSection
                     marketingSection
                     tosSection
@@ -52,6 +54,35 @@ struct SignupConsentView: View {
             Text("A couple of quick questions so we can tailor your experience.")
                 .font(SBFont.body)
                 .foregroundStyle(Color.sbWarm)
+        }
+    }
+
+    // Name field — shown to all new users. Pre-filled from OAuth metadata
+    // (Google/Apple) when available; otherwise the user types their name.
+    // Email/magic-link users have no OAuth name at all.
+    private var nameSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("YOUR NAME")
+                .font(SBFont.capsLabel)
+                .foregroundStyle(Color.sbWarm)
+                .letterSpacing(1.5)
+            TextField("First and last name", text: $enteredName)
+                .font(SBFont.body)
+                .padding(14)
+                .background(Color.sbIvory2)
+                .clipShape(RoundedRectangle(cornerRadius: SBRadius.button))
+                .overlay(
+                    RoundedRectangle(cornerRadius: SBRadius.button)
+                        .strokeBorder(Color.sbLine, lineWidth: 1)
+                )
+                .textContentType(.name)
+                .autocorrectionDisabled()
+        }
+        .onAppear {
+            // Pre-fill from OAuth metadata if available
+            if let name = appState.auth.displayName, !name.isEmpty {
+                enteredName = name
+            }
         }
     }
 
@@ -151,7 +182,8 @@ struct SignupConsentView: View {
                 isSubmitting = true
                 await appState.auth.completeSignupConsent(
                     userRoles: Array(selectedRoles),
-                    emailMarketingOptIn: emailMarketingOptIn
+                    emailMarketingOptIn: emailMarketingOptIn,
+                    displayName: enteredName.isEmpty ? nil : enteredName
                 )
                 // needsSignupConsent flips to false inside the call,
                 // RootView swaps to AppRouter automatically.

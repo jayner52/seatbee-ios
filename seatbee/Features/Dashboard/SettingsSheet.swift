@@ -13,12 +13,14 @@ struct SettingsSheet: View {
     @State private var emailMarketingOptIn = false
     @State private var selectedRoles: Set<String> = []
     @State private var profileLoaded = false
+    @State private var profileDisplayName: String? = nil
 
+    // Web parity: role IDs must match App.jsx line 22633 exactly.
     private static let roleOptions: [(id: String, label: String, icon: String)] = [
-        ("bride_groom", "Bride or Groom",                "heart.fill"),
-        ("host",        "Event Host",                    "person.fill"),
-        ("planner",     "Professional Wedding Planner",  "briefcase.fill"),
-        ("vendor",      "Wedding Vendor",                "storefront.fill"),
+        ("bride_groom",    "Bride or Groom",               "heart.fill"),
+        ("event_host",     "Event Host",                   "person.fill"),
+        ("wedding_planner","Professional Wedding Planner",  "briefcase.fill"),
+        ("wedding_vendor", "Wedding Vendor",               "storefront.fill"),
     ]
 
     var body: some View {
@@ -27,15 +29,29 @@ struct SettingsSheet: View {
                 // Account
                 Section {
                     if let user = appState.auth.currentUser {
+                        let displayName = profileDisplayName ?? appState.auth.displayName
                         HStack(spacing: 12) {
-                            SBAvatar(name: user.email ?? "User", size: 40)
+                            SBAvatar(
+                                name: displayName ?? user.email ?? "User",
+                                size: 40,
+                                photoURL: appState.auth.avatarURL
+                            )
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(user.email ?? "Signed in")
-                                    .font(SBFont.bodySmallBold)
-                                    .foregroundStyle(Color.sbCharcoal)
-                                Text("Seatbee Account")
-                                    .font(SBFont.caption)
-                                    .foregroundStyle(Color.sbWarm)
+                                if let name = displayName, !name.isEmpty {
+                                    Text(name)
+                                        .font(SBFont.bodySmallBold)
+                                        .foregroundStyle(Color.sbCharcoal)
+                                    Text(user.email ?? "Seatbee Account")
+                                        .font(SBFont.caption)
+                                        .foregroundStyle(Color.sbWarm)
+                                } else {
+                                    Text(user.email ?? "Signed in")
+                                        .font(SBFont.bodySmallBold)
+                                        .foregroundStyle(Color.sbCharcoal)
+                                    Text("Seatbee Account")
+                                        .font(SBFont.caption)
+                                        .foregroundStyle(Color.sbWarm)
+                                }
                             }
                         }
                         .padding(.vertical, 4)
@@ -226,6 +242,7 @@ struct SettingsSheet: View {
                 if let p = await appState.auth.loadProfile() {
                     emailMarketingOptIn = p.email_marketing_opt_in ?? false
                     selectedRoles = Set(p.user_roles ?? [])
+                    profileDisplayName = p.full_name
                 }
                 profileLoaded = true
             }

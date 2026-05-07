@@ -3,8 +3,28 @@ import SwiftUI
 struct SBAvatar: View {
     let name: String
     var size: CGFloat = 36
+    var photoURL: URL? = nil
 
     var body: some View {
+        if let url = photoURL {
+            AsyncImage(url: url) { phase in
+                if let image = phase.image {
+                    image
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: size, height: size)
+                        .clipShape(Circle())
+                } else {
+                    initialsView
+                }
+            }
+            .frame(width: size, height: size)
+        } else {
+            initialsView
+        }
+    }
+
+    private var initialsView: some View {
         ZStack {
             Circle()
                 .fill(avatarColor)
