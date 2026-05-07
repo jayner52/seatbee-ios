@@ -1200,10 +1200,10 @@ class CanvasTableView: UIView {
         let text = isFull ? "\(filled)/\(total) ✓" : "\(filled)/\(total)"
         countLabel.text = text
 
-        if isFull && (table.type == .round || table.type == .oval) {
-            // Gold pill below the centred name.
-            countLabel.backgroundColor = CanvasTableView.atmGold
-            countLabel.textColor = CanvasTableView.atmPaper
+        if isFull {
+            // Gold pill inside the body, just below the centred name.
+            countLabel.backgroundColor = isHead ? CanvasTableView.atmGold : CanvasTableView.atmGold
+            countLabel.textColor = isHead ? CanvasTableView.atmInk : CanvasTableView.atmPaper
             let pillSize = CGSize(width: 44, height: 16)
             countLabel.frame = CGRect(x: c.x - pillSize.width / 2,
                                        y: c.y + 8,
@@ -1213,14 +1213,12 @@ class CanvasTableView: UIView {
             countLabel.textColor = isHead
                 ? CanvasTableView.atmGold
                 : CanvasTableView.atmInk2
-            // Position differs by shape: round/oval below the name in body;
-            // rect/head just below the body so the progress line stays
-            // visible above the label.
+            // All shapes: count sits just below the centred name inside the body.
             let yOffset: CGFloat
             switch table.type {
             case .round:        yOffset = c.y + 10
             case .oval:         yOffset = c.y + 11
-            case .rect, .head:  yOffset = c.y + body.height / 2 + 6
+            case .rect, .head:  yOffset = c.y + 10
             case .sweetheart:   yOffset = c.y + 10  // unused
             }
             countLabel.frame = CGRect(x: c.x - 28, y: yOffset, width: 56, height: 12)
