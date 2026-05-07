@@ -157,14 +157,33 @@ struct ShareView: View {
                 }
 
                 if collabIsOwner {
+                    // Collaborator invites are a paid-tier feature on web
+                    // (AccountSettings ~25149) and the dashboard tier
+                    // badge already lists them as such. On free / expired
+                    // plans we route the tap straight to the paywall —
+                    // matches the "skip gate alerts, go straight to
+                    // paywall" pattern Shayan wired for the other gates.
+                    let isPaid = appState.activePlanTier != .free && !appState.isActivePlanExpired
                     Button {
-                        inviteEmail = ""
-                        inviteResult = nil
-                        showInvitePrompt = true
+                        if isPaid {
+                            inviteEmail = ""
+                            inviteResult = nil
+                            showInvitePrompt = true
+                        } else {
+                            appState.showUpgrade = true
+                        }
                     } label: {
                         HStack(spacing: 6) {
-                            Image(systemName: "plus.circle.fill")
+                            Image(systemName: isPaid ? "plus.circle.fill" : "lock.fill")
                             Text("Invite by email")
+                            if !isPaid {
+                                Text("· Upgrade")
+                                    .font(SBFont.caption)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(Color.sbChampagne)
+                                    .clipShape(Capsule())
+                            }
                         }
                         .font(SBFont.bodySemibold)
                         .foregroundStyle(Color.sbGoldDk)
