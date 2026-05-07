@@ -94,7 +94,11 @@ struct AddTableSheet: View {
             rotation: 0,
             assignments: [:],
             locked: false,
-            color: type == .sweetheart || type == .head ? "#C9A961" : "#9CAF88",
+            // Web parity (App.jsx atmospheric redesign ad49273): all new
+            // tables default to gold. The colour now reads as a thin inner
+            // ring on top of the paper body, so monotone defaults give the
+            // canvas a unified look — users can re-tint per table later.
+            color: "#C9A961",
             width: dims.width,
             height: dims.height,
             diameter: dims.diameter,

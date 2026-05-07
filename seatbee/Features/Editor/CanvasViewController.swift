@@ -453,6 +453,16 @@ class CanvasViewController: UIViewController, UIScrollViewDelegate {
         saveViewport()
     }
 
+    /// Forward zoom changes to each table view so seats can render
+    /// initials past the threshold. setZoom() short-circuits when the
+    /// threshold isn't crossed, so this is cheap on every frame.
+    func scrollViewDidZoom(_ scrollView: UIScrollView) {
+        let z = scrollView.zoomScale
+        for tv in tableViews.values {
+            tv.setZoom(z)
+        }
+    }
+
     func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
         saveViewport()
     }
@@ -523,7 +533,7 @@ class CanvasViewController: UIViewController, UIScrollViewDelegate {
                 existing.update(table: table, guests: guests, isSelected: table.id == selectedId)
                 existing.center = CGPoint(x: canvasOrigin.x + table.x, y: canvasOrigin.y + table.y)
             } else {
-                let tv = CanvasTableView(table: table, guests: guests, isSelected: table.id == selectedId)
+                let tv = CanvasTableView(table: table, guests: guests, isSelected: table.id == selectedId, zoom: scrollView.zoomScale)
                 tv.center = CGPoint(x: canvasOrigin.x + table.x, y: canvasOrigin.y + table.y)
                 tv.onTap = { [weak self] in
                     self?.selectTable(table.id)
@@ -641,18 +651,45 @@ class CanvasTableView: UIView {
     private var table: SeatTable
     private var isItemSelected = false
 
-    // Padding around the body for seats (~14pt outside) + selection ring + label slack.
+    // Padding around the body for seats (~14pt outside) + selection halo + label slack.
+    // Selection glow is the largest at +20pt outside the body, so 28 leaves room.
     private let padding: CGFloat = 28
 
-    private let shapeLayer = CAShapeLayer()
-    private let selectionLayer = CAShapeLayer()
-    private let label = UILabel()
+    // ATM palette (web parity — App.jsx atmospheric redesign commit ad49273).
+    private static let atmPaper    = UIColor(red: 251/255, green: 247/255, blue: 236/255, alpha: 1) // #FBF7EC
+    private static let atmInk      = UIColor(red:  45/255, green:  45/255, blue:  45/255, alpha: 1) // #2D2D2D
+    private static let atmInk2     = UIColor(red: 107/255, green: 101/255, blue:  92/255, alpha: 1) // #6b655c
+    private static let atmGold     = UIColor(red: 201/255, green: 169/255, blue:  97/255, alpha: 1) // #C9A961
+    private static let atmGoldGlow = UIColor(red: 201/255, green: 169/255, blue:  97/255, alpha: 0.25) // rgba(201,169,97,.25)
+
+    // Layered render — back-to-front:
+    //   glow → dashedRing → progress → body → colorRing → name → count
+    private let glowLayer       = CAShapeLayer() // soft gold halo when selected
+    private let dashedRingLayer = CAShapeLayer() // dashed gold ring outside body when selected
+    private let progressLayer   = CAShapeLayer() // gold arc / line showing seated/total
+    private let shapeLayer      = CAShapeLayer() // body fill (paper, or ink for head)
+    private let colorRingLayer  = CAShapeLayer() // inner ring tinted with table.color
+    private let label           = UILabel()      // table name (italic serif)
+    private let countLabel      = UILabel()      // seat count (mono) — pill background when full
     private var seatLayers: [CAShapeLayer] = []
+    private var seatInitialLayers: [CATextLayer] = [] // initials shown when zoom ≥ threshold
     private let lockBadge = UIImageView()
 
-    init(table: SeatTable, guests: [Guest], isSelected: Bool) {
+    /// Zoom-aware seat-label gating. Web parity (App.jsx PR #12 + #13):
+    /// at zoom < 1.3× we render seats as small dots; at ≥ 1.3× we
+    /// enlarge them and show two-letter initials of the seated guest.
+    private static let seatLabelZoomThreshold: CGFloat = 1.3
+    private var currentZoom: CGFloat = 1.0
+    /// Cache of seatIndex → guest so the parent can change the zoom
+    /// without re-passing the guest list each time.
+    private var seatGuestByIndex: [Int: Guest] = [:]
+    private var lastBodyCenter: CGPoint = .zero
+    private var lastBody: CGSize = .zero
+
+    init(table: SeatTable, guests: [Guest], isSelected: Bool, zoom: CGFloat = 1.0) {
         self.table = table
         self.isItemSelected = isSelected
+        self.currentZoom = zoom
         super.init(frame: .zero)
         setupView()
         update(table: table, guests: guests, isSelected: isSelected)
@@ -664,21 +701,61 @@ class CanvasTableView: UIView {
     private func setupView() {
         backgroundColor = .clear
 
-        selectionLayer.strokeColor = UIColor(red: 201/255, green: 169/255, blue: 97/255, alpha: 1).cgColor
-        selectionLayer.fillColor = UIColor.clear.cgColor
-        selectionLayer.lineWidth = 2
-        selectionLayer.lineDashPattern = [4, 3]
-        selectionLayer.isHidden = true
-        layer.addSublayer(selectionLayer)
+        // Selection glow — soft solid halo behind everything.
+        glowLayer.fillColor = CanvasTableView.atmGoldGlow.cgColor
+        glowLayer.strokeColor = UIColor.clear.cgColor
+        glowLayer.isHidden = true
+        layer.addSublayer(glowLayer)
 
-        shapeLayer.strokeColor = UIColor(red: 45/255, green: 45/255, blue: 45/255, alpha: 0.15).cgColor
-        shapeLayer.lineWidth = 1
+        // Dashed gold ring outside body (round / oval / sweetheart only — rect
+        // gets just the rounded glow rect).
+        dashedRingLayer.strokeColor = CanvasTableView.atmGold.cgColor
+        dashedRingLayer.fillColor = UIColor.clear.cgColor
+        dashedRingLayer.lineWidth = 1
+        dashedRingLayer.lineDashPattern = [2, 4]
+        dashedRingLayer.isHidden = true
+        layer.addSublayer(dashedRingLayer)
+
+        // Gold progress indicator — strokeStart/strokeEnd on a closed path
+        // for round/oval, or a horizontal stroke for rect.
+        progressLayer.fillColor = UIColor.clear.cgColor
+        progressLayer.strokeColor = CanvasTableView.atmGold.cgColor
+        progressLayer.lineWidth = 3.5
+        progressLayer.lineCap = .round
+        progressLayer.isHidden = true
+        layer.addSublayer(progressLayer)
+
+        // Body — paper fill with a soft drop shadow. Filled separately
+        // per-update because head tables flip to ink.
+        shapeLayer.strokeColor = UIColor.clear.cgColor
+        shapeLayer.shadowColor = UIColor.black.cgColor
+        shapeLayer.shadowOpacity = 0.16
+        shapeLayer.shadowOffset = CGSize(width: 0, height: 2)
+        shapeLayer.shadowRadius = 3
         layer.addSublayer(shapeLayer)
 
+        // Inner color ring — at body radius - 5pt, tinted with table.color.
+        colorRingLayer.fillColor = UIColor.clear.cgColor
+        colorRingLayer.lineWidth = 2.5
+        colorRingLayer.opacity = 0.55
+        layer.addSublayer(colorRingLayer)
+
+        // Italic serif for the table name (web uses Fraunces; iOS ships
+        // Georgia which has the closest cut and is bundled with the OS).
         label.textAlignment = .center
-        label.font = UIFont.systemFont(ofSize: 10, weight: .medium)
-        label.textColor = UIColor(red: 45/255, green: 45/255, blue: 45/255, alpha: 1)
+        label.font = UIFont(name: "Georgia-Italic", size: 11)
+            ?? UIFont.italicSystemFont(ofSize: 11)
+        label.textColor = CanvasTableView.atmInk
         addSubview(label)
+
+        // Mono seat count. Becomes a gold pill ("8/8 ✓") when full;
+        // otherwise plain text in ink2.
+        countLabel.textAlignment = .center
+        countLabel.font = UIFont.monospacedSystemFont(ofSize: 8, weight: .semibold)
+        countLabel.textColor = CanvasTableView.atmInk2
+        countLabel.layer.cornerRadius = 8
+        countLabel.layer.masksToBounds = true
+        addSubview(countLabel)
 
         // Lock badge — shown when the table is marked locked. Sits in
         // the top-right corner of the bounding box. Web shows a lock
@@ -705,62 +782,271 @@ class CanvasTableView: UIView {
         if savedCenter != .zero { self.center = savedCenter }
 
         let bodyCenter = CGPoint(x: padding + body.width/2, y: padding + body.height/2)
+        let isHead = table.type == .head
+        let total = max(table.seats, 1)
+        let filled = max(0, min(table.filledCount, total))
+        let frac = Double(filled) / Double(total)
+        let isFull = filled == total && total > 0
 
+        // Suppress implicit animations on path/colour churn so dragging
+        // a table doesn't smear seat dots across the canvas.
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+
+        // ── Body ───────────────────────────────────────────────────────
         let bodyPath = CanvasTableView.shapePath(for: table, body: body, center: bodyCenter)
         shapeLayer.path = bodyPath.cgPath
-        let fallbackFill = UIColor(red: 247/255, green: 231/255, blue: 206/255, alpha: 1)
-        shapeLayer.fillColor = (UIColor(hex: table.color ?? "") ?? fallbackFill).cgColor
+        shapeLayer.shadowPath = bodyPath.cgPath
+        shapeLayer.fillColor = isHead
+            ? CanvasTableView.atmInk.cgColor
+            : CanvasTableView.atmPaper.cgColor
 
-        let selPath = CanvasTableView.selectionPath(for: table, body: body, center: bodyCenter)
-        selectionLayer.path = selPath.cgPath
-        selectionLayer.isHidden = !isSelected
+        // ── Inner colour ring (skip for head — ink body absorbs it) ──
+        let tableColor = UIColor(hex: table.color ?? "") ?? CanvasTableView.atmGold
+        if isHead {
+            colorRingLayer.path = nil
+        } else {
+            colorRingLayer.path = CanvasTableView.colorRingPath(for: table, body: body, center: bodyCenter).cgPath
+            colorRingLayer.strokeColor = tableColor.cgColor
+        }
 
+        // ── Selection glow + dashed ring ──────────────────────────────
+        glowLayer.path = CanvasTableView.glowPath(for: table, body: body, center: bodyCenter).cgPath
+        glowLayer.isHidden = !isSelected
+        if let dashed = CanvasTableView.dashedRingPath(for: table, body: body, center: bodyCenter) {
+            dashedRingLayer.path = dashed.cgPath
+            dashedRingLayer.isHidden = !isSelected
+        } else {
+            dashedRingLayer.path = nil
+            dashedRingLayer.isHidden = true
+        }
+
+        // ── Progress indicator (arc for round/oval, line for rect) ────
+        configureProgressLayer(table: table, body: body, center: bodyCenter, frac: frac, isHead: isHead)
+
+        // ── Name label ────────────────────────────────────────────────
         label.text = table.name
-        label.frame = CGRect(x: padding, y: bodyCenter.y - 6, width: body.width, height: 12)
+        label.textColor = isHead ? CanvasTableView.atmPaper : CanvasTableView.atmInk
+        let nameYOffset: CGFloat = (table.type == .sweetheart) ? -8 : 0
+        label.frame = CGRect(x: padding, y: bodyCenter.y + nameYOffset - 7, width: body.width, height: 14)
 
+        // ── Seat count ────────────────────────────────────────────────
+        configureCountLabel(table: table, body: body, center: bodyCenter,
+                            filled: filled, total: total, isFull: isFull, isHead: isHead)
+
+        // ── Seat dots / initials ──────────────────────────────────────
+        // Build the seat-index → guest cache so setZoom() can re-render
+        // initials later without re-passing the guest list.
+        seatGuestByIndex.removeAll(keepingCapacity: true)
+        for (gid, idx) in table.assignments {
+            if let g = guests.first(where: { $0.id == gid }) {
+                seatGuestByIndex[idx] = g
+            }
+        }
+        lastBodyCenter = bodyCenter
+        lastBody = body
+        renderSeats(table: table, body: body, center: bodyCenter, filled: filled)
+
+        // Lock badge — centred horizontally on the table, sitting just
+        // above the table-name label so it reads as "this table is
+        // locked" without overlapping seats or sticking outside the body.
+        let badgeSize: CGFloat = 14
+        lockBadge.frame = CGRect(
+            x: bodyCenter.x - badgeSize / 2,
+            y: label.frame.minY - badgeSize - 2,
+            width: badgeSize, height: badgeSize
+        )
+        lockBadge.isHidden = (table.locked != true)
+
+        CATransaction.commit()
+        applyTransform(animated: false)
+    }
+
+    /// Re-render seat dots (and initials, when zoomed in past the threshold).
+    /// Cheap to call repeatedly — wipes its own layers on each invocation.
+    private func renderSeats(table: SeatTable, body: CGSize, center bodyCenter: CGPoint, filled: Int) {
         seatLayers.forEach { $0.removeFromSuperlayer() }
         seatLayers = []
+        seatInitialLayers.forEach { $0.removeFromSuperlayer() }
+        seatInitialLayers = []
 
-        let dotSize: CGFloat = 8
-        let gold = UIColor(red: 201/255, green: 169/255, blue: 97/255, alpha: 1)
-        let empty = UIColor(red: 255/255, green: 254/255, blue: 249/255, alpha: 1)
-        let emptyStroke = UIColor(red: 185/255, green: 179/255, blue: 166/255, alpha: 1)
+        let showInitials = currentZoom >= Self.seatLabelZoomThreshold
+        let dotSize: CGFloat = showInitials ? 18 : 8
+        let gold = CanvasTableView.atmGold
+        let emptyStroke = UIColor(red: 201/255, green: 169/255, blue: 97/255, alpha: 0.45)
 
         let seatPositions = CanvasTableView.seatPositions(for: table, body: body, center: bodyCenter)
         for (i, pos) in seatPositions.enumerated() {
             let dot = CAShapeLayer()
             let r = CGRect(x: pos.x - dotSize/2, y: pos.y - dotSize/2, width: dotSize, height: dotSize)
             dot.path = UIBezierPath(ovalIn: r).cgPath
-            if i < table.filledCount {
+            if i < filled {
                 dot.fillColor = gold.cgColor
                 dot.strokeColor = gold.cgColor
+                dot.lineWidth = 1
             } else {
-                dot.fillColor = empty.cgColor
+                dot.fillColor = UIColor.clear.cgColor
                 dot.strokeColor = emptyStroke.cgColor
+                dot.lineWidth = 1.5
             }
-            dot.lineWidth = 1
             layer.addSublayer(dot)
             seatLayers.append(dot)
+
+            // Initials — only when zoomed past the threshold AND the seat
+            // is filled. Empty seats stay as plain rings even when zoomed.
+            if showInitials, let guest = seatGuestByIndex[i] {
+                let text = CATextLayer()
+                text.contentsScale = UIScreen.main.scale
+                text.alignmentMode = .center
+                text.string = Self.initials(for: guest.displayName)
+                text.foregroundColor = CanvasTableView.atmPaper.cgColor
+                text.font = UIFont.systemFont(ofSize: 9, weight: .semibold)
+                text.fontSize = 9
+                let textHeight: CGFloat = 11
+                text.frame = CGRect(x: pos.x - dotSize/2,
+                                    y: pos.y - textHeight/2,
+                                    width: dotSize, height: textHeight)
+                layer.addSublayer(text)
+                seatInitialLayers.append(text)
+            }
         }
+    }
 
-        // Lock badge — centred horizontally on the table, sitting just
-        // above the table-name label so it reads as "this table is
-        // locked" without overlapping seats or sticking outside the body.
-        let badgeSize: CGFloat = 14
-        let labelTopY = bodyCenter.y - 6  // matches label.frame.origin.y above
-        lockBadge.frame = CGRect(
-            x: bodyCenter.x - badgeSize / 2,
-            y: labelTopY - badgeSize - 2,
-            width: badgeSize, height: badgeSize
-        )
-        lockBadge.isHidden = (table.locked != true)
+    /// Two-letter initials matching SBAvatar's logic so canvas + drawer agree.
+    private static func initials(for name: String) -> String {
+        let parts = name.split(separator: " ")
+        if parts.count >= 2 {
+            return String(parts[0].prefix(1) + parts[1].prefix(1)).uppercased()
+        }
+        return String(name.prefix(2)).uppercased()
+    }
 
-        applyTransform(animated: false)
+    /// Called by the parent view controller when the canvas zoom changes.
+    /// Re-renders seats only when the threshold is crossed so we don't
+    /// thrash CATextLayers on every zoom delta.
+    func setZoom(_ zoom: CGFloat) {
+        let wasShowing = currentZoom >= Self.seatLabelZoomThreshold
+        let nowShowing = zoom >= Self.seatLabelZoomThreshold
+        currentZoom = zoom
+        guard wasShowing != nowShowing, lastBody != .zero else { return }
+        let total = max(table.seats, 1)
+        let filled = max(0, min(table.filledCount, total))
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        renderSeats(table: table, body: lastBody, center: lastBodyCenter, filled: filled)
+        CATransaction.commit()
+    }
+
+    // MARK: - Progress / count helpers
+
+    private func configureProgressLayer(table: SeatTable, body: CGSize, center c: CGPoint,
+                                        frac: Double, isHead: Bool) {
+        // Hide for sweetheart (no count visualisation needed) and head
+        // tables (the ink fill is its own visual marker).
+        guard !isHead, table.type != .sweetheart, frac > 0 else {
+            progressLayer.isHidden = true
+            progressLayer.path = nil
+            return
+        }
+        progressLayer.isHidden = false
+
+        switch table.type {
+        case .round:
+            let r = body.width / 2 + 4
+            let arc = UIBezierPath(arcCenter: c, radius: r,
+                                    startAngle: -.pi / 2,
+                                    endAngle: -.pi / 2 + .pi * 2,
+                                    clockwise: true)
+            progressLayer.path = arc.cgPath
+            progressLayer.lineWidth = 3.5
+            progressLayer.strokeStart = 0
+            progressLayer.strokeEnd = CGFloat(frac)
+        case .oval:
+            // Approximate the oval by using the body's enclosing rect at +4pt.
+            let rect = CGRect(x: c.x - body.width/2 - 4,
+                              y: c.y - body.height/2 - 4,
+                              width: body.width + 8, height: body.height + 8)
+            // Build an ellipse path manually starting at the top so
+            // strokeEnd goes clockwise from 12 o'clock — matches web.
+            let path = UIBezierPath()
+            let steps = 64
+            for i in 0...steps {
+                let t = Double(i) / Double(steps) * .pi * 2 - .pi / 2
+                let p = CGPoint(x: rect.midX + (rect.width / 2) * CGFloat(cos(t)),
+                                y: rect.midY + (rect.height / 2) * CGFloat(sin(t)))
+                if i == 0 { path.move(to: p) } else { path.addLine(to: p) }
+            }
+            path.close()
+            progressLayer.path = path.cgPath
+            progressLayer.lineWidth = 3.5
+            progressLayer.strokeStart = 0
+            progressLayer.strokeEnd = CGFloat(frac)
+        case .rect:
+            // Horizontal line under the table label at the bottom edge.
+            let inset: CGFloat = 6
+            let y = c.y + body.height / 2 - 4
+            let startX = c.x - body.width / 2 + inset
+            let endX   = startX + (body.width - inset * 2) * CGFloat(frac)
+            let path = UIBezierPath()
+            path.move(to: CGPoint(x: startX, y: y))
+            path.addLine(to: CGPoint(x: endX, y: y))
+            progressLayer.path = path.cgPath
+            progressLayer.lineWidth = 2.5
+            progressLayer.strokeStart = 0
+            progressLayer.strokeEnd = 1
+        case .head, .sweetheart:
+            progressLayer.isHidden = true
+            progressLayer.path = nil
+        }
+    }
+
+    private func configureCountLabel(table: SeatTable, body: CGSize, center c: CGPoint,
+                                     filled: Int, total: Int, isFull: Bool, isHead: Bool) {
+        // Sweetheart never shows a count.
+        guard table.type != .sweetheart else {
+            countLabel.isHidden = true
+            return
+        }
+        countLabel.isHidden = false
+
+        let text = isFull ? "\(filled)/\(total) ✓" : "\(filled)/\(total)"
+        countLabel.text = text
+
+        if isFull && (table.type == .round || table.type == .oval) {
+            // Gold pill below the centred name.
+            countLabel.backgroundColor = CanvasTableView.atmGold
+            countLabel.textColor = CanvasTableView.atmPaper
+            let pillSize = CGSize(width: 44, height: 16)
+            countLabel.frame = CGRect(x: c.x - pillSize.width / 2,
+                                       y: c.y + 8,
+                                       width: pillSize.width, height: pillSize.height)
+        } else {
+            countLabel.backgroundColor = .clear
+            countLabel.textColor = isHead
+                ? CanvasTableView.atmGold
+                : CanvasTableView.atmInk2
+            // Position differs by shape: round/oval below the name in body;
+            // rect/head just below the body so the progress line stays
+            // visible above the label.
+            let yOffset: CGFloat
+            switch table.type {
+            case .round:        yOffset = c.y + 10
+            case .oval:         yOffset = c.y + 11
+            case .rect, .head:  yOffset = c.y + body.height / 2 + 6
+            case .sweetheart:   yOffset = c.y + 10  // unused
+            }
+            countLabel.frame = CGRect(x: c.x - 28, y: yOffset, width: 56, height: 12)
+        }
     }
 
     func setSelected(_ selected: Bool) {
         isItemSelected = selected
-        selectionLayer.isHidden = !selected
+        glowLayer.isHidden = !selected
+        // Dashed ring is only configured for shapes that use it (round /
+        // oval / sweetheart); preserve hidden state when path is nil.
+        if dashedRingLayer.path != nil {
+            dashedRingLayer.isHidden = !selected
+        }
         UIView.animate(withDuration: 0.2) {
             self.applyTransform(animated: true)
         }
@@ -810,22 +1096,71 @@ class CanvasTableView: UIView {
         }
     }
 
-    private static func selectionPath(for table: SeatTable, body: CGSize, center c: CGPoint) -> UIBezierPath {
+    /// Soft glow halo behind the table when selected. Web parity:
+    /// circle/ellipse at body+20pt, rounded rect at body+20pt for rect/head.
+    private static func glowPath(for table: SeatTable, body: CGSize, center c: CGPoint) -> UIBezierPath {
         switch table.type {
         case .round:
-            return UIBezierPath(arcCenter: c, radius: body.width / 2 + 10,
+            return UIBezierPath(arcCenter: c, radius: body.width / 2 + 20,
                                 startAngle: 0, endAngle: .pi * 2, clockwise: true)
-        case .rect, .head:
-            let rect = CGRect(x: c.x - body.width/2 - 6, y: c.y - body.height/2 - 6,
-                              width: body.width + 12, height: body.height + 12)
-            return UIBezierPath(roundedRect: rect, cornerRadius: 10)
-        case .sweetheart:
-            let inflated = CGSize(width: body.width + 12, height: body.height + 12)
-            return sweetheartPath(shape: table.sweetShape, body: inflated, center: c)
         case .oval:
-            let inflated = CGRect(x: c.x - body.width/2 - 6, y: c.y - body.height/2 - 6,
-                                  width: body.width + 12, height: body.height + 12)
-            return UIBezierPath(ovalIn: inflated)
+            let rect = CGRect(x: c.x - body.width/2 - 20, y: c.y - body.height/2 - 20,
+                              width: body.width + 40, height: body.height + 40)
+            return UIBezierPath(ovalIn: rect)
+        case .rect, .head:
+            let rect = CGRect(x: c.x - body.width/2 - 10, y: c.y - body.height/2 - 10,
+                              width: body.width + 20, height: body.height + 20)
+            return UIBezierPath(roundedRect: rect, cornerRadius: 14)
+        case .sweetheart:
+            let inflated = CGSize(width: body.width + 20, height: body.height + 20)
+            return sweetheartPath(shape: table.sweetShape, body: inflated, center: c)
+        }
+    }
+
+    /// Dashed gold ring outside the body when selected. Only emitted for
+    /// shapes that take it (web only draws it on round / oval / sweetheart;
+    /// rect / head get the rounded glow rect alone).
+    private static func dashedRingPath(for table: SeatTable, body: CGSize, center c: CGPoint) -> UIBezierPath? {
+        switch table.type {
+        case .round:
+            return UIBezierPath(arcCenter: c, radius: body.width / 2 + 11,
+                                startAngle: 0, endAngle: .pi * 2, clockwise: true)
+        case .oval:
+            let rect = CGRect(x: c.x - body.width/2 - 11, y: c.y - body.height/2 - 11,
+                              width: body.width + 22, height: body.height + 22)
+            return UIBezierPath(ovalIn: rect)
+        case .sweetheart:
+            let inflated = CGSize(width: body.width + 18, height: body.height + 18)
+            return sweetheartPath(shape: table.sweetShape, body: inflated, center: c)
+        case .rect, .head:
+            return nil
+        }
+    }
+
+    /// Inner colour ring at body radius - 5pt — replaces the old "fill the
+    /// body with table.color" so the colour reads as a thin tint instead.
+    private static func colorRingPath(for table: SeatTable, body: CGSize, center c: CGPoint) -> UIBezierPath {
+        switch table.type {
+        case .round:
+            return UIBezierPath(arcCenter: c, radius: max(body.width / 2 - 5, 1),
+                                startAngle: 0, endAngle: .pi * 2, clockwise: true)
+        case .oval:
+            let rect = CGRect(x: c.x - body.width/2 + 5, y: c.y - body.height/2 + 5,
+                              width: max(body.width - 10, 1), height: max(body.height - 10, 1))
+            return UIBezierPath(ovalIn: rect)
+        case .rect:
+            // For rect tables web draws a 3px colour line under the body
+            // instead of an inner ring — render that as a horizontal path
+            // so the colour ring layer's line cap sells it.
+            let path = UIBezierPath()
+            let y = c.y + body.height / 2 + 5
+            path.move(to: CGPoint(x: c.x - body.width / 2 + 6, y: y))
+            path.addLine(to: CGPoint(x: c.x + body.width / 2 - 6, y: y))
+            return path
+        case .head, .sweetheart:
+            // Head body is ink (no colour ring); sweetheart uses paper +
+            // glow, no ring either.
+            return UIBezierPath()
         }
     }
 

@@ -109,16 +109,6 @@ struct EditorView: View {
                     .presentationCornerRadius(24)
             }
         }
-        .sheet(isPresented: $showGuestPicker) {
-            if let plan {
-                GuestPickerSheet(guests: plan.guests, tables: plan.tables) { guest in
-                    assignGuest(guest)
-                }
-                .environment(appState)
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
-            }
-        }
         .sheet(isPresented: $showAddTable) {
             AddTableSheet()
                 .environment(appState)
@@ -428,6 +418,19 @@ struct EditorView: View {
                 .padding(.top, 12)
             }
             .background(Color.sbIvory)
+        }
+        // Nest the guest picker inside this sheet — sibling `.sheet`
+        // modifiers on EditorView can't stack (SwiftUI only presents the
+        // first true binding), so the empty-seat tap was a silent no-op.
+        .sheet(isPresented: $showGuestPicker) {
+            if let plan {
+                GuestPickerSheet(guests: plan.guests, tables: plan.tables) { guest in
+                    assignGuest(guest)
+                }
+                .environment(appState)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+            }
         }
     }
 
