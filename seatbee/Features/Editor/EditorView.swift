@@ -579,23 +579,15 @@ struct EditorView: View {
                 Text("\(index + 1)").font(SBFont.inter(10, weight: .bold)).foregroundStyle(.white)
             }
             SBAvatar(name: guest.displayName, size: 30)
-            VStack(alignment: .leading, spacing: 1) {
-                HStack(spacing: 4) {
-                    Text(guest.displayName).font(SBFont.bodySmallBold).foregroundStyle(Color.sbCharcoal)
-                    if let meal = guest.mealDisplay {
-                        Text("\(meal.icon) \(meal.short)")
-                            .font(SBFont.small)
-                            .foregroundStyle(Color.sbCharcoal2)
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 1)
-                            .background(Color.sbChampagne.opacity(0.55))
-                            .clipShape(Capsule())
-                    }
-                }
-                if let label = plan?.displayCategoryLabel(for: guest) {
-                    Text(label).font(SBFont.capsLabel).foregroundStyle(Color.sbWarm)
-                }
-            }
+            // Name only — meal pill + category label removed because the
+            // two-column drawer (PR #70) is too narrow for the chips and
+            // they wrapped character-by-character ("Beef" stacked as
+            // B/e/e/f). Full guest detail one tap away in the sheet.
+            Text(guest.displayName)
+                .font(SBFont.bodySmallBold)
+                .foregroundStyle(Color.sbCharcoal)
+                .lineLimit(1)
+                .truncationMode(.tail)
             Spacer()
             if !isLocked {
                 Button { unassignGuest(guest) } label: {
