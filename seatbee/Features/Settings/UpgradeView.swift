@@ -19,11 +19,13 @@ struct UpgradeView: View {
 
     var body: some View {
         ZStack {
-            // Background gradient
+            // Background gradient — blush top, sage hint, ivory body
             LinearGradient(
                 stops: [
-                    .init(color: Color.sbChampagne.opacity(0.6), location: 0),
-                    .init(color: Color.sbIvory, location: 0.35),
+                    .init(color: Color.sbBlush.opacity(0.25), location: 0),
+                    .init(color: Color.sbChampagne.opacity(0.4), location: 0.2),
+                    .init(color: Color.sbIvory, location: 0.45),
+                    .init(color: Color.sbSage.opacity(0.05), location: 0.85),
                     .init(color: Color.sbIvory, location: 1),
                 ],
                 startPoint: .top,
@@ -191,23 +193,25 @@ struct UpgradeView: View {
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 6)
-                        .background(Color.sbGold)
+                        .background(
+                            LinearGradient(colors: [Color.sbSage, Color.sbSage.opacity(0.8)], startPoint: .leading, endPoint: .trailing)
+                        )
                 }
 
                 HStack(spacing: 16) {
-                    // Icon
+                    // Icon — each tier has its own accent color
                     ZStack {
                         RoundedRectangle(cornerRadius: 12)
                             .fill(
                                 isSelected
-                                    ? LinearGradient(colors: [Color.sbGold, Color.sbGoldDk], startPoint: .topLeading, endPoint: .bottomTrailing)
-                                    : LinearGradient(colors: [Color.sbIvory2, Color.sbIvory2], startPoint: .topLeading, endPoint: .bottomTrailing)
+                                    ? LinearGradient(colors: tierColors(seatbeeProduct), startPoint: .topLeading, endPoint: .bottomTrailing)
+                                    : LinearGradient(colors: [tierAccent(seatbeeProduct).opacity(0.1), tierAccent(seatbeeProduct).opacity(0.05)], startPoint: .topLeading, endPoint: .bottomTrailing)
                             )
                             .frame(width: 48, height: 48)
 
                         Image(systemName: seatbeeProduct == .grandPass ? "crown.fill" : (seatbeeProduct == .signaturePass ? "star.fill" : "sparkles"))
                             .font(.system(size: 20))
-                            .foregroundStyle(isSelected ? .white : Color.sbGold)
+                            .foregroundStyle(isSelected ? .white : tierAccent(seatbeeProduct))
                     }
 
                     // Details
@@ -245,12 +249,12 @@ struct UpgradeView: View {
             .overlay(
                 RoundedRectangle(cornerRadius: isPopular ? 16 : 14)
                     .strokeBorder(
-                        isSelected ? Color.sbGold : Color.sbLine,
+                        isSelected ? tierAccent(seatbeeProduct) : Color.sbLine,
                         lineWidth: isSelected ? 2.5 : 1
                     )
             )
             .shadow(
-                color: isSelected ? Color.sbGold.opacity(0.15) : Color.clear,
+                color: isSelected ? tierAccent(seatbeeProduct).opacity(0.2) : Color.clear,
                 radius: isSelected ? 12 : 0,
                 x: 0,
                 y: isSelected ? 6 : 0
@@ -258,6 +262,23 @@ struct UpgradeView: View {
             .scaleEffect(isSelected ? 1.02 : 1.0)
         }
         .buttonStyle(.plain)
+    }
+
+    // Per-tier accent colors — breaks the gold monotone
+    private func tierAccent(_ p: SeatbeeProduct) -> Color {
+        switch p {
+        case .eventPass: return Color.sbSage
+        case .signaturePass: return Color.sbBlush
+        case .grandPass: return Color.sbGold
+        }
+    }
+
+    private func tierColors(_ p: SeatbeeProduct) -> [Color] {
+        switch p {
+        case .eventPass: return [Color.sbSage, Color.sbSage.opacity(0.8)]
+        case .signaturePass: return [Color.sbBlush, Color.sbBlush.opacity(0.8)]
+        case .grandPass: return [Color.sbGold, Color.sbGoldDk]
+        }
     }
 
     private func fallbackPrice(_ p: SeatbeeProduct) -> String {
@@ -326,23 +347,23 @@ struct UpgradeView: View {
                 .letterSpacing(2)
 
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                featureItem(icon: "sparkles", title: "AI Seating", subtitle: "Auto-arrange guests")
-                featureItem(icon: "person.3.fill", title: "\(selectedProduct.guestLimit) Guests", subtitle: "Seated capacity")
-                featureItem(icon: "doc.viewfinder", title: "Floor Plan AI", subtitle: "Scan your venue")
-                featureItem(icon: "rectangle.on.rectangle", title: "Arrangements", subtitle: "Multiple layouts")
-                featureItem(icon: "doc.text", title: "PDF Export", subtitle: "Print-ready charts")
-                featureItem(icon: "person.2", title: "Collaborate", subtitle: "Share with planner")
+                featureItem(icon: "sparkles", title: "AI Seating", subtitle: "Auto-arrange guests", tint: Color.sbGold)
+                featureItem(icon: "person.3.fill", title: "\(selectedProduct.guestLimit) Guests", subtitle: "Seated capacity", tint: Color.sbSage)
+                featureItem(icon: "doc.viewfinder", title: "Floor Plan AI", subtitle: "Scan your venue", tint: Color.sbBlush)
+                featureItem(icon: "rectangle.on.rectangle", title: "Arrangements", subtitle: "Multiple layouts", tint: Color(hex: "8B9DC3"))
+                featureItem(icon: "doc.text", title: "PDF Export", subtitle: "Print-ready charts", tint: Color(hex: "DDA0DD"))
+                featureItem(icon: "person.2", title: "Collaborate", subtitle: "Share with planner", tint: Color(hex: "87CEEB"))
             }
         }
     }
 
-    private func featureItem(icon: String, title: String, subtitle: String) -> some View {
+    private func featureItem(icon: String, title: String, subtitle: String, tint: Color = Color.sbGold) -> some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
                 .font(.system(size: 16, weight: .medium))
-                .foregroundStyle(Color.sbGold)
+                .foregroundStyle(tint)
                 .frame(width: 36, height: 36)
-                .background(Color.sbGold.opacity(0.1))
+                .background(tint.opacity(0.12))
                 .clipShape(RoundedRectangle(cornerRadius: 10))
 
             VStack(alignment: .leading, spacing: 1) {
