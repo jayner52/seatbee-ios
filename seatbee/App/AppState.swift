@@ -7,6 +7,7 @@ final class AppState {
     var isOnline = true
     var showAuth = false
     var showOnboarding = false
+    var showUpgrade = false
 
     // Navigation paths for each tab
     var plansPath = NavigationPath()
