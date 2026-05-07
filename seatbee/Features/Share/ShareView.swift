@@ -476,15 +476,33 @@ struct ShareView: View {
                                 }
                             }
                         }
+                        // Tell users what guests actually get when they
+                        // scan, so the "design" link reads as polish, not
+                        // a missing feature. Mirrors web's GuestQRPanel
+                        // copy.
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("WHAT GUESTS SEE")
+                                .font(SBFont.capsLabel)
+                                .foregroundStyle(Color.sbWarm)
+                                .letterSpacing(1.5)
+                            Text("Their table assignment, your welcome message, dietary icons, meal selection, and any icebreakers you've written for the event.")
+                                .font(SBFont.caption)
+                                .foregroundStyle(Color.sbCharcoal2)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .padding(.top, 4)
+
                         Button {
                             openWebPlan(planId: plan.id)
                         } label: {
                             HStack(spacing: 4) {
-                                Text("Customize design on web")
+                                Image(systemName: "paintbrush")
+                                Text("Customize colors, logo, welcome message, and icebreakers on web")
                                 Image(systemName: "arrow.up.right.square")
                             }
                             .font(SBFont.caption)
                             .foregroundStyle(Color.sbGoldDk)
+                            .multilineTextAlignment(.leading)
                         }
                         .buttonStyle(.plain)
                     } else if qrEnabled && qrToken == nil {
@@ -881,20 +899,62 @@ struct PendingInvitation {
 // 30% recovery, robust at small print sizes). No third-party deps.
 
 extension UIImage {
-    static func qrCode(from string: String, size: CGFloat = 240) -> UIImage? {
+    /// Generates a Seatbee-branded QR code: gold modules on white,
+    /// with the bee logo overlaid in a white halo at the centre. Web
+    /// parity (`qr-code-styling` config in App.jsx GuestQRPanel) uses
+    /// the same gold + center logo treatment. H-level error correction
+    /// (~30% recovery) is what lets the centre cells be obscured by
+    /// the logo without breaking the scan.
+    static func qrCode(from string: String,
+                       size: CGFloat = 240,
+                       accentColor: UIColor = UIColor(red: 201/255, green: 169/255, blue: 97/255, alpha: 1),
+                       centerLogo: UIImage? = UIImage(named: "SeatbeeLogo")) -> UIImage? {
         guard let data = string.data(using: .utf8) else { return nil }
-        let filter = CIFilter.qrCodeGenerator()
-        filter.message = data
-        filter.correctionLevel = "H"
-        guard let ciImage = filter.outputImage else { return nil }
+        let qrFilter = CIFilter.qrCodeGenerator()
+        qrFilter.message = data
+        qrFilter.correctionLevel = "H"
+        guard let qrImage = qrFilter.outputImage else { return nil }
 
-        // Default CI output is ~25–35pt; scale up to the requested size.
-        let scaleX = size / ciImage.extent.width
-        let scaleY = size / ciImage.extent.height
-        let scaled = ciImage.transformed(by: CGAffineTransform(scaleX: scaleX, y: scaleY))
+        // Recolour: black → accent (gold), white → fully transparent
+        // so the white card background shows through cleanly. Web's
+        // qr-code-styling does the equivalent.
+        let colorFilter = CIFilter.falseColor()
+        colorFilter.inputImage = qrImage
+        colorFilter.color0 = CIColor(color: accentColor)
+        colorFilter.color1 = CIColor(red: 1, green: 1, blue: 1, alpha: 0)
+        guard let coloured = colorFilter.outputImage else { return nil }
+
+        // Default CI output is ~25–35pt; scale to the requested size.
+        let scale = size / coloured.extent.width
+        let scaled = coloured.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
 
         let context = CIContext(options: nil)
         guard let cgImage = context.createCGImage(scaled, from: scaled.extent) else { return nil }
-        return UIImage(cgImage: cgImage)
+        let qrUIImage = UIImage(cgImage: cgImage)
+
+        // Composite white-card-background + QR + centre logo.
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: size, height: size))
+        return renderer.image { ctx in
+            UIColor.white.setFill()
+            ctx.fill(CGRect(x: 0, y: 0, width: size, height: size))
+            qrUIImage.draw(in: CGRect(x: 0, y: 0, width: size, height: size))
+
+            if let logo = centerLogo {
+                // ~22% of the QR's width — well within H-level's 30%
+                // recovery budget, so the QR still scans reliably.
+                let logoSize = size * 0.22
+                let logoRect = CGRect(
+                    x: (size - logoSize) / 2,
+                    y: (size - logoSize) / 2,
+                    width: logoSize, height: logoSize
+                )
+                // White halo behind the logo so gold-on-gold modules
+                // don't bleed into it.
+                let halo = logoRect.insetBy(dx: -logoSize * 0.18, dy: -logoSize * 0.18)
+                UIColor.white.setFill()
+                UIBezierPath(ovalIn: halo).fill()
+                logo.draw(in: logoRect)
+            }
+        }
     }
 }
