@@ -7,6 +7,20 @@ struct SettingsSheet: View {
     @State private var showSignOutConfirm = false
     @State private var showDeletePlanConfirm = false
 
+    // Profile-backed state — loaded from `profiles` on appear and
+    // written live to Supabase on every change. Mirrors web's
+    // AccountSettings (App.jsx ~25241–25272).
+    @State private var emailMarketingOptIn = false
+    @State private var selectedRoles: Set<String> = []
+    @State private var profileLoaded = false
+
+    private static let roleOptions: [(id: String, label: String, icon: String)] = [
+        ("bride_groom", "Bride or Groom",                "heart.fill"),
+        ("host",        "Event Host",                    "person.fill"),
+        ("planner",     "Professional Wedding Planner",  "briefcase.fill"),
+        ("vendor",      "Wedding Vendor",                "storefront.fill"),
+    ]
+
     var body: some View {
         NavigationStack {
             List {
@@ -67,13 +81,69 @@ struct SettingsSheet: View {
                     }
                 }
 
-                // Plan management
-                if appState.activePlan != nil {
+                // Notifications — marketing email toggle. Web parity
+                // (App.jsx AccountSettings ~25241).
+                Section {
+                    Toggle(isOn: $emailMarketingOptIn) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Marketing emails")
+                                .foregroundStyle(Color.sbCharcoal)
+                            Text("Venue tips, planning guides, product updates.")
+                                .font(SBFont.caption)
+                                .foregroundStyle(Color.sbWarm)
+                        }
+                    }
+                    .tint(Color.sbGold)
+                    .onChange(of: emailMarketingOptIn) { _, newValue in
+                        guard profileLoaded else { return }
+                        Task { await appState.auth.updateEmailMarketingOptIn(newValue) }
+                    }
+                } header: {
+                    Text("Notifications")
+                }
+
+                // Role multi-select. Web parity (App.jsx ~25261).
+                Section {
+                    ForEach(Self.roleOptions, id: \.id) { opt in
+                        let active = selectedRoles.contains(opt.id)
+                        Button {
+                            if active { selectedRoles.remove(opt.id) }
+                            else      { selectedRoles.insert(opt.id) }
+                            HapticEngine.selection()
+                            // Persist after every toggle so the switch
+                            // reads as immediately-saved (matches web).
+                            Task { await appState.auth.updateUserRoles(Array(selectedRoles)) }
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: opt.icon)
+                                    .foregroundStyle(active ? Color.sbGoldDk : Color.sbWarm)
+                                    .frame(width: 24)
+                                Text(opt.label)
+                                    .foregroundStyle(Color.sbCharcoal)
+                                Spacer()
+                                Image(systemName: active ? "checkmark.circle.fill" : "circle")
+                                    .foregroundStyle(active ? Color.sbGold : Color.sbWarm2)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                } header: {
+                    Text("I am a…")
+                } footer: {
+                    Text("Pick any that apply. Helps us tailor tips and templates.")
+                }
+
+                // Active Event — rich card mirroring web AccountSettings
+                // (App.jsx ~25094). Shows tier badge, optional date /
+                // venue / table count, seated-guest progress, and
+                // feature flags. Tapping the card returns to the editor.
+                if let plan = appState.activePlan {
                     Section {
+                        activeEventCard(plan)
                         Button {
                             showDeletePlanConfirm = true
                         } label: {
-                            HStack {
+                            HStack(spacing: 8) {
                                 Image(systemName: "trash")
                                     .foregroundStyle(Color.sbError)
                                 Text("Delete Active Plan")
@@ -149,6 +219,16 @@ struct SettingsSheet: View {
                         .foregroundStyle(Color.sbGoldDk)
                 }
             }
+            .task {
+                // Load the profile once on first appear. The
+                // `profileLoaded` gate prevents the .onChange writers
+                // from firing when we hydrate the toggle / role state.
+                if let p = await appState.auth.loadProfile() {
+                    emailMarketingOptIn = p.email_marketing_opt_in ?? false
+                    selectedRoles = Set(p.user_roles ?? [])
+                }
+                profileLoaded = true
+            }
             .alert("Sign Out?", isPresented: $showSignOutConfirm) {
                 Button("Sign Out", role: .destructive) {
                     Task {
@@ -167,6 +247,139 @@ struct SettingsSheet: View {
                 Text("This will permanently delete \"\(appState.activePlan?.name ?? "this plan")\". This cannot be undone.")
             }
         }
+    }
+
+    // MARK: - Active event card (web parity, App.jsx ~25094)
+
+    @ViewBuilder
+    private func activeEventCard(_ plan: SeatingPlan) -> some View {
+        let tier = appState.activePlanTier
+        let limits = appState.activePlanLimits
+        let isPaid = tier != .free
+        let seated = plan.guests.count
+        let cap = limits.seatedGuests
+        let progress = cap > 0 ? min(1.0, Double(seated) / Double(cap)) : 0
+        let overCap = seated >= cap
+
+        Button {
+            // Tap returns to the editor for this plan.
+            appState.selectedTab = .edit
+            dismiss()
+        } label: {
+            VStack(alignment: .leading, spacing: 12) {
+                // Title row: event name + optional tier badge
+                HStack(alignment: .top, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(plan.name)
+                            .font(SBFont.bodySemibold)
+                            .foregroundStyle(Color.sbCharcoal)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+                        if isPaid, let daysLeft = daysRemaining(plan) {
+                            Text("\(tier.displayName) · \(daysLeft) days remaining")
+                                .font(SBFont.caption)
+                                .foregroundStyle(Color.sbGoldDk)
+                        } else if isPaid {
+                            Text(tier.displayName)
+                                .font(SBFont.caption)
+                                .foregroundStyle(Color.sbGoldDk)
+                        } else {
+                            Text("Free Plan")
+                                .font(SBFont.caption)
+                                .foregroundStyle(Color.sbWarm)
+                        }
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Color.sbGoldDk)
+                }
+
+                // Event facts (date / venue / table count)
+                if plan.eventDate != nil || (plan.venue?.isEmpty == false) || !plan.tables.isEmpty {
+                    VStack(alignment: .leading, spacing: 4) {
+                        if let date = plan.eventDate {
+                            factRow(icon: "calendar",
+                                    text: date.formatted(date: .long, time: .omitted))
+                        }
+                        if let venue = plan.venue, !venue.isEmpty {
+                            factRow(icon: "mappin.and.ellipse", text: venue)
+                        }
+                        if !plan.tables.isEmpty {
+                            factRow(icon: "square.stack.3d.up",
+                                    text: "\(plan.tables.count) \(plan.tables.count == 1 ? "table" : "tables")")
+                        }
+                    }
+                }
+
+                // Seated guests progress
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text("Seated guests")
+                            .font(SBFont.caption)
+                            .foregroundStyle(Color.sbWarm)
+                        Spacer()
+                        Text("\(seated) / \(cap)")
+                            .font(SBFont.caption)
+                            .foregroundStyle(Color.sbCharcoal)
+                    }
+                    GeometryReader { geo in
+                        ZStack(alignment: .leading) {
+                            Capsule()
+                                .fill(Color.sbCharcoal.opacity(0.10))
+                            Capsule()
+                                .fill(overCap ? Color.sbError.opacity(0.8) : Color.sbGold)
+                                .frame(width: geo.size.width * progress)
+                        }
+                    }
+                    .frame(height: 6)
+                }
+
+                // Feature flags — mirrors web's tierLimits booleans
+                VStack(alignment: .leading, spacing: 3) {
+                    featureRow("AI auto-seating",        on: limits.aiGenerate)
+                    featureRow("AI floor plan detection",on: limits.aiFloorPlan)
+                    featureRow("Watermark-free exports", on: isPaid)
+                    featureRow("Invite collaborators",   on: isPaid)
+                }
+            }
+            .padding(.vertical, 4)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func factRow(icon: String, text: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 11))
+                .foregroundStyle(Color.sbWarm.opacity(0.7))
+                .frame(width: 14)
+            Text(text)
+                .font(SBFont.caption)
+                .foregroundStyle(Color.sbCharcoal2)
+                .lineLimit(1)
+        }
+    }
+
+    private func featureRow(_ label: String, on: Bool) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: on ? "checkmark.circle.fill" : "xmark.circle")
+                .font(.system(size: 11))
+                .foregroundStyle(on ? Color.sbSage : Color.sbCharcoal.opacity(0.3))
+                .frame(width: 14)
+            Text(label)
+                .font(SBFont.caption)
+                .foregroundStyle(on ? Color.sbCharcoal2 : Color.sbWarm)
+        }
+    }
+
+    /// Whole days between now and the plan's pass expiry. Nil for plans
+    /// with no expiry on file (e.g. free plans).
+    private func daysRemaining(_ plan: SeatingPlan) -> Int? {
+        guard let exp = plan.eventPassExpiresAt else { return nil }
+        let secs = exp.timeIntervalSince(Date())
+        guard secs > 0 else { return 0 }
+        return Int(secs / 86_400)
     }
 
     private func deletePlan() {

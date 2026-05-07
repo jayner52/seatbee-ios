@@ -23,13 +23,19 @@ struct RootView: View {
 
     var body: some View {
         Group {
-            if appState.auth.isAuthenticated {
-                AppRouter()
-            } else {
+            if !appState.auth.isAuthenticated {
                 AuthView()
+            } else if appState.auth.needsSignupConsent {
+                // First-time signup on this device. Mirrors web's
+                // PlannerAuthModal — collect role + marketing + TOS
+                // before letting the user into the dashboard.
+                SignupConsentView()
+            } else {
+                AppRouter()
             }
         }
         .preferredColorScheme(.light)
         .animation(.seatbeeScreen, value: appState.auth.isAuthenticated)
+        .animation(.seatbeeScreen, value: appState.auth.needsSignupConsent)
     }
 }
