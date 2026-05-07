@@ -184,6 +184,13 @@ struct DashboardView: View {
                     .buttonStyle(.plain)
                 }
 
+                // Tier badge — shows which pass (if any) is applied to
+                // this event. Tapping the free chip opens the paywall;
+                // paid chips are informational. Branding matches the
+                // EventPassesView statCards so users recognise tiers
+                // wherever they appear in the app.
+                tierBadge(for: plan)
+
                 if let date = plan.eventDate {
                     HStack(spacing: 6) {
                         if let venue = plan.venue {
@@ -247,6 +254,86 @@ struct DashboardView: View {
         .padding(16)
         .background(Color.sbCharcoal)
         .clipShape(RoundedRectangle(cornerRadius: SBRadius.button))
+    }
+
+    // MARK: - Tier badge
+    //
+    // Branding mirrors EventPassesView statCards (lines 64–68):
+    //   Event Pass     — sbChampagne tint, sbGoldDk accent
+    //   Signature Pass — sbChampagne2 tint, sbGoldDk accent
+    //   Grand Pass     — sbCharcoal/10 tint, sbCharcoal accent
+    //   Free / Expired — neutral warm tint with gold "Upgrade" CTA
+
+    @ViewBuilder
+    private func tierBadge(for plan: SeatingPlan) -> some View {
+        let tier = appState.activePlanTier
+        let expired = appState.isActivePlanExpired
+        let daysLeft = daysRemaining(plan)
+
+        if tier == .free || expired {
+            // Free / expired → tappable upgrade chip.
+            Button {
+                appState.showUpgrade = true
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "ticket")
+                        .font(.system(size: 11, weight: .semibold))
+                    Text(expired ? "Pass expired" : "Free Plan")
+                        .font(SBFont.bodySmallBold)
+                    Text("·")
+                        .foregroundStyle(Color.sbWarm)
+                    Text("Upgrade")
+                        .font(SBFont.bodySmallBold)
+                    Image(systemName: "arrow.right")
+                        .font(.system(size: 10, weight: .semibold))
+                }
+                .foregroundStyle(Color.sbGoldDk)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(Color.sbChampagne)
+                .clipShape(Capsule())
+                .overlay(
+                    Capsule().strokeBorder(Color.sbGoldDk.opacity(0.4), lineWidth: 1)
+                )
+            }
+            .buttonStyle(.plain)
+        } else {
+            // Paid tier → informational chip styled per tier.
+            let style = tierBadgeStyle(for: tier)
+            HStack(spacing: 6) {
+                Image(systemName: "ticket.fill")
+                    .font(.system(size: 11, weight: .semibold))
+                Text(tier.displayName)
+                    .font(SBFont.bodySmallBold)
+                if let daysLeft, daysLeft >= 0 {
+                    Text("·")
+                        .foregroundStyle(style.accent.opacity(0.6))
+                    Text("\(daysLeft)d left")
+                        .font(SBFont.caption)
+                }
+            }
+            .foregroundStyle(style.accent)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(style.tint)
+            .clipShape(Capsule())
+        }
+    }
+
+    private func tierBadgeStyle(for tier: PlanTier) -> (tint: Color, accent: Color) {
+        switch tier {
+        case .eventPass:     return (Color.sbChampagne,             Color.sbGoldDk)
+        case .signaturePass: return (Color.sbChampagne2,            Color.sbGoldDk)
+        case .proPass:       return (Color.sbCharcoal.opacity(0.10), Color.sbCharcoal)
+        case .free:          return (Color.sbChampagne,             Color.sbGoldDk)
+        }
+    }
+
+    private func daysRemaining(_ plan: SeatingPlan) -> Int? {
+        guard let exp = plan.eventPassExpiresAt else { return nil }
+        let secs = exp.timeIntervalSince(Date())
+        guard secs > 0 else { return 0 }
+        return Int(secs / 86_400)
     }
 
     // MARK: - Quick Actions
