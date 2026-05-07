@@ -1530,7 +1530,10 @@ struct OnboardingView: View {
         let gridStartX = (dim.width - Double(cols) * cellW) / 2
         let gridStartY = max(220, (dim.height - Double(rows) * cellH) / 2)
 
-        let colors = ["#9CAF88", "#D4A5A5", "#C9A961", "#A88843", "#8B8680"]
+        // Web parity (App.jsx atmospheric redesign ad49273): all seeded
+        // tables default to gold so the canvas reads as a unified atmospheric
+        // layout. Users can re-tint individual tables from the drawer.
+        let colors = ["#C9A961"]
 
         for i in 0..<regularCount {
             let col = i % cols
