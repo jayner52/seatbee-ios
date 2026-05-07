@@ -5,7 +5,6 @@ struct TableDrawerView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
     @State private var selectedTab = "Layout"
-    @State private var showRenameAlert = false
     @State private var renameText = ""
 
     private let tabs = ["Layout", "Seats", "Notes", "Tags"]
@@ -15,13 +14,13 @@ struct TableDrawerView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Header — table name + seated count (web parity, mirrors the
-            // "4/8 guests seated" stat at the top of web's edit-table panel)
+            // Header — inline editable name + seated count
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(table.name)
+                    TextField("Table name", text: $renameText)
                         .font(SBFont.displayMedium)
                         .foregroundStyle(Color.sbCharcoal)
+                        .onChange(of: renameText) { _, _ in renameTable() }
                     Text("\(table.assignments.count)/\(table.seats) guests seated")
                         .font(SBFont.caption)
                         .foregroundStyle(table.assignments.count > 0 ? Color.sbGoldDk : Color.sbWarm)
@@ -127,11 +126,6 @@ struct TableDrawerView: View {
             .padding(.top, SBSpacing.lg)
         }
         .background(Color.sbIvory)
-        .alert("Rename Table", isPresented: $showRenameAlert) {
-            TextField("Table name", text: $renameText)
-            Button("Save") { renameTable() }
-            Button("Cancel", role: .cancel) {}
-        }
         .onAppear { renameText = table.name }
     }
 
@@ -140,9 +134,6 @@ struct TableDrawerView: View {
     private var actionStrip: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 12) {
-                actionButton(icon: "pencil", label: "Rename") {
-                    showRenameAlert = true
-                }
                 actionButton(icon: table.locked == true ? "lock.fill" : "lock", label: table.locked == true ? "Unlock" : "Lock") {
                     toggleLock()
                 }

@@ -13,70 +13,76 @@ struct AddTableSheet: View {
     ]
 
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 16) {
-                Text("Choose a table type")
-                    .font(SBFont.displaySmall)
+        VStack(spacing: 0) {
+            // Custom header — avoids NavigationStack nav-bar/content overlap in sheets
+            ZStack {
+                Text("Add Table")
+                    .font(SBFont.bodySemibold)
                     .foregroundStyle(Color.sbCharcoal)
-                    .padding(.top, 8)
-
-                ForEach(tableTypes, id: \.type) { item in
-                    Button {
-                        addTable(type: item.type, seats: item.seats, name: item.name)
-                    } label: {
-                        HStack(spacing: 16) {
-                            ZStack {
-                                Circle()
-                                    .fill(Color.sbChampagne)
-                                    .frame(width: 52, height: 52)
-                                Image(systemName: item.icon)
-                                    .font(.system(size: 22))
-                                    .foregroundStyle(Color.sbGoldDk)
-                            }
-
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(item.name)
-                                    .font(SBFont.bodySemibold)
-                                    .foregroundStyle(Color.sbCharcoal)
-                                Text(item.description)
-                                    .font(SBFont.caption)
-                                    .foregroundStyle(Color.sbWarm)
-                            }
-
-                            Spacer()
-
-                            Text("\(item.seats) seats")
-                                .font(SBFont.capsLabel)
-                                .foregroundStyle(Color.sbGoldDk)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 4)
-                                .background(Color.sbChampagne)
-                                .clipShape(RoundedRectangle(cornerRadius: 6))
-                        }
-                        .padding(16)
-                        .background(Color.sbIvory2)
-                        .clipShape(RoundedRectangle(cornerRadius: SBRadius.card))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: SBRadius.card)
-                                .strokeBorder(Color.sbLine, lineWidth: 1)
-                        )
-                    }
-                    .buttonStyle(.plain)
+                HStack {
+                    Button("Cancel") { dismiss() }
+                        .font(SBFont.body)
+                        .foregroundStyle(Color.sbWarm)
+                    Spacer()
                 }
-
-                Spacer()
             }
             .padding(.horizontal, SBSpacing.screenMargin)
-            .background(Color.sbIvory)
-            .navigationTitle("Add Table")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                        .foregroundStyle(Color.sbWarm)
+            .padding(.top, 16)
+            .padding(.bottom, 12)
+
+            Divider()
+
+            ScrollView {
+                VStack(spacing: 12) {
+                    ForEach(tableTypes, id: \.type) { item in
+                        Button {
+                            addTable(type: item.type, seats: item.seats, name: item.name)
+                        } label: {
+                            HStack(spacing: 16) {
+                                ZStack {
+                                    Circle()
+                                        .fill(Color.sbChampagne)
+                                        .frame(width: 52, height: 52)
+                                    Image(systemName: item.icon)
+                                        .font(.system(size: 22))
+                                        .foregroundStyle(Color.sbGoldDk)
+                                }
+
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(item.name)
+                                        .font(SBFont.bodySemibold)
+                                        .foregroundStyle(Color.sbCharcoal)
+                                    Text(item.description)
+                                        .font(SBFont.caption)
+                                        .foregroundStyle(Color.sbWarm)
+                                }
+
+                                Spacer()
+
+                                Text("\(item.seats) seats")
+                                    .font(SBFont.capsLabel)
+                                    .foregroundStyle(Color.sbGoldDk)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 4)
+                                    .background(Color.sbChampagne)
+                                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                            }
+                            .padding(16)
+                            .background(Color.sbIvory2)
+                            .clipShape(RoundedRectangle(cornerRadius: SBRadius.card))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: SBRadius.card)
+                                    .strokeBorder(Color.sbLine, lineWidth: 1)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
+                .padding(.horizontal, SBSpacing.screenMargin)
+                .padding(.vertical, 16)
             }
         }
+        .background(Color.sbIvory)
     }
 
     private func addTable(type: SeatTable.TableType, seats: Int, name: String) {
