@@ -100,10 +100,16 @@ struct RoomSetupSheet: View {
                                     HapticEngine.selection()
                                 } label: {
                                     VStack(spacing: 6) {
-                                        Image(systemName: shape.icon)
-                                            .font(.system(size: 22))
-                                            .scaleEffect(x: shape.mirror ? -1 : 1, y: 1)
-                                            .foregroundStyle(selectedShape == shape.id ? Color.sbGoldDk : Color.sbWarm)
+                                        let iconColor = selectedShape == shape.id ? Color.sbGoldDk : Color.sbWarm
+                                        if ["l", "l_rev", "t", "u"].contains(shape.id) {
+                                            RoomShapeIcon(shape: shape.id, color: iconColor)
+                                                .frame(width: 26, height: 26)
+                                        } else {
+                                            Image(systemName: shape.icon)
+                                                .font(.system(size: 22))
+                                                .scaleEffect(x: shape.mirror ? -1 : 1, y: 1)
+                                                .foregroundStyle(iconColor)
+                                        }
                                         Text(shape.label)
                                             .font(SBFont.capsLabel)
                                             .foregroundStyle(selectedShape == shape.id ? Color.sbGoldDk : Color.sbWarm)
@@ -612,6 +618,67 @@ struct RoomSetupSheet: View {
                 analysisResult = "Analysis failed: \(error.localizedDescription)"
             }
             isAnalyzing = false
+        }
+    }
+}
+
+// MARK: - RoomShapeIcon
+//
+// Draws actual floor-plan polygon outlines for L / L-Reversed / T / U shapes
+// so the picker shows the room silhouette rather than the letter glyph.
+// Coordinates are normalized 0…1 and scaled to the frame at draw time.
+
+struct RoomShapeIcon: View {
+    let shape: String
+    let color: Color
+
+    var body: some View {
+        Canvas { ctx, size in
+            guard let pts = points(for: shape) else { return }
+            let w = size.width, h = size.height
+            var path = Path()
+            path.move(to: CGPoint(x: pts[0].x * w, y: pts[0].y * h))
+            for pt in pts.dropFirst() { path.addLine(to: CGPoint(x: pt.x * w, y: pt.y * h)) }
+            path.closeSubpath()
+            ctx.fill(path, with: .color(color.opacity(0.12)))
+            ctx.stroke(path, with: .color(color), style: StrokeStyle(lineWidth: 1.8, lineJoin: .round))
+        }
+    }
+
+    private func points(for id: String) -> [CGPoint]? {
+        switch id {
+        case "l":
+            // Tall left column + bottom bar extending right
+            return [
+                CGPoint(x: 0, y: 0), CGPoint(x: 0.45, y: 0),
+                CGPoint(x: 0.45, y: 0.52), CGPoint(x: 1, y: 0.52),
+                CGPoint(x: 1, y: 1), CGPoint(x: 0, y: 1),
+            ]
+        case "l_rev":
+            // Mirror of L: tall right column + bottom bar extending left
+            return [
+                CGPoint(x: 0, y: 0.52), CGPoint(x: 0.55, y: 0.52),
+                CGPoint(x: 0.55, y: 0), CGPoint(x: 1, y: 0),
+                CGPoint(x: 1, y: 1), CGPoint(x: 0, y: 1),
+            ]
+        case "t":
+            // Wide top bar + narrow center stem
+            return [
+                CGPoint(x: 0, y: 0), CGPoint(x: 1, y: 0),
+                CGPoint(x: 1, y: 0.42), CGPoint(x: 0.65, y: 0.42),
+                CGPoint(x: 0.65, y: 1), CGPoint(x: 0.35, y: 1),
+                CGPoint(x: 0.35, y: 0.42), CGPoint(x: 0, y: 0.42),
+            ]
+        case "u":
+            // Two arms + bottom bar, open at top
+            return [
+                CGPoint(x: 0, y: 0), CGPoint(x: 0.3, y: 0),
+                CGPoint(x: 0.3, y: 0.62), CGPoint(x: 0.7, y: 0.62),
+                CGPoint(x: 0.7, y: 0), CGPoint(x: 1, y: 0),
+                CGPoint(x: 1, y: 1), CGPoint(x: 0, y: 1),
+            ]
+        default:
+            return nil
         }
     }
 }
