@@ -376,119 +376,260 @@ final class PDFExportService {
 
     static func shareGuestListCSV(plan: SeatingPlan) {
         let csv = generateGuestCSV(plan: plan)
-        let url = writeTempFile(csv, name: "\(safeFilename(plan.name)) Guests.csv")
+        // Web parity (App.jsx:14429): replace any non-alphanumeric with
+        // _, suffix `_guests.csv`.
+        let url = writeTempFile(csv, name: "\(csvSafeName(plan.name))_guests.csv")
         shareFile(url)
     }
 
     static func shareTablesCSV(plan: SeatingPlan) {
         let csv = generateTablesCSV(plan: plan)
-        let url = writeTempFile(csv, name: "\(safeFilename(plan.name)) Tables.csv")
+        let url = writeTempFile(csv, name: "\(csvSafeName(plan.name))_tables.csv")
         shareFile(url)
     }
 
+    /// Web parity (`(state.event?.name||'seating').replace(/[^a-z0-9]/gi,'_')`).
+    /// Underscore-replaces any character that isn't `[A-Za-z0-9]`.
+    private static func csvSafeName(_ name: String) -> String {
+        let allowed = CharacterSet.alphanumerics
+        let mapped = name.unicodeScalars.map { allowed.contains($0) ? Character($0) : "_" }
+        let result = String(mapped)
+        return result.isEmpty ? "seating" : result
+    }
+
     private static func generateGuestCSV(plan: SeatingPlan) -> String {
-        // Build a guest → (table, seat) lookup so we don't scan tables N times.
-        var seatByGuest: [String: (table: SeatTable, seat: Int)] = [:]
+        // Web parity (App.jsx expCSV ~14406). Column order, header
+        // names, value formatting, and even the always-empty Seat
+        // column all match exactly so caterers/vendors can't tell
+        // which client produced the file.
+        var seatByGuest: [String: SeatTable] = [:]
         for table in plan.tables {
-            for (guestId, seatIndex) in table.assignments {
-                seatByGuest[guestId] = (table, seatIndex)
+            for guestId in table.assignments.keys {
+                seatByGuest[guestId] = table
+            }
+        }
+
+        // Resolve per-guest party member names from rawParties so the
+        // Party column matches web's `partyNames` formatting (display
+        // or first-name fallback, joined by '; ', excludes self).
+        var partyMemberNames: [String: String] = [:]
+        if let rawParties = plan.rawParties {
+            let guestById = Dictionary(uniqueKeysWithValues: plan.guests.map { ($0.id, $0) })
+            for partyDict in rawParties {
+                guard let memberIds = partyDict["guestIds"]?.value as? [String] else { continue }
+                let names = memberIds.map { id -> (gid: String, name: String) in
+                    guard let g = guestById[id] else { return (id, "") }
+                    let label = (g.display?.isEmpty == false) ? g.display!
+                        : g.name.split(separator: " ").first.map(String.init) ?? ""
+                    return (id, label)
+                }
+                for (gid, _) in names {
+                    let others = names.filter { $0.gid != gid && !$0.name.isEmpty }
+                                      .map(\.name)
+                                      .joined(separator: "; ")
+                    if !others.isEmpty { partyMemberNames[gid] = others }
+                }
             }
         }
 
         let header = [
-            "Name", "Email", "Side", "Table", "Seat",
-            "RSVP", "Meal", "Dietary", "Categories",
-            "VIP", "Child", "High Chair", "Notes"
+            "Guest Name", "Display Name", "RSVP", "Table", "Seat",
+            "Meal", "Dietary", "Category", "Side", "VIP",
+            "Child", "High Chair", "Party", "Email", "Phone", "Notes"
         ]
         var rows: [[String]] = [header]
         for g in plan.guests {
-            let assignment = seatByGuest[g.id]
+            let table = seatByGuest[g.id]
             let categoryNames = g.categories.compactMap { id -> String? in
                 guard let raw = plan.rawCategories else { return id }
                 let entry = raw.first { ($0["id"]?.value as? String) == id }
                 return (entry?["name"]?.value as? String) ?? id
             }.joined(separator: "; ")
 
+            // Web mapping: yes→Yes, no→No, pending→Maybe, else ''
+            let rsvpLabel: String
+            switch g.rsvp {
+            case .yes:     rsvpLabel = "Yes"
+            case .no:      rsvpLabel = "No"
+            case .pending: rsvpLabel = "Maybe"
+            default:       rsvpLabel = ""
+            }
+
             rows.append([
-                g.displayName,
-                g.email ?? "",
-                g.side.rawValue,
-                assignment?.table.name ?? "",
-                assignment.map { String($0.seat + 1) } ?? "",
-                g.rsvp.rawValue,
-                g.meal ?? "",
-                g.dietary ?? "",
-                categoryNames,
-                g.vip ? "yes" : "",
-                (g.isChild == true) ? "yes" : "",
-                (g.highChair == true) ? "yes" : "",
-                g.notes ?? "",
+                g.name,                                  // Guest Name (full)
+                g.display ?? "",                          // Display Name
+                rsvpLabel,                                // RSVP (capitalized)
+                table?.name ?? "Unassigned",              // Table
+                "",                                       // Seat (web leaves blank — App.jsx:14423)
+                g.meal ?? "",                             // Meal
+                g.dietary ?? "",                          // Dietary
+                categoryNames,                            // Category (joined; matches web's `cats`)
+                g.side.rawValue,                          // Side
+                g.vip ? "Yes" : "",                       // VIP (capital Y, matches web)
+                (g.isChild == true) ? "Yes" : "",         // Child
+                (g.highChair == true) ? "Yes" : "",       // High Chair
+                partyMemberNames[g.id] ?? "",             // Party (other member names)
+                g.email ?? "",                            // Email
+                "",                                       // Phone (iOS Guest model has no phone field)
+                g.notes ?? "",                            // Notes
             ])
         }
         return csvString(rows)
+    }
+
+    /// Web parity (App.jsx getMealShort). Maps a guest's free-text
+    /// meal to a normalised short label so meal columns aggregate
+    /// cleanly. `Beef`/`Salmon`/`Chicken`/`Vegan` are the canonical
+    /// shorts; anything else falls back to the first two words.
+    private static func mealShort(_ raw: String?) -> String? {
+        guard let raw, !raw.isEmpty else { return nil }
+        let m = raw.lowercased()
+        if m.contains("beef") || m.contains("tenderloin") { return "Beef" }
+        if m.contains("salmon") || m.contains("prawn") || m.contains("fish") { return "Salmon" }
+        if m.contains("chicken") { return "Chicken" }
+        if m.contains("mushroom") || m.contains("quinoa") || m.contains("vegan") || m.contains("vegetarian") {
+            return "Vegan"
+        }
+        return raw.split(separator: " ").prefix(2).joined(separator: " ")
     }
 
     private static func generateTablesCSV(plan: SeatingPlan) -> String {
-        let header = [
-            "Table", "Type", "Capacity", "Seated", "Locked",
-            "Guests", "Meal breakdown", "Dietary needs", "High chairs"
-        ]
+        // Web parity (App.jsx expTableCSV ~14433). One column PER meal
+        // type (Beef / Chicken / Salmon / Vegan / etc.) instead of a
+        // single combined "Meal breakdown" column. Includes an
+        // (Unassigned) row for guests with no table and a TOTALS row.
+        let guestsById = Dictionary(uniqueKeysWithValues: plan.guests.map { ($0.id, $0) })
+        let assignedIds = Set(plan.tables.flatMap { $0.assignments.keys })
+
+        // Collect every meal short across SEATED guests, sorted alpha.
+        var mealSet = Set<String>()
+        for g in plan.guests where assignedIds.contains(g.id) {
+            if let s = mealShort(g.meal) { mealSet.insert(s) }
+        }
+        let mealTypes = mealSet.sorted()
+        let hasMeals = !mealTypes.isEmpty
+
+        var header = ["Table", "Type", "Capacity", "Seated"]
+        if hasMeals { header.append(contentsOf: mealTypes) }
+        header.append(contentsOf: ["Dietary Needs", "High Chairs", "Guests"])
+
         var rows: [[String]] = [header]
 
-        let guestsById = Dictionary(uniqueKeysWithValues: plan.guests.map { ($0.id, $0) })
+        var totalSeated = 0
+        var totalCapacity = 0
+        var totalHighChairs = 0
+        var totalMeals: [String: Int] = [:]
+        for m in mealTypes { totalMeals[m] = 0 }
+        var totalDietary: [String] = []
 
         for table in plan.tables {
-            let tableGuests = table.assignments.keys.compactMap { guestsById[$0] }
-            let names = tableGuests.map { $0.displayName }.joined(separator: "; ")
+            let tGuests = table.assignments.keys.compactMap { guestsById[$0] }
+            let seated = tGuests.count
+            totalSeated += seated
+            totalCapacity += table.seats
 
-            // Meal counts (web parity: `Beef: 3, Chicken: 2`).
             var mealCounts: [String: Int] = [:]
-            for g in tableGuests {
-                if let m = g.meal, !m.isEmpty {
-                    mealCounts[m, default: 0] += 1
+            for m in mealTypes { mealCounts[m] = 0 }
+            for g in tGuests {
+                if let s = mealShort(g.meal), mealCounts[s] != nil {
+                    mealCounts[s, default: 0] += 1
+                    totalMeals[s, default: 0] += 1
                 }
             }
-            let mealBreakdown = mealCounts
-                .sorted { $0.key < $1.key }
-                .map { "\($0.key): \($0.value)" }
-                .joined(separator: ", ")
 
-            // Dietary needs — count guests with non-empty dietary or any tag.
-            let dietaryCount = tableGuests.filter {
-                !($0.dietary ?? "").isEmpty || !(($0.dietaryTags ?? []).isEmpty)
-            }.count
+            let dietaryList = tGuests.compactMap { g -> String? in
+                guard let d = g.dietary, !d.isEmpty else { return nil }
+                return d
+            }
+            let dietarySummary = dietaryList.joined(separator: "; ")
+            totalDietary.append(contentsOf: dietaryList)
 
-            let highChairCount = tableGuests.filter { $0.highChair == true }.count
+            let highChairs = tGuests.filter { $0.highChair == true }.count
+            totalHighChairs += highChairs
 
-            rows.append([
+            // Web uses g.name (full) for the table's guest list, not
+            // displayName.
+            let names = tGuests.map { $0.name }.joined(separator: "; ")
+
+            var row: [String] = [
                 table.name,
                 table.type.rawValue,
                 String(table.seats),
-                String(table.assignments.count),
-                (table.locked == true) ? "yes" : "",
+                String(seated),
+            ]
+            if hasMeals {
+                row.append(contentsOf: mealTypes.map { mealCounts[$0]! > 0 ? String(mealCounts[$0]!) : "" })
+            }
+            row.append(contentsOf: [
+                dietarySummary,
+                highChairs > 0 ? String(highChairs) : "",
                 names,
-                mealBreakdown,
-                dietaryCount > 0 ? String(dietaryCount) : "",
-                highChairCount > 0 ? String(highChairCount) : "",
             ])
+            rows.append(row)
         }
+
+        // (Unassigned) row — RSVP=no guests are excluded, matching web.
+        let unassigned = plan.guests.filter {
+            !assignedIds.contains($0.id) && $0.rsvp != .no
+        }
+        if !unassigned.isEmpty {
+            var mealCounts: [String: Int] = [:]
+            for m in mealTypes { mealCounts[m] = 0 }
+            for g in unassigned {
+                if let s = mealShort(g.meal), mealCounts[s] != nil {
+                    mealCounts[s, default: 0] += 1
+                    totalMeals[s, default: 0] += 1
+                }
+            }
+            let dietaryList = unassigned.compactMap { g -> String? in
+                guard let d = g.dietary, !d.isEmpty else { return nil }
+                return d
+            }
+            let highChairs = unassigned.filter { $0.highChair == true }.count
+            totalHighChairs += highChairs
+
+            var row: [String] = ["(Unassigned)", "", "-", String(unassigned.count)]
+            if hasMeals {
+                row.append(contentsOf: mealTypes.map { mealCounts[$0]! > 0 ? String(mealCounts[$0]!) : "" })
+            }
+            row.append(contentsOf: [
+                dietaryList.joined(separator: "; "),
+                highChairs > 0 ? String(highChairs) : "",
+                unassigned.map { $0.name }.joined(separator: "; "),
+            ])
+            rows.append(row)
+        }
+
+        // Blank separator + TOTALS row.
+        rows.append([])
+        var totals: [String] = ["TOTALS", "", String(totalCapacity), String(totalSeated + unassigned.count)]
+        if hasMeals {
+            totals.append(contentsOf: mealTypes.map { String(totalMeals[$0] ?? 0) })
+        }
+        totals.append(contentsOf: [
+            "\(totalDietary.count) total",
+            totalHighChairs > 0 ? String(totalHighChairs) : "",
+            "",
+        ])
+        rows.append(totals)
+
         return csvString(rows)
     }
 
-    /// RFC 4180 CSV — wrap any field containing `,`, `"`, or newline in
-    /// double quotes; double-up internal `"`. Matches Excel/Numbers parsing.
+    /// Web-parity CSV (App.jsx ~14425): wraps EVERY field in double
+    /// quotes (not just ones containing separators), doubles internal
+    /// quotes, joins rows with `\n` (not CRLF). Excel + Numbers parse
+    /// either format fine, but matching byte-for-byte means a vendor
+    /// can't tell which client generated the file.
     private static func csvString(_ rows: [[String]]) -> String {
         rows.map { row in
             row.map { cell in
-                if cell.contains(",") || cell.contains("\"") || cell.contains("\n") {
-                    let escaped = cell.replacingOccurrences(of: "\"", with: "\"\"")
-                    return "\"\(escaped)\""
-                }
-                return cell
+                let escaped = cell.replacingOccurrences(of: "\"", with: "\"\"")
+                return "\"\(escaped)\""
             }
             .joined(separator: ",")
         }
-        .joined(separator: "\r\n")
+        .joined(separator: "\n")
     }
 
     private static func writeTempFile(_ contents: String, name: String) -> URL {
