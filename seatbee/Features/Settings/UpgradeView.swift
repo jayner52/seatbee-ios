@@ -432,7 +432,7 @@ struct UpgradeView: View {
             }
             .buttonStyle(.plain)
 
-            Text("Also available at seatbee.app")
+            Text("Manage your account at seatbee.app")
                 .font(.system(size: 11))
                 .foregroundStyle(Color.sbWarm2)
         }
