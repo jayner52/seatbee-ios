@@ -206,20 +206,10 @@ struct CSVImportSheet: View {
     private func importGuests() {
         guard var plan = appState.activePlan else { return }
 
-        // Tier-limit guard: block if importing this batch would exceed the cap.
-        if appState.wouldExceedGuestLimit(adding: parsedGuests.count) {
-            let limits = appState.activePlanLimits
-            let tier = appState.activePlanTier
-            let remaining = max(0, limits.seatedGuests - plan.guests.count)
-            if appState.isActivePlanExpired {
-                tierLimitMessage = "This event's pass has expired, so it's back to a \(limits.seatedGuests)-guest cap. You can add \(remaining) more — this CSV has \(parsedGuests.count). Apply a fresh Event Pass in Settings to import the full list."
-            } else {
-                tierLimitMessage = "Your \(tier.displayName) plan supports up to \(limits.seatedGuests) guests. You can add \(remaining) more — this CSV has \(parsedGuests.count). Apply an Event Pass in Settings to import the full list."
-            }
-            HapticEngine.error()
-            return
-        }
-
+        // Web parity: importing guests is never blocked by the tier limit.
+        // The limit only applies when SEATING guests (assigning to tables).
+        // Users should be able to build their full guest list on the free
+        // tier and only hit the gate when they try to seat more than the cap.
         plan.guests.append(contentsOf: parsedGuests)
         appState.activePlan = plan
         HapticEngine.success()

@@ -404,11 +404,8 @@ struct GuestDetailSheet: View {
                 plan.guests[idx] = updatedGuest
             }
         } else {
-            // Tier-limit guard for new guests only — never block edits to existing.
-            if appState.wouldExceedGuestLimit(adding: 1) {
-                showTierLimitAlert = true
-                return
-            }
+            // Web parity: adding guests to the list is never blocked.
+            // The tier limit only applies when SEATING (assigning to tables).
             plan.guests.append(updatedGuest)
         }
 
