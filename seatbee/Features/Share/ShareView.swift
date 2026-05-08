@@ -960,6 +960,12 @@ struct ShareView: View {
             "shellfish-allergy": "sh", "halal": "hal", "kosher": "kos"
         ]
         var crossRef: [String: [String: Int]] = [:]
+        // Custom-note breakdown — guests with a non-empty Guest.dietary
+        // (free-text "other restriction" field). Surfaces as a list the
+        // tool can render under an "Other notes" section so caterers
+        // see things like "no pork" / "low sodium" that don't map to
+        // the canonical 8 tags.
+        var customNotes: [[String: Any]] = []
         for g in plan.guests where assignedIds.contains(g.id) {
             guard let m = g.meal, !m.isEmpty else { continue }
             let mealId = m
@@ -969,6 +975,14 @@ struct ShareView: View {
             for k in bucket {
                 crossRef[k, default: [:]][mealId, default: 0] += 1
             }
+            if let note = g.dietary?.trimmingCharacters(in: .whitespaces),
+               !note.isEmpty {
+                customNotes.append([
+                    "guest": g.displayName,
+                    "meal": mealId,
+                    "note": note,
+                ])
+            }
         }
 
         let payload: [String: Any] = [
@@ -977,6 +991,7 @@ struct ShareView: View {
             "venueName": plan.venue ?? "",
             "meals": meals,
             "crossRef": crossRef,
+            "customNotes": customNotes,
         ]
         openToolURL(path: "/tools/dietary-summary", payload: payload)
     }
