@@ -121,6 +121,14 @@ struct PartiesSheet: View {
                 .padding(.top, 16)
             }
             .background(Color.sbIvory)
+            // Floating Create Party bar — only attached while the
+            // picker is active so it doesn't sit there occupying the
+            // home-indicator strip the rest of the time.
+            .safeAreaInset(edge: .bottom) {
+                if creatingParty {
+                    floatingCreateBar
+                }
+            }
             .navigationTitle("Parties & Groups")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -312,22 +320,10 @@ struct PartiesSheet: View {
                 }
             }
 
-            // Commit
-            Button {
-                commitCreate()
-            } label: {
-                let n = selectedGuestIds.count
-                Text(n == 0 ? "Pick at least one guest"
-                     : "Create Party (\(n))")
-                    .font(SBFont.bodySemibold)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-                    .foregroundStyle(.white)
-                    .background(n == 0 ? Color.sbWarm2 : Color.sbGoldDk)
-                    .clipShape(RoundedRectangle(cornerRadius: SBRadius.button))
-            }
-            .buttonStyle(.plain)
-            .disabled(selectedGuestIds.isEmpty)
+            // Commit lives outside this card, in a floating
+            // safeAreaInset bar — see `floatingCreateBar` below — so
+            // it stays visible no matter how far the user has scrolled
+            // through the guest list.
         }
         .padding(14)
         .background(Color.sbChampagne.opacity(0.35))
@@ -336,6 +332,47 @@ struct PartiesSheet: View {
             RoundedRectangle(cornerRadius: SBRadius.card)
                 .strokeBorder(Color.sbGoldDk.opacity(0.3), lineWidth: 1)
         )
+    }
+
+    /// Sticky bottom bar that floats over the scroll content while the
+    /// create-party picker is open. Mounted via `.safeAreaInset(edge:
+    /// .bottom)` on the ScrollView so it sits above the home indicator
+    /// and never scrolls out of view — fixes the "I have to scroll to
+    /// the very bottom of 200 guests to find the Create button" trap.
+    private var floatingCreateBar: some View {
+        VStack(spacing: 0) {
+            // Soft fade so the button doesn't visually collide with
+            // guest rows scrolling underneath.
+            LinearGradient(
+                colors: [Color.sbIvory.opacity(0), Color.sbIvory],
+                startPoint: .top, endPoint: .bottom
+            )
+            .frame(height: 14)
+            .allowsHitTesting(false)
+
+            Button {
+                commitCreate()
+            } label: {
+                let n = selectedGuestIds.count
+                HStack(spacing: 8) {
+                    Image(systemName: n == 0 ? "person.crop.circle.badge.plus" : "checkmark.circle.fill")
+                        .font(.system(size: 16, weight: .semibold))
+                    Text(n == 0 ? "Pick at least one guest"
+                         : "Create Party (\(n))")
+                        .font(SBFont.bodySemibold)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .foregroundStyle(.white)
+                .background(n == 0 ? Color.sbWarm2 : Color.sbGoldDk)
+                .clipShape(RoundedRectangle(cornerRadius: SBRadius.button))
+            }
+            .buttonStyle(.plain)
+            .disabled(selectedGuestIds.isEmpty)
+            .padding(.horizontal, SBSpacing.screenMargin)
+            .padding(.bottom, 8)
+            .background(Color.sbIvory)
+        }
     }
 
     private func pickerRow(guest: Guest, selected: Bool, action: @escaping () -> Void) -> some View {
