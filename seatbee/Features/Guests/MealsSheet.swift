@@ -49,6 +49,7 @@ struct MealsSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: SBSpacing.sectionGap) {
+                    csvImportTip
                     countsSummary
                     selectionToolbar
                     guestList
@@ -114,6 +115,29 @@ struct MealsSheet: View {
                 .presentationDetents([.medium, .large])
             }
         }
+    }
+
+    // MARK: - CSV import tip
+
+    /// Soft permanent reminder for users with hundreds of guests: the
+    /// Guests tab's "Import" button accepts a `meal` column, so they
+    /// don't have to assign meals one-by-one in this sheet. Kept
+    /// quiet — small text, single line, no big banner — so power
+    /// users who already know it can tune it out.
+    private var csvImportTip: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "lightbulb")
+                .font(.system(size: 12))
+                .foregroundStyle(Color.sbGoldDk)
+            Text("Got a CSV with meal preferences? Use **Import** on the Guests tab to bring them in all at once.")
+                .font(SBFont.caption)
+                .foregroundStyle(Color.sbWarm)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.sbChampagne.opacity(0.5))
+        .clipShape(RoundedRectangle(cornerRadius: SBRadius.small))
     }
 
     // MARK: - Counts summary
@@ -511,36 +535,43 @@ private struct MealPickerSheet: View {
                     }
                 }
 
-                HStack(spacing: 8) {
-                    Image(systemName: "pencil.line")
-                        .foregroundStyle(Color.sbGoldDk)
-                        .font(.system(size: 14))
-                    TextField("Custom meal (e.g. \"Chicken fingers\")",
-                              text: $customMealText)
-                        .textFieldStyle(.plain)
-                        .font(SBFont.body)
-                        .onChange(of: customMealText) { _, newValue in
-                            if !newValue.isEmpty {
-                                selectedMeal = ""    // chips deselect
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "plus.circle")
+                            .foregroundStyle(Color.sbGoldDk)
+                            .font(.system(size: 14))
+                        TextField("Add a new meal — e.g. Beef, Chicken fingers, Vegetarian risotto",
+                                  text: $customMealText, axis: .horizontal)
+                            .textFieldStyle(.plain)
+                            .font(SBFont.body)
+                            .onChange(of: customMealText) { _, newValue in
+                                if !newValue.isEmpty {
+                                    selectedMeal = ""    // chips deselect
+                                }
+                                if mode == .bulk { mealEdited = true }
                             }
-                            if mode == .bulk { mealEdited = true }
-                        }
-                    if !customMealText.isEmpty {
-                        Button {
-                            customMealText = ""
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .foregroundStyle(Color.sbWarm2)
+                        if !customMealText.isEmpty {
+                            Button {
+                                customMealText = ""
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundStyle(Color.sbWarm2)
+                            }
                         }
                     }
+                    .padding(10)
+                    .background(Color.white)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: SBRadius.small)
+                            .strokeBorder(Color.sbLine, lineWidth: 1)
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: SBRadius.small))
+
+                    Text("New meals are saved automatically — they'll appear as chips for future guests in this plan.")
+                        .font(SBFont.caption)
+                        .foregroundStyle(Color.sbWarm)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                .padding(10)
-                .background(Color.white)
-                .overlay(
-                    RoundedRectangle(cornerRadius: SBRadius.small)
-                        .strokeBorder(Color.sbLine, lineWidth: 1)
-                )
-                .clipShape(RoundedRectangle(cornerRadius: SBRadius.small))
             }
         }
     }
