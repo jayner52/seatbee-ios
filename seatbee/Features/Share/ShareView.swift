@@ -342,20 +342,8 @@ struct ShareView: View {
     private var shareViaRow: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 12) {
-                shareViaCard(
-                    icon: "sparkles",
-                    title: "Snapshot",
-                    subtitle: "Branded share card with stats",
-                    action: { handleShareSocial() }
-                )
-                shareViaCard(
-                    icon: "square.grid.2x2",
-                    title: includeGuestNamesOnFloorPlan ? "Seating Chart" : "Floor Plan",
-                    subtitle: includeGuestNamesOnFloorPlan
-                        ? "Room layout with each guest's name"
-                        : "Room layout — tables only, no names",
-                    action: { handleShareFloorPlan() }
-                )
+                snapshotShareCard
+                seatingChartShareCard
             }
 
             // Inline toggle row for the Floor Plan variant. Drawn as a
@@ -383,29 +371,73 @@ struct ShareView: View {
         }
     }
 
-    private func shareViaCard(icon: String, title: String, subtitle: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            VStack(alignment: .leading, spacing: 8) {
+    // MARK: - Share Via cards
+    //
+    // Each card has a stylised mini-preview hinting at the actual
+    // exported image (not a literal render — too expensive — but
+    // shapes + the brand palette so the card itself feels like a
+    // tease of what'll get shared). Outcome-first copy: tells the
+    // user what they're sending, not what file format it is. Two
+    // distinct colour identities so the row doesn't read as two
+    // copies of the same generic tile.
+
+    /// Warm gold "wrapped"-style preview hinting at stats + sparkles.
+    /// Headline is a real number from the user's plan when one
+    /// exists — feels personalised rather than templated.
+    private var snapshotShareCard: some View {
+        let totalGuests = appState.activePlan?.guests.filter { $0.rsvp != .no }.count ?? 0
+        return Button {
+            handleShareSocial()
+        } label: {
+            VStack(alignment: .leading, spacing: 10) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.sbChampagne.opacity(0.45))
-                    Image(systemName: icon)
-                        .font(.system(size: 22, weight: .semibold))
-                        .foregroundStyle(Color.sbGoldDk)
+                    LinearGradient(
+                        colors: [
+                            Color(red: 234/255, green: 220/255, blue: 188/255),  // champagne
+                            Color(red: 213/255, green: 184/255, blue: 116/255),  // gold
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+
+                    // Inner mock card — gives the feel of a Wrapped
+                    // preview without rendering the full image.
+                    VStack(spacing: 2) {
+                        HStack(spacing: 3) {
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 8, weight: .semibold))
+                            Text("SEATBEE")
+                                .font(.system(size: 7, weight: .bold))
+                                .kerning(1)
+                        }
+                        .foregroundStyle(Color(white: 1).opacity(0.85))
+
+                        Text(totalGuests > 0 ? "\(totalGuests)" : "110")
+                            .font(.system(size: 26, weight: .bold))
+                            .foregroundStyle(.white)
+                        Text("GUESTS")
+                            .font(.system(size: 7, weight: .bold))
+                            .kerning(1.5)
+                            .foregroundStyle(Color(white: 1).opacity(0.85))
+                    }
                 }
-                .frame(height: 64)
-                Text(title)
-                    .font(SBFont.bodySmallBold)
-                    .foregroundStyle(Color.sbCharcoal)
-                Text(subtitle)
-                    .font(SBFont.caption)
-                    .foregroundStyle(Color.sbWarm)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
-                    .fixedSize(horizontal: false, vertical: true)
+                .frame(height: 88)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Seating Snapshot")
+                        .font(SBFont.bodySmallBold)
+                        .foregroundStyle(Color.sbCharcoal)
+                    Text("Show off your plan — guests, tables, top categories.")
+                        .font(SBFont.caption)
+                        .foregroundStyle(Color.sbWarm)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(12)
+            .padding(10)
             .background(Color.sbIvory2)
             .clipShape(RoundedRectangle(cornerRadius: SBRadius.card))
             .overlay(
@@ -414,6 +446,80 @@ struct ShareView: View {
             )
         }
         .buttonStyle(.plain)
+    }
+
+    /// Sage-tinted preview with stylised seat dots arranged around a
+    /// table — hints at the actual floor-plan output without trying
+    /// to render the full image. Title and subtitle flip with the
+    /// "include names" toggle.
+    private var seatingChartShareCard: some View {
+        let withNames = includeGuestNamesOnFloorPlan
+        return Button {
+            handleShareFloorPlan()
+        } label: {
+            VStack(alignment: .leading, spacing: 10) {
+                ZStack {
+                    LinearGradient(
+                        colors: [
+                            Color(red: 245/255, green: 240/255, blue: 224/255),  // soft ivory
+                            Color(red: 213/255, green: 222/255, blue: 198/255),  // soft sage
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+
+                    seatingDotIllustration
+                }
+                .frame(height: 88)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(withNames ? "Seating Chart" : "Floor Plan")
+                        .font(SBFont.bodySmallBold)
+                        .foregroundStyle(Color.sbCharcoal)
+                    Text(withNames
+                         ? "See who sits where — perfect for the group chat."
+                         : "Just the room layout, tables only.")
+                        .font(SBFont.caption)
+                        .foregroundStyle(Color.sbWarm)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(10)
+            .background(Color.sbIvory2)
+            .clipShape(RoundedRectangle(cornerRadius: SBRadius.card))
+            .overlay(
+                RoundedRectangle(cornerRadius: SBRadius.card)
+                    .strokeBorder(Color.sbLine, lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// 6 gold seat dots arranged around a small table circle. Pure
+    /// SwiftUI shapes — no asset needed. Mirrors the look of the
+    /// real floor-plan render so the card teases the actual output.
+    private var seatingDotIllustration: some View {
+        let goldDk = Color(red: 161/255, green: 132/255, blue: 65/255)
+        let gold = Color(red: 201/255, green: 169/255, blue: 97/255)
+        return ZStack {
+            // Centre table
+            Circle()
+                .fill(Color.white.opacity(0.7))
+                .overlay(Circle().strokeBorder(goldDk, lineWidth: 1))
+                .frame(width: 32, height: 32)
+            // 6 seats around it
+            ForEach(0..<6, id: \.self) { i in
+                let angle = Double(i) / 6 * 2 * .pi - .pi / 2
+                Circle()
+                    .fill(gold)
+                    .frame(width: 8, height: 8)
+                    .offset(x: 28 * cos(angle), y: 28 * sin(angle))
+            }
+        }
     }
 
     private func handleShareSocial() {
