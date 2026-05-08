@@ -382,10 +382,13 @@ struct ShareView: View {
     // copies of the same generic tile.
 
     /// Warm gold "wrapped"-style preview hinting at stats + sparkles.
-    /// Headline is a real number from the user's plan when one
-    /// exists — feels personalised rather than templated.
+    /// Headline is the LIVE seated-guest count for the active plan,
+    /// so the card reflects actual progress on the current plan
+    /// rather than a static mock or just the total RSVP'd count.
+    /// Falls back to "100" when no plan is loaded so the card still
+    /// looks like a populated preview.
     private var snapshotShareCard: some View {
-        let totalGuests = appState.activePlan?.guests.filter { $0.rsvp != .no }.count ?? 0
+        let seatedCount = appState.activePlan?.tables.reduce(0) { $0 + $1.assignments.count } ?? 0
         return Button {
             handleShareSocial()
         } label: {
@@ -413,10 +416,10 @@ struct ShareView: View {
                         }
                         .foregroundStyle(Color(white: 1).opacity(0.85))
 
-                        Text(totalGuests > 0 ? "\(totalGuests)" : "110")
+                        Text(seatedCount > 0 ? "\(seatedCount)" : "100")
                             .font(.system(size: 26, weight: .bold))
                             .foregroundStyle(.white)
-                        Text("GUESTS")
+                        Text("SEATED")
                             .font(.system(size: 7, weight: .bold))
                             .kerning(1.5)
                             .foregroundStyle(Color(white: 1).opacity(0.85))
