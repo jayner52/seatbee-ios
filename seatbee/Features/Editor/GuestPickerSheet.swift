@@ -10,7 +10,12 @@ struct GuestPickerSheet: View {
 
     private var unseatedGuests: [Guest] {
         let seatedIds = Set(tables.flatMap { $0.assignments.keys })
-        let filtered = guests.filter { !seatedIds.contains($0.id) }
+        // Web parity (App.jsx onDrop): never offer rsvp == .no guests
+        // as seating candidates — they've explicitly declined and
+        // shouldn't fill a chair someone else needs.
+        let filtered = guests.filter {
+            !seatedIds.contains($0.id) && $0.rsvp != .no
+        }
         if searchText.isEmpty { return filtered }
         return filtered.filter { $0.displayName.localizedCaseInsensitiveContains(searchText) }
     }

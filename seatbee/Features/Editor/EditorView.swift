@@ -675,6 +675,15 @@ struct EditorView: View {
     }
 
     private func assignGuestToNextEmpty(_ guest: Guest) {
+        // Defence-in-depth: GuestPickerSheet + RSVPSheet already
+        // hide rsvp == .no guests, but quickAssignRow funnels here
+        // too, and AI-generated row tap-to-seat could regress in
+        // future. Drop on the floor + error haptic so callers don't
+        // need their own guard.
+        guard guest.rsvp != .no else {
+            HapticEngine.error()
+            return
+        }
         guard let tableId = selectedTableId,
               var p = appState.activePlan,
               let ti = p.tables.firstIndex(where: { $0.id == tableId }) else { return }
@@ -792,6 +801,11 @@ struct EditorView: View {
     }
 
     private func assignGuest(_ guest: Guest) {
+        // See assignGuestToNextEmpty — same RSVP=.no defence here.
+        guard guest.rsvp != .no else {
+            HapticEngine.error()
+            return
+        }
         guard let seatIndex = assigningSeatIndex,
               let tableId = selectedTableId,
               var p = appState.activePlan,
