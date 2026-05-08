@@ -31,10 +31,14 @@ struct EventPassesView: View {
     var body: some View {
         List {
             summarySection
+            // Redeem-a-gift-code sits up top so users arriving from
+            // the new Settings → "Redeem a Gift Code" entry point can
+            // act immediately without scrolling past their inventory.
+            // Discoverable for users coming in via Event Passes too.
+            redeemGiftCodeSection
             availableSection
             if !redeemedPasses.isEmpty { redeemedSection }
             if !giftedPasses.isEmpty { giftedSection }
-            redeemGiftCodeSection
             if !expiredPasses.isEmpty { expiredSection }
             buyMoreSection
         }
