@@ -8,8 +8,14 @@ struct EventPassesView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
 
-    @State private var redeemingPassId: String?
     @State private var alertMessage: AlertMessage?
+    /// When set, presents the PlanPickerSheet so the user explicitly
+    /// chooses which plan a pass applies to. Replaces the old behaviour
+    /// of silently auto-applying to whatever plan happened to be
+    /// active in the editor. The sheet itself owns the per-plan
+    /// applying spinner — we don't track per-pass loading state up
+    /// here anymore.
+    @State private var pickingPlanForPass: EventPass?
 
     private struct AlertMessage: Identifiable {
         let id = UUID()
@@ -43,6 +49,14 @@ struct EventPassesView: View {
             Button("OK") { alertMessage = nil }
         } message: { msg in
             Text(msg.body)
+        }
+        .sheet(item: $pickingPlanForPass) { pass in
+            PlanPickerSheet(pass: pass) { result in
+                handleApplied(result, pass: pass)
+            }
+            .environment(appState)
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
         }
     }
 
@@ -193,35 +207,24 @@ struct EventPassesView: View {
         .padding(.vertical, 4)
     }
 
-    @ViewBuilder
     private func applyButton(for pass: EventPass) -> some View {
-        let activePlan = appState.activePlan
-        let canApply = canApply(pass: pass, to: activePlan)
-
-        if redeemingPassId == pass.id {
-            ProgressView()
-        } else if canApply {
-            Button {
-                Task { await redeem(pass) }
-            } label: {
-                Text("Apply")
-                    .font(SBFont.label)
-                    .foregroundStyle(Color.white)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(Color.sbGold)
-                    .clipShape(Capsule())
-            }
-            .buttonStyle(.borderless)
-        } else if let plan = activePlan, plan.tier != nil, plan.tier != "free" {
-            Text("Plan upgraded")
-                .font(SBFont.caption)
-                .foregroundStyle(Color.sbWarm)
-        } else if activePlan == nil {
-            Text("Open a plan")
-                .font(SBFont.caption)
-                .foregroundStyle(Color.sbWarm)
+        // Apply is ALWAYS available for in-inventory passes — the
+        // picker sheet decides per-plan eligibility, not this row.
+        // The old "Plan upgraded" gate hid the button whenever the
+        // active plan happened to be at >= the pass's tier, which
+        // made passes look used when they were still in inventory.
+        Button {
+            pickingPlanForPass = pass
+        } label: {
+            Text("Apply")
+                .font(SBFont.label)
+                .foregroundStyle(Color.white)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(Color.sbGold)
+                .clipShape(Capsule())
         }
+        .buttonStyle(.borderless)
     }
 
     // MARK: - Redeemed / Expired sections
@@ -239,20 +242,35 @@ struct EventPassesView: View {
             ForEach(redeemedPasses) { pass in
                 HStack(spacing: 12) {
                     tierBadge(pass.tier)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(pass.tier.displayName)
-                            .font(SBFont.bodySmallBold)
-                            .foregroundStyle(Color.sbCharcoal)
+                    VStack(alignment: .leading, spacing: 3) {
+                        // Lead with the plan name now that the user
+                        // explicitly picks per-pass — they're more
+                        // likely to be asking "where is this pass?"
+                        // than "what tier was it?". Tier shows below.
                         if let planName = pass.seatingPlans?.name {
-                            Text("Applied to: \(planName)")
-                                .font(SBFont.caption)
-                                .foregroundStyle(Color.sbWarm)
+                            Text(planName)
+                                .font(SBFont.bodySmallBold)
+                                .foregroundStyle(Color.sbCharcoal)
                                 .lineLimit(1)
-                        } else if let date = pass.redeemedAt {
-                            Text("Redeemed \(date.formatted(date: .abbreviated, time: .omitted))")
-                                .font(SBFont.caption)
+                        } else if pass.seatingPlans?.deletedAt != nil {
+                            Text("Plan deleted")
+                                .font(SBFont.bodySmallBold)
                                 .foregroundStyle(Color.sbWarm)
+                        } else {
+                            Text(pass.tier.displayName)
+                                .font(SBFont.bodySmallBold)
+                                .foregroundStyle(Color.sbCharcoal)
                         }
+                        HStack(spacing: 4) {
+                            Text(pass.tier.displayName)
+                            if let date = pass.redeemedAt {
+                                Text("·")
+                                    .foregroundStyle(Color.sbWarm2)
+                                Text("redeemed \(date.formatted(date: .abbreviated, time: .omitted))")
+                            }
+                        }
+                        .font(SBFont.caption)
+                        .foregroundStyle(Color.sbWarm)
                     }
                     Spacer()
                 }
@@ -324,35 +342,28 @@ struct EventPassesView: View {
         }
     }
 
-    private func canApply(pass: EventPass, to plan: SeatingPlan?) -> Bool {
-        guard let plan else { return false }
-        let currentTier = PlanTier.from(plan.tier)
-        return pass.tier.rank > currentTier.rank
-    }
+    /// Called by `PlanPickerSheet` after a successful redeem. Mirrors
+    /// the side-effects the old auto-apply path used to do: refresh
+    /// the pass inventory, update active plan tier in memory if it
+    /// matches, surface a confirmation alert.
+    private func handleApplied(_ result: RedeemPassResponse, pass: EventPass) {
+        // If the user happened to apply to whichever plan is currently
+        // open, reflect the new tier in memory so other surfaces
+        // (Editor / Share) update without a full refetch. Other plans
+        // are stateless on iOS — next time they're opened they'll be
+        // re-fetched fresh from Supabase with the new tier.
+        if let newTier = result.tier,
+           let appliedPlanId = result.planId,
+           appState.activePlan?.id == appliedPlanId {
+            appState.activePlan?.tier = newTier
+        }
 
-    private func redeem(_ pass: EventPass) async {
-        guard let planId = appState.activePlan?.id else { return }
-        redeemingPassId = pass.id
-        defer { redeemingPassId = nil }
-        do {
-            let result = try await appState.passes.redeemPass(planId: planId, passId: pass.id)
-            HapticEngine.success()
-            // Reflect new tier locally without forcing a full plan refetch.
-            if let newTier = result.tier {
-                appState.activePlan?.tier = newTier
-            }
-            // Refresh inventory so this pass moves out of "Available".
+        Task {
             await appState.refreshPasses()
             alertMessage = AlertMessage(
                 title: "Pass Applied",
-                body: result.message ?? "\(pass.tier.displayName) applied to this event."
+                body: result.message ?? "\(pass.tier.displayName) applied."
             )
-        } catch let error as PassesService.PassesError {
-            HapticEngine.error()
-            alertMessage = AlertMessage(title: "Could not apply pass", body: error.localizedDescription)
-        } catch {
-            HapticEngine.error()
-            alertMessage = AlertMessage(title: "Could not apply pass", body: error.localizedDescription)
         }
     }
 }
