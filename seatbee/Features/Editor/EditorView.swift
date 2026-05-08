@@ -584,7 +584,7 @@ struct EditorView: View {
             // they wrapped character-by-character ("Beef" stacked as
             // B/e/e/f). Full guest detail one tap away in the sheet.
             Text(guest.displayName)
-                .font(SBFont.bodySmallBold)
+                .font(SBFont.inter(13, weight: .semibold))
                 .foregroundStyle(Color.sbCharcoal)
                 .lineLimit(1)
                 .truncationMode(.tail)

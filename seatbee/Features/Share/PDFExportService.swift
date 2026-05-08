@@ -1,205 +1,904 @@
 import SwiftUI
 import PDFKit
 
+// MARK: - PDF export options (web parity)
+//
+// Web's exportPDF / exportPlannerPDF accept an opts object with the
+// three printable toggles: include meal selections, include dietary
+// restrictions, include high chair flags. iOS surfaces these as toggles
+// in the Share view and threads them through to both Seating Chart
+// and Planner View PDFs so the column set / annotations match exactly.
+
+struct PDFExportOpts: Sendable {
+    var includeMeals: Bool = true
+    var includeDietary: Bool = true
+    var includeHighChairs: Bool = true
+
+    static let `default` = PDFExportOpts()
+}
+
 @MainActor
 final class PDFExportService {
 
-    static func generateSeatingPDF(plan: SeatingPlan) -> Data? {
-        let pageWidth: CGFloat = 612  // Letter
+    // MARK: - Seating Chart PDF (web parity: exportPDF ~13854)
+    //
+    // Page 1: title + floor plan + stats row.
+    // Page 2+: "Seating Assignments" header + 2-column table card grid
+    //          (table name + guest list, simpler than Planner View).
+    // Free-tier watermark on every page.
+
+    static func generateSeatingChartPDF(plan: SeatingPlan, opts: PDFExportOpts, isPaid: Bool) -> Data? {
+        let pageWidth: CGFloat = 612   // Letter portrait
         let pageHeight: CGFloat = 792
         let margin: CGFloat = 40
 
         let renderer = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: pageWidth, height: pageHeight))
-
-        let data = renderer.pdfData { context in
-            // PAGE 1: Cover
+        return renderer.pdfData { context in
+            // ── PAGE 1: Floor plan overview ──
             context.beginPage()
-            drawCoverPage(context: context.cgContext, plan: plan, pageWidth: pageWidth, pageHeight: pageHeight, margin: margin)
+            var ctx = context.cgContext
+            drawHeader(ctx: ctx, plan: plan, pageWidth: pageWidth, top: margin)
 
-            // PAGE 2+: Table assignments
-            let tablesPerPage = 4
-            let tableChunks = stride(from: 0, to: plan.tables.count, by: tablesPerPage).map {
-                Array(plan.tables[$0..<min($0 + tablesPerPage, plan.tables.count)])
-            }
+            let floorTop: CGFloat = margin + 90
+            let floorRect = CGRect(x: margin, y: floorTop,
+                                   width: pageWidth - margin * 2,
+                                   height: pageHeight * 0.55)
+            let cardPath = UIBezierPath(roundedRect: floorRect, cornerRadius: 8)
+            ctx.setFillColor(UIColor(white: 0.99, alpha: 1).cgColor)
+            ctx.setStrokeColor(UIColor(white: 0.85, alpha: 1).cgColor)
+            ctx.setLineWidth(0.7)
+            ctx.addPath(cardPath.cgPath)
+            ctx.drawPath(using: .fillStroke)
+            CanvasPDFRenderer.drawFloorPlan(in: ctx, rect: floorRect, plan: plan)
 
-            for chunk in tableChunks {
+            drawStatsRow(ctx: ctx, plan: plan, pageWidth: pageWidth, y: floorRect.maxY + 24)
+            drawFooter(ctx: ctx, pageWidth: pageWidth, pageHeight: pageHeight, margin: margin)
+            if !isPaid { drawWatermark(ctx: ctx, pageWidth: pageWidth, pageHeight: pageHeight) }
+
+            // ── PAGE 2+: Seating Assignments — 2-col card grid ──
+            let cardWidth = (pageWidth - margin * 3) / 2
+            let topYAfterTitle: CGFloat = margin + 28
+            let pageBottomY = pageHeight - margin - 24
+            let sortedTables = sortTablesForCards(plan.tables)
+
+            var idx = 0
+            var pageNum = 1
+            while idx < sortedTables.count {
                 context.beginPage()
-                drawTablePage(context: context.cgContext, tables: chunk, guests: plan.guests, plan: plan, pageWidth: pageWidth, pageHeight: pageHeight, margin: margin)
+                pageNum += 1
+                ctx = context.cgContext
+
+                // Section title centred at top
+                let titleAttrs: [NSAttributedString.Key: Any] = [
+                    .font: UIFont.systemFont(ofSize: 14, weight: .semibold),
+                    .foregroundColor: charcoalColor,
+                ]
+                let title = NSString(string: "Seating Assignments")
+                let tSize = title.size(withAttributes: titleAttrs)
+                title.draw(at: CGPoint(x: (pageWidth - tSize.width) / 2, y: margin),
+                           withAttributes: titleAttrs)
+
+                if !isPaid { drawWatermark(ctx: ctx, pageWidth: pageWidth, pageHeight: pageHeight) }
+
+                var col = 0
+                var leftY = topYAfterTitle
+                var rightY = topYAfterTitle
+                while idx < sortedTables.count {
+                    let table = sortedTables[idx]
+                    let cardH = seatingCardHeight(table: table, opts: opts)
+                    let curY = (col == 0) ? leftY : rightY
+                    if curY + cardH > pageBottomY { break }
+
+                    let x = margin + CGFloat(col) * (cardWidth + margin)
+                    drawSeatingChartCard(ctx: ctx, table: table, plan: plan, opts: opts,
+                                         rect: CGRect(x: x, y: curY, width: cardWidth, height: cardH))
+                    if col == 0 { leftY += cardH + 10 } else { rightY += cardH + 10 }
+                    col = (col + 1) % 2
+                    idx += 1
+                }
+                drawFooter(ctx: ctx, pageWidth: pageWidth, pageHeight: pageHeight, margin: margin)
+
+                // Legend on the last page so caterers know what HC / GF /
+                // VG / etc. mean (only includes badges actually used).
+                if idx >= sortedTables.count {
+                    drawLegend(ctx: ctx, plan: plan, opts: opts,
+                               pageWidth: pageWidth, y: pageHeight - margin - 18)
+                }
             }
         }
-
-        return data
     }
 
-    private static func drawCoverPage(context: CGContext, plan: SeatingPlan, pageWidth: CGFloat, pageHeight: CGFloat, margin: CGFloat) {
-        let goldColor = UIColor(red: 201/255, green: 169/255, blue: 97/255, alpha: 1)
-        let charcoalColor = UIColor(red: 45/255, green: 45/255, blue: 45/255, alpha: 1)
-        let warmColor = UIColor(red: 139/255, green: 134/255, blue: 128/255, alpha: 1)
+    // MARK: - Planner View PDF (web parity: exportPlannerPDF ~14135)
+    //
+    // Page 1: title + floor plan only.
+    // Page 2+: "Planner View" + 2-col card grid where each card has a
+    //          left diagram panel (table shape with numbered seat dots)
+    //          and a right list panel with seat-numbered guest rows,
+    //          dietary/HC badges, meal column, dietary sub-line.
+    // Last page: legend explaining badge codes used in the plan.
 
-        // Title
+    static func generatePlannerViewPDF(plan: SeatingPlan, opts: PDFExportOpts, isPaid: Bool) -> Data? {
+        let pageWidth: CGFloat = 612
+        let pageHeight: CGFloat = 792
+        let margin: CGFloat = 40
+
+        let renderer = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: pageWidth, height: pageHeight))
+        return renderer.pdfData { context in
+            // ── PAGE 1: Floor plan overview ──
+            context.beginPage()
+            var ctx = context.cgContext
+            drawHeader(ctx: ctx, plan: plan, pageWidth: pageWidth, top: margin)
+            let floorRect = CGRect(x: margin, y: margin + 90,
+                                   width: pageWidth - margin * 2,
+                                   height: pageHeight - margin * 2 - 130)
+            let cardPath = UIBezierPath(roundedRect: floorRect, cornerRadius: 8)
+            ctx.setFillColor(UIColor(white: 0.99, alpha: 1).cgColor)
+            ctx.setStrokeColor(UIColor(white: 0.85, alpha: 1).cgColor)
+            ctx.setLineWidth(0.7)
+            ctx.addPath(cardPath.cgPath)
+            ctx.drawPath(using: .fillStroke)
+            CanvasPDFRenderer.drawFloorPlan(in: ctx, rect: floorRect, plan: plan)
+
+            // Footnote about seat numbering — matches web's planner PDF
+            let noteAttrs: [NSAttributedString.Key: Any] = [
+                .font: UIFont.italicSystemFont(ofSize: 8),
+                .foregroundColor: warmColor,
+            ]
+            let note = NSString(string: "Seat 1 is always the top-most position (12 o'clock) on each round table. Table detail on following pages.")
+            note.draw(at: CGPoint(x: margin, y: floorRect.maxY + 8),
+                      withAttributes: noteAttrs)
+
+            drawFooter(ctx: ctx, pageWidth: pageWidth, pageHeight: pageHeight, margin: margin)
+            if !isPaid { drawWatermark(ctx: ctx, pageWidth: pageWidth, pageHeight: pageHeight) }
+
+            // ── PAGE 2+: Planner cards ──
+            let cardWidth = (pageWidth - margin * 3) / 2
+            let topYAfterTitle: CGFloat = margin + 28
+            let pageBottomY = pageHeight - margin - 36   // leave room for legend strip
+            let sortedTables = sortTablesForCards(plan.tables)
+
+            var idx = 0
+            while idx < sortedTables.count {
+                context.beginPage()
+                ctx = context.cgContext
+
+                let titleAttrs: [NSAttributedString.Key: Any] = [
+                    .font: UIFont.systemFont(ofSize: 14, weight: .semibold),
+                    .foregroundColor: charcoalColor,
+                ]
+                let title = NSString(string: "Planner View")
+                let tSize = title.size(withAttributes: titleAttrs)
+                title.draw(at: CGPoint(x: (pageWidth - tSize.width) / 2, y: margin),
+                           withAttributes: titleAttrs)
+
+                if !isPaid { drawWatermark(ctx: ctx, pageWidth: pageWidth, pageHeight: pageHeight) }
+
+                var col = 0
+                var leftY = topYAfterTitle
+                var rightY = topYAfterTitle
+                while idx < sortedTables.count {
+                    let table = sortedTables[idx]
+                    let cardH = plannerCardHeight(table: table, opts: opts)
+                    let curY = (col == 0) ? leftY : rightY
+                    if curY + cardH > pageBottomY { break }
+
+                    let x = margin + CGFloat(col) * (cardWidth + margin)
+                    drawPlannerCard(ctx: ctx, table: table, plan: plan, opts: opts,
+                                    rect: CGRect(x: x, y: curY, width: cardWidth, height: cardH))
+                    if col == 0 { leftY += cardH + 10 } else { rightY += cardH + 10 }
+                    col = (col + 1) % 2
+                    idx += 1
+                }
+                drawFooter(ctx: ctx, pageWidth: pageWidth, pageHeight: pageHeight, margin: margin)
+
+                // Legend on the LAST page only.
+                if idx >= sortedTables.count {
+                    drawLegend(ctx: ctx, plan: plan, opts: opts, pageWidth: pageWidth, y: pageHeight - margin - 18)
+                }
+            }
+        }
+    }
+
+    /// Web parity: head tables first, then sweetheart, then natural-sort
+    /// by name so Table 2 sorts before Table 10.
+    private static func sortTablesForCards(_ tables: [SeatTable]) -> [SeatTable] {
+        tables.sorted { a, b in
+            let aHead = a.type == .head, bHead = b.type == .head
+            if aHead != bHead { return aHead }
+            let aSweet = a.type == .sweetheart, bSweet = b.type == .sweetheart
+            if aSweet != bSweet { return aSweet }
+            return a.name.compare(b.name, options: [.numeric, .caseInsensitive]) == .orderedAscending
+        }
+    }
+
+
+    // MARK: - Shared PDF chrome (header / stats / footer / watermark)
+
+    private static let goldColor = UIColor(red: 201/255, green: 169/255, blue: 97/255, alpha: 1)
+    private static let charcoalColor = UIColor(red: 45/255, green: 45/255, blue: 45/255, alpha: 1)
+    private static let warmColor = UIColor(red: 139/255, green: 134/255, blue: 128/255, alpha: 1)
+    private static let ivoryColor = UIColor(red: 250/255, green: 246/255, blue: 236/255, alpha: 1)
+
+    /// Title block at the top of a PDF page: plan name, decorative line,
+    /// optional date + venue subtitle. Returns nothing — caller knows the
+    /// header consumes ~90pt vertical space below `top`.
+    private static func drawHeader(ctx: CGContext, plan: SeatingPlan, pageWidth: CGFloat, top: CGFloat) {
         let titleAttrs: [NSAttributedString.Key: Any] = [
-            .font: UIFont.systemFont(ofSize: 36, weight: .medium),
-            .foregroundColor: charcoalColor
+            .font: UIFont.systemFont(ofSize: 24, weight: .semibold),
+            .foregroundColor: charcoalColor,
         ]
         let title = NSString(string: plan.name)
         let titleSize = title.size(withAttributes: titleAttrs)
-        title.draw(at: CGPoint(x: (pageWidth - titleSize.width) / 2, y: pageHeight * 0.3), withAttributes: titleAttrs)
+        title.draw(at: CGPoint(x: (pageWidth - titleSize.width) / 2, y: top),
+                   withAttributes: titleAttrs)
 
-        // Subtitle
-        let subtitleAttrs: [NSAttributedString.Key: Any] = [
-            .font: UIFont.systemFont(ofSize: 18, weight: .regular),
-            .foregroundColor: warmColor
-        ]
-        let subtitle = NSString(string: "Seating Arrangement")
-        let subSize = subtitle.size(withAttributes: subtitleAttrs)
-        subtitle.draw(at: CGPoint(x: (pageWidth - subSize.width) / 2, y: pageHeight * 0.3 + 50), withAttributes: subtitleAttrs)
+        // Decorative gold line under the title
+        let lineY = top + titleSize.height + 6
+        let lineWidth: CGFloat = 60
+        ctx.setStrokeColor(goldColor.cgColor)
+        ctx.setLineWidth(1.2)
+        ctx.move(to: CGPoint(x: (pageWidth - lineWidth) / 2, y: lineY))
+        ctx.addLine(to: CGPoint(x: (pageWidth + lineWidth) / 2, y: lineY))
+        ctx.strokePath()
 
-        // Date & venue
-        var detailY = pageHeight * 0.3 + 90
-        let detailAttrs: [NSAttributedString.Key: Any] = [
-            .font: UIFont.systemFont(ofSize: 14),
-            .foregroundColor: warmColor
-        ]
-
+        // Date + venue subtitle (single line, em-dash separated)
+        var subtitleParts: [String] = []
         if let date = plan.eventDate {
-            let dateFormatter = DateFormatter()
-            dateFormatter.dateStyle = .long
-            let dateStr = NSString(string: dateFormatter.string(from: date))
-            let dateSize = dateStr.size(withAttributes: detailAttrs)
-            dateStr.draw(at: CGPoint(x: (pageWidth - dateSize.width) / 2, y: detailY), withAttributes: detailAttrs)
-            detailY += 24
+            let f = DateFormatter()
+            f.dateStyle = .long
+            subtitleParts.append(f.string(from: date))
         }
-
-        if let venue = plan.venue {
-            let venueStr = NSString(string: venue)
-            let venueSize = venueStr.size(withAttributes: detailAttrs)
-            venueStr.draw(at: CGPoint(x: (pageWidth - venueSize.width) / 2, y: detailY), withAttributes: detailAttrs)
-            detailY += 24
+        if let venue = plan.venue, !venue.isEmpty { subtitleParts.append(venue) }
+        if !subtitleParts.isEmpty {
+            let subAttrs: [NSAttributedString.Key: Any] = [
+                .font: UIFont.systemFont(ofSize: 11, weight: .regular),
+                .foregroundColor: warmColor,
+            ]
+            let sub = NSString(string: subtitleParts.joined(separator: " — "))
+            let subSize = sub.size(withAttributes: subAttrs)
+            sub.draw(at: CGPoint(x: (pageWidth - subSize.width) / 2, y: lineY + 10),
+                     withAttributes: subAttrs)
         }
+    }
 
-        // Stats
-        let statsY = pageHeight * 0.55
+    /// Three-up stats row: Total Guests / Tables / Seated %.
+    private static func drawStatsRow(ctx: CGContext, plan: SeatingPlan, pageWidth: CGFloat, y: CGFloat) {
+        let totalGuests = plan.guests.filter { $0.rsvp != .no }.count
+        let totalTables = plan.tables.count
+        let totalSeats = plan.tables.reduce(0) { $0 + $1.seats }
+        let seatedCount = plan.tables.reduce(0) { $0 + $1.assignments.count }
+        let seatedPct = totalSeats > 0 ? Int(round(Double(seatedCount) / Double(totalSeats) * 100)) : 0
+
+        let stats: [(String, String)] = [
+            ("\(totalGuests)", "TOTAL GUESTS"),
+            ("\(totalTables)", "TABLES"),
+            ("\(seatedPct)%", "SEATED"),
+        ]
         let statsAttrs: [NSAttributedString.Key: Any] = [
-            .font: UIFont.systemFont(ofSize: 28, weight: .medium),
-            .foregroundColor: goldColor
+            .font: UIFont.systemFont(ofSize: 22, weight: .semibold),
+            .foregroundColor: goldColor,
         ]
         let labelAttrs: [NSAttributedString.Key: Any] = [
-            .font: UIFont.systemFont(ofSize: 11, weight: .semibold),
-            .foregroundColor: warmColor
+            .font: UIFont.systemFont(ofSize: 9, weight: .semibold),
+            .foregroundColor: warmColor,
         ]
-
-        let stats = [
-            ("\(plan.guests.count)", "GUESTS"),
-            ("\(plan.tables.count)", "TABLES"),
-            ("\(plan.tables.reduce(0) { $0 + $1.seats })", "SEATS")
-        ]
-
-        let statSpacing = pageWidth / CGFloat(stats.count + 1)
+        let spacing = pageWidth / CGFloat(stats.count + 1)
         for (i, stat) in stats.enumerated() {
-            let x = statSpacing * CGFloat(i + 1)
-            let numStr = NSString(string: stat.0)
-            let numSize = numStr.size(withAttributes: statsAttrs)
-            numStr.draw(at: CGPoint(x: x - numSize.width / 2, y: statsY), withAttributes: statsAttrs)
-
-            let labStr = NSString(string: stat.1)
-            let labSize = labStr.size(withAttributes: labelAttrs)
-            labStr.draw(at: CGPoint(x: x - labSize.width / 2, y: statsY + 36), withAttributes: labelAttrs)
+            let cx = spacing * CGFloat(i + 1)
+            let num = NSString(string: stat.0)
+            let nSize = num.size(withAttributes: statsAttrs)
+            num.draw(at: CGPoint(x: cx - nSize.width / 2, y: y), withAttributes: statsAttrs)
+            let lab = NSString(string: stat.1)
+            let lSize = lab.size(withAttributes: labelAttrs)
+            lab.draw(at: CGPoint(x: cx - lSize.width / 2, y: y + nSize.height + 2),
+                     withAttributes: labelAttrs)
         }
-
-        // Footer
-        let footerAttrs: [NSAttributedString.Key: Any] = [
-            .font: UIFont.systemFont(ofSize: 10),
-            .foregroundColor: warmColor
-        ]
-        let footer = NSString(string: "Generated by Seatbee · seatbee.app")
-        let footerSize = footer.size(withAttributes: footerAttrs)
-        footer.draw(at: CGPoint(x: (pageWidth - footerSize.width) / 2, y: pageHeight - margin - 20), withAttributes: footerAttrs)
     }
 
-    private static func drawTablePage(context: CGContext, tables: [SeatTable], guests: [Guest], plan: SeatingPlan, pageWidth: CGFloat, pageHeight: CGFloat, margin: CGFloat) {
-        let charcoalColor = UIColor(red: 45/255, green: 45/255, blue: 45/255, alpha: 1)
-        let goldColor = UIColor(red: 201/255, green: 169/255, blue: 97/255, alpha: 1)
-        let warmColor = UIColor(red: 139/255, green: 134/255, blue: 128/255, alpha: 1)
-        let ivoryColor = UIColor(red: 250/255, green: 246/255, blue: 236/255, alpha: 1)
+    // MARK: - Card-grid rendering (shared by Seating Chart + Planner View)
+    //
+    // Both PDFs use a 2-column card grid on pages 2+. Card height varies by
+    // seat count + selected opts. The Seating Chart draws a simpler card
+    // (just guest list with optional meal/dietary text); the Planner View
+    // draws a richer card with a left-side table diagram and right-side
+    // structured columns + dietary badges.
 
-        // Header
-        let headerAttrs: [NSAttributedString.Key: Any] = [
-            .font: UIFont.systemFont(ofSize: 12, weight: .semibold),
-            .foregroundColor: warmColor
+    /// Web parity: badge { label, fillColor }. Drawn as small filled
+    /// circles with white letters on top — readable on both screen and
+    /// print, doesn't depend on emoji font support.
+    private struct DietaryBadge {
+        let label: String
+        let color: UIColor
+    }
+
+    /// Maps a guest's dietaryTags + flags to badges. `opts` controls
+    /// whether dietary / HC categories show. Mirrors the web mapping
+    /// (App.jsx ~14349) so a printed iOS PDF keeps the same legend.
+    private static func badges(for guest: Guest, opts: PDFExportOpts) -> [DietaryBadge] {
+        var out: [DietaryBadge] = []
+        if opts.includeHighChairs, guest.highChair == true {
+            out.append(DietaryBadge(label: "HC", color: UIColor(red: 0.89, green: 0.42, blue: 0.34, alpha: 1)))
+        }
+        if guest.isChild == true {
+            out.append(DietaryBadge(label: "KID", color: UIColor(red: 0.63, green: 0.43, blue: 0.82, alpha: 1)))
+        }
+        if opts.includeDietary {
+            for tag in (guest.dietaryTags ?? []) {
+                if let badge = dietaryBadge(forTag: tag) { out.append(badge) }
+            }
+            // Free-text dietary (no tag) → generic "D" badge so the row
+            // still flags that catering needs to see the sub-line.
+            let hasTags = !(guest.dietaryTags ?? []).isEmpty
+            if let d = guest.dietary, !d.isEmpty, !hasTags {
+                out.append(DietaryBadge(label: "D", color: UIColor(red: 0.39, green: 0.55, blue: 0.78, alpha: 1)))
+            }
+        }
+        return out
+    }
+
+    private static func dietaryBadge(forTag tag: String) -> DietaryBadge? {
+        switch tag {
+        case "vegetarian":        return DietaryBadge(label: "VG", color: UIColor(red: 0.31, green: 0.62, blue: 0.35, alpha: 1))
+        case "vegan":             return DietaryBadge(label: "VE", color: UIColor(red: 0.16, green: 0.51, blue: 0.25, alpha: 1))
+        case "halal":             return DietaryBadge(label: "HL", color: UIColor(red: 0.12, green: 0.55, blue: 0.55, alpha: 1))
+        case "gluten-free":       return DietaryBadge(label: "GF", color: UIColor(red: 0.78, green: 0.58, blue: 0.16, alpha: 1))
+        case "dairy-free":        return DietaryBadge(label: "DF", color: UIColor(red: 0.39, green: 0.58, blue: 0.78, alpha: 1))
+        case "nut-allergy":       return DietaryBadge(label: "NA", color: UIColor(red: 0.80, green: 0.24, blue: 0.22, alpha: 1))
+        case "shellfish-allergy": return DietaryBadge(label: "SH", color: UIColor(red: 0.82, green: 0.39, blue: 0.22, alpha: 1))
+        case "kosher":            return DietaryBadge(label: "KS", color: UIColor(red: 0.35, green: 0.43, blue: 0.69, alpha: 1))
+        default:                  return nil
+        }
+    }
+
+    private static func drawDietaryBadge(_ badge: DietaryBadge, center: CGPoint, ctx: CGContext) {
+        let r: CGFloat = 5.5
+        let rect = CGRect(x: center.x - r, y: center.y - r, width: r * 2, height: r * 2)
+        ctx.setFillColor(badge.color.cgColor)
+        ctx.fillEllipse(in: rect)
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 5.5, weight: .bold),
+            .foregroundColor: UIColor.white,
         ]
-        let header = NSString(string: "SEATING ASSIGNMENTS — \(plan.name.uppercased())")
-        header.draw(at: CGPoint(x: margin, y: margin), withAttributes: headerAttrs)
+        let s = NSString(string: badge.label)
+        let sz = s.size(withAttributes: attrs)
+        s.draw(at: CGPoint(x: center.x - sz.width / 2, y: center.y - sz.height / 2 + 0.3),
+               withAttributes: attrs)
+    }
 
-        // Draw tables in 2-column layout
-        let colWidth = (pageWidth - margin * 3) / 2
-        var y = margin + 40
+    // MARK: - Seating Chart card (web parity: exportPDF table cards)
 
-        for (i, table) in tables.enumerated() {
-            let col = CGFloat(i % 2)
-            let x = margin + col * (colWidth + margin)
+    private static func seatingCardHeight(table: SeatTable, opts: PDFExportOpts) -> CGFloat {
+        let header: CGFloat = 24
+        let perRow: CGFloat = 14
+        let assigned = max(table.assignments.count, 1)
+        let detailHeight: CGFloat = (opts.includeMeals || opts.includeDietary) ? 4 : 0
+        return header + CGFloat(assigned) * (perRow + detailHeight) + 10
+    }
 
-            if i > 0 && i % 2 == 0 {
-                y += 180
+    private static func drawSeatingChartCard(ctx: CGContext, table: SeatTable, plan: SeatingPlan,
+                                             opts: PDFExportOpts, rect: CGRect) {
+        // Card chrome
+        drawCardChrome(ctx: ctx, table: table, rect: rect)
+
+        let guestById = Dictionary(uniqueKeysWithValues: plan.guests.map { ($0.id, $0) })
+        let assigned = table.assignments
+            .sorted { $0.value < $1.value }
+            .compactMap { guestById[$0.key] }
+
+        let headerHeight: CGFloat = 24
+        let nameAttrs: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 9.5, weight: .regular),
+            .foregroundColor: charcoalColor,
+        ]
+        let mutedAttrs: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 7.5, weight: .regular),
+            .foregroundColor: warmColor,
+        ]
+
+        var y = rect.minY + headerHeight + 6
+        if assigned.isEmpty {
+            NSString(string: "No guests assigned").draw(
+                at: CGPoint(x: rect.minX + 8, y: y),
+                withAttributes: mutedAttrs)
+            return
+        }
+        for (i, g) in assigned.enumerated() {
+            if y + 14 > rect.maxY - 4 { break }
+
+            let displayName = g.displayName.isEmpty ? g.name : g.displayName
+            let prefix = "\(i + 1). "
+            let nameRow = "\(prefix)\(displayName)"
+
+            // Right-aligned dietary + HC badges (same set as Planner View
+            // so the two PDFs read consistently when both toggles are on).
+            let guestBadges = badges(for: g, opts: opts)
+            let badgeStride: CGFloat = 13
+            let badgesWidth = CGFloat(guestBadges.count) * badgeStride
+            let nameMaxW = rect.width - 16 - badgesWidth
+
+            let truncated = truncate(nameRow, attrs: nameAttrs, maxWidth: nameMaxW)
+            NSString(string: truncated).draw(at: CGPoint(x: rect.minX + 8, y: y),
+                                              withAttributes: nameAttrs)
+            // Badges drawn at row mid-height, right-aligned to card edge
+            let rowMidY = y + 5
+            for (bi, b) in guestBadges.enumerated() {
+                let bx = rect.maxX - 8 - CGFloat(guestBadges.count - bi - 1) * badgeStride - 5.5
+                drawDietaryBadge(b, center: CGPoint(x: bx, y: rowMidY), ctx: ctx)
             }
 
-            // Table card background
-            let cardRect = CGRect(x: x, y: y, width: colWidth, height: 160)
-            context.setFillColor(ivoryColor.cgColor)
-            let path = UIBezierPath(roundedRect: cardRect, cornerRadius: 8)
-            context.addPath(path.cgPath)
-            context.fillPath()
+            // Sub-line: meal · free-text dietary (always text — the badge
+            // tells the high-level story, the sub-line gives caterers
+            // the exact words).
+            if opts.includeMeals || opts.includeDietary {
+                var parts: [String] = []
+                if opts.includeMeals, let m = g.meal, !m.isEmpty { parts.append(m) }
+                if opts.includeDietary, let d = g.dietary, !d.isEmpty { parts.append(d) }
+                if !parts.isEmpty {
+                    let detail = parts.joined(separator: " · ")
+                    let truncatedDetail = truncate(detail, attrs: mutedAttrs, maxWidth: rect.width - 16)
+                    NSString(string: truncatedDetail).draw(
+                        at: CGPoint(x: rect.minX + 12, y: y + 11),
+                        withAttributes: mutedAttrs)
+                    y += 18
+                    continue
+                }
+            }
+            y += 14
+        }
+    }
 
-            // Table name
-            let nameAttrs: [NSAttributedString.Key: Any] = [
-                .font: UIFont.systemFont(ofSize: 16, weight: .semibold),
-                .foregroundColor: charcoalColor
-            ]
-            NSString(string: table.name).draw(at: CGPoint(x: x + 12, y: y + 10), withAttributes: nameAttrs)
+    // MARK: - Planner View card (web parity: exportPlannerPDF table cards)
 
-            // Seat info
-            let infoAttrs: [NSAttributedString.Key: Any] = [
-                .font: UIFont.systemFont(ofSize: 10),
-                .foregroundColor: warmColor
-            ]
-            NSString(string: "\(table.type.rawValue) · \(table.seats) seats").draw(at: CGPoint(x: x + 12, y: y + 30), withAttributes: infoAttrs)
+    /// Card layout: left diagram panel (lpW) + right list panel (rpW).
+    /// Height grows with seat count. Same visual mapping as web — round
+    /// tables get a circular diagram with seat dots numbered 1..N around
+    /// the perimeter; rect/head/sweetheart get a rectangular diagram with
+    /// seats above + below.
+    private static func plannerCardHeight(table: SeatTable, opts: PDFExportOpts) -> CGFloat {
+        let header: CGFloat = 24
+        let perSeat: CGFloat = (opts.includeMeals || opts.includeDietary) ? 16 : 14
+        let listPad: CGFloat = (opts.includeMeals || opts.includeDietary) ? 16 : 6
+        return header + listPad + CGFloat(table.seats) * perSeat + 6
+    }
 
-            // Guest names
-            let guestAttrs: [NSAttributedString.Key: Any] = [
-                .font: UIFont.systemFont(ofSize: 11),
-                .foregroundColor: charcoalColor
-            ]
-            let dietaryAttrs: [NSAttributedString.Key: Any] = [
-                .font: UIFont.systemFont(ofSize: 9),
-                .foregroundColor: goldColor
-            ]
+    private static func drawPlannerCard(ctx: CGContext, table: SeatTable, plan: SeatingPlan,
+                                        opts: PDFExportOpts, rect: CGRect) {
+        drawCardChrome(ctx: ctx, table: table, rect: rect)
 
-            var guestY = y + 50
-            for seatIdx in 0..<table.seats {
-                if guestY > y + 145 { break }
-                let guestId = table.assignments.first { $0.value == seatIdx }?.key
-                let guest = guestId.flatMap { gId in guests.first { $0.id == gId } }
+        let headerHeight: CGFloat = 24
+        let lpW: CGFloat = min(90, rect.width * 0.32)   // left diagram panel
+        let rpX = rect.minX + lpW + 6
+        let rpW = rect.width - lpW - 12
+        let bodyTop = rect.minY + headerHeight
+        let bodyHeight = rect.maxY - bodyTop
 
-                let seatLabel = "\(seatIdx + 1). "
-                let guestName = guest?.displayName ?? "—"
+        // Vertical divider between diagram and list
+        ctx.setStrokeColor(UIColor(white: 0.92, alpha: 1).cgColor)
+        ctx.setLineWidth(0.5)
+        ctx.move(to: CGPoint(x: rect.minX + lpW, y: bodyTop + 4))
+        ctx.addLine(to: CGPoint(x: rect.minX + lpW, y: rect.maxY - 4))
+        ctx.strokePath()
 
-                NSString(string: seatLabel + guestName).draw(at: CGPoint(x: x + 14, y: guestY), withAttributes: guestAttrs)
+        // Left: table diagram with numbered seats
+        drawMiniTableDiagram(table: table, panelRect: CGRect(x: rect.minX, y: bodyTop,
+                                                              width: lpW, height: bodyHeight),
+                             ctx: ctx)
 
-                if let dietary = guest?.dietary {
-                    NSString(string: dietary).draw(at: CGPoint(x: x + colWidth - 60, y: guestY + 1), withAttributes: dietaryAttrs)
+        // Right: column headers
+        let showDetail = opts.includeMeals || opts.includeDietary
+        let headerAttrs: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 6.5, weight: .bold),
+            .foregroundColor: UIColor(white: 0.55, alpha: 1),
+        ]
+        let nameColW: CGFloat = opts.includeMeals ? rpW * 0.55 : rpW - 14
+        var listY = bodyTop + (showDetail ? 14 : 4)
+        if showDetail {
+            NSString(string: "GUEST").draw(at: CGPoint(x: rpX + 12, y: bodyTop + 4),
+                                            withAttributes: headerAttrs)
+            if opts.includeMeals {
+                NSString(string: "MEAL").draw(at: CGPoint(x: rpX + 14 + nameColW, y: bodyTop + 4),
+                                               withAttributes: headerAttrs)
+            }
+            ctx.setStrokeColor(UIColor(white: 0.88, alpha: 1).cgColor)
+            ctx.setLineWidth(0.4)
+            ctx.move(to: CGPoint(x: rpX + 1, y: bodyTop + 11))
+            ctx.addLine(to: CGPoint(x: rect.maxX - 4, y: bodyTop + 11))
+            ctx.strokePath()
+        }
+
+        // Seat rows
+        let guestById = Dictionary(uniqueKeysWithValues: plan.guests.map { ($0.id, $0) })
+        let seatOrder = plannerSeatOrder(table: table, guestById: guestById)
+        let perSeat: CGFloat = showDetail ? 16 : 14
+        let isHeadOrSweet = table.type == .head || table.type == .sweetheart
+        let badgeColor = isHeadOrSweet
+            ? UIColor(red: 0.79, green: 0.66, blue: 0.38, alpha: 1)
+            : UIColor(red: 0.61, green: 0.69, blue: 0.53, alpha: 1)
+
+        let seatBadgeAttrs: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 6, weight: .bold),
+            .foregroundColor: UIColor.white,
+        ]
+        let nameAttrs: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 8.5, weight: .regular),
+            .foregroundColor: charcoalColor,
+        ]
+        let dietSubAttrs: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 6.5, weight: .regular),
+            .foregroundColor: UIColor(white: 0.6, alpha: 1),
+        ]
+        let mealAttrs: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 7, weight: .regular),
+            .foregroundColor: UIColor(white: 0.4, alpha: 1),
+        ]
+        let emptyAttrs: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 7, weight: .regular),
+            .foregroundColor: UIColor(white: 0.78, alpha: 1),
+        ]
+
+        for i in 0..<table.seats {
+            let rowMidY = listY + perSeat * 0.42
+            // Seat-number circle
+            let circleR: CGFloat = 4.5
+            let circleRect = CGRect(x: rpX + 2, y: rowMidY - circleR,
+                                    width: circleR * 2, height: circleR * 2)
+            ctx.setFillColor(badgeColor.cgColor)
+            ctx.fillEllipse(in: circleRect)
+            let n = NSString(string: "\(i + 1)")
+            let nSize = n.size(withAttributes: seatBadgeAttrs)
+            n.draw(at: CGPoint(x: rpX + 2 + circleR - nSize.width / 2,
+                               y: rowMidY - nSize.height / 2 + 0.3),
+                   withAttributes: seatBadgeAttrs)
+
+            let g = seatOrder[i]
+            if let g = g {
+                let guestBadges = badges(for: g, opts: opts)
+                let badgeW = CGFloat(guestBadges.count) * 13
+                let displayName = g.displayName.isEmpty ? g.name : g.displayName
+                let nameMaxW = nameColW - badgeW - 4
+                let truncatedName = truncate(displayName, attrs: nameAttrs, maxWidth: nameMaxW)
+                NSString(string: truncatedName).draw(
+                    at: CGPoint(x: rpX + 12, y: rowMidY - 4),
+                    withAttributes: nameAttrs)
+
+                // Right-aligned badges in the name column
+                for (bi, b) in guestBadges.enumerated() {
+                    let bx = rpX + 12 + nameColW - CGFloat(guestBadges.count - bi) * 13 + 6
+                    drawDietaryBadge(b, center: CGPoint(x: bx, y: rowMidY), ctx: ctx)
                 }
 
-                guestY += 16
+                // Meal text in MEAL column
+                if opts.includeMeals, let m = g.meal, !m.isEmpty {
+                    let mealColX = rpX + 14 + nameColW
+                    let mealMaxW = rect.maxX - mealColX - 6
+                    let truncatedMeal = truncate(m, attrs: mealAttrs, maxWidth: mealMaxW)
+                    NSString(string: truncatedMeal).draw(
+                        at: CGPoint(x: mealColX, y: rowMidY - 3),
+                        withAttributes: mealAttrs)
+                }
+
+                // Free-text dietary sub-line under name
+                if opts.includeDietary, let d = g.dietary, !d.isEmpty {
+                    let truncatedDiet = truncate(d, attrs: dietSubAttrs, maxWidth: nameColW)
+                    NSString(string: truncatedDiet).draw(
+                        at: CGPoint(x: rpX + 12, y: listY + perSeat * 0.78 - 4),
+                        withAttributes: dietSubAttrs)
+                }
+            } else {
+                NSString(string: "— empty —").draw(
+                    at: CGPoint(x: rpX + 12, y: rowMidY - 3),
+                    withAttributes: emptyAttrs)
+            }
+
+            // Row divider
+            if i < table.seats - 1 {
+                ctx.setStrokeColor(UIColor(white: 0.95, alpha: 1).cgColor)
+                ctx.setLineWidth(0.3)
+                ctx.move(to: CGPoint(x: rpX + 1, y: listY + perSeat))
+                ctx.addLine(to: CGPoint(x: rect.maxX - 4, y: listY + perSeat))
+                ctx.strokePath()
+            }
+            listY += perSeat
+        }
+    }
+
+    /// Web parity: tries seatOrders[tableId], falls back to assignment
+    /// dict order for unordered seats. Returns an array of length
+    /// `table.seats` where index i is the guest at seat i (or nil).
+    private static func plannerSeatOrder(table: SeatTable, guestById: [String: Guest]) -> [Guest?] {
+        var out: [Guest?] = Array(repeating: nil, count: table.seats)
+        // Direct assignments first — guestId → seatIndex
+        for (gid, idx) in table.assignments {
+            if idx >= 0, idx < table.seats {
+                out[idx] = guestById[gid]
+            }
+        }
+        // Backfill: any unindexed guests fill remaining nil slots in order
+        let placedIds = Set(table.assignments.keys)
+        let unordered = table.assignments.keys
+            .compactMap { guestById[$0] }
+            .filter { placedIds.contains($0.id) && !out.contains(where: { $0?.id == $0?.id ? false : false }) }
+        var ui = 0
+        for i in 0..<out.count where out[i] == nil {
+            if ui < unordered.count { out[i] = unordered[ui]; ui += 1 }
+        }
+        return out
+    }
+
+    /// Shared card chrome: rounded background + colored header strip with
+    /// table name + occupancy count.
+    private static func drawCardChrome(ctx: CGContext, table: SeatTable, rect: CGRect) {
+        let isHeadOrSweet = table.type == .head || table.type == .sweetheart
+        let headerColor = isHeadOrSweet
+            ? UIColor(red: 0.79, green: 0.66, blue: 0.38, alpha: 1)
+            : UIColor(red: 0.61, green: 0.69, blue: 0.53, alpha: 1)
+
+        let cardPath = UIBezierPath(roundedRect: rect, cornerRadius: 6)
+        ctx.setFillColor(UIColor.white.cgColor)
+        ctx.setStrokeColor(UIColor(white: 0.85, alpha: 1).cgColor)
+        ctx.setLineWidth(0.6)
+        ctx.addPath(cardPath.cgPath)
+        ctx.drawPath(using: .fillStroke)
+
+        let headerHeight: CGFloat = 24
+        let headerRect = CGRect(x: rect.minX, y: rect.minY, width: rect.width, height: headerHeight)
+        ctx.saveGState()
+        let headerPath = UIBezierPath(roundedRect: headerRect, cornerRadius: 6)
+        ctx.addPath(headerPath.cgPath)
+        ctx.clip()
+        ctx.setFillColor(headerColor.cgColor)
+        ctx.fill(headerRect)
+        ctx.restoreGState()
+
+        let nameAttrs: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 11, weight: .semibold),
+            .foregroundColor: UIColor.white,
+        ]
+        NSString(string: table.name).draw(at: CGPoint(x: rect.minX + 8, y: rect.minY + 5),
+                                           withAttributes: nameAttrs)
+        let metaAttrs: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 8, weight: .regular),
+            .foregroundColor: UIColor.white.withAlphaComponent(0.85),
+        ]
+        let typeLabel = "\(table.type.rawValue.capitalized) · \(table.assignments.count)/\(table.seats)"
+        let meta = NSString(string: typeLabel)
+        let mSize = meta.size(withAttributes: metaAttrs)
+        meta.draw(at: CGPoint(x: rect.maxX - mSize.width - 8, y: rect.minY + 8),
+                  withAttributes: metaAttrs)
+    }
+
+    // MARK: - Mini table diagram (Planner View left panel)
+
+    /// Draws a small representation of the table with seat dots numbered
+    /// 1..N around the perimeter. Web parity: round/sweetheart use a
+    /// circle; rect/head use a horizontal pill with seats above + below.
+    private static func drawMiniTableDiagram(table: SeatTable, panelRect: CGRect, ctx: CGContext) {
+        let cx = panelRect.midX
+        let cy = panelRect.midY
+        let isRound = table.type == .round || table.type == .oval || table.type == .sweetheart
+
+        let bodyFill = UIColor(red: 0.97, green: 0.96, blue: 0.93, alpha: 1)
+        let isHeadOrSweet = table.type == .head || table.type == .sweetheart
+        let bodyStroke = isHeadOrSweet
+            ? UIColor(red: 0.79, green: 0.66, blue: 0.38, alpha: 1)
+            : UIColor(red: 0.61, green: 0.69, blue: 0.53, alpha: 1)
+
+        let seatR: CGFloat = 4.5
+        let seatLabelAttrs: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 5, weight: .bold),
+            .foregroundColor: UIColor.white,
+        ]
+        let filledIndices = Set(table.assignments.values)
+        let n = max(table.seats, 1)
+
+        if isRound {
+            let bodyR: CGFloat = 9
+            let seatRadius = min(panelRect.width / 2 - 6, panelRect.height / 2 - 6)
+            ctx.setFillColor(bodyFill.cgColor)
+            ctx.setStrokeColor(bodyStroke.cgColor)
+            ctx.setLineWidth(0.7)
+            let bodyRect = CGRect(x: cx - bodyR, y: cy - bodyR, width: bodyR * 2, height: bodyR * 2)
+            ctx.fillEllipse(in: bodyRect)
+            ctx.strokeEllipse(in: bodyRect)
+
+            for i in 0..<n {
+                let ang = CGFloat(i) / CGFloat(n) * .pi * 2 - .pi / 2
+                let sx = cx + cos(ang) * seatRadius
+                let sy = cy + sin(ang) * seatRadius
+                let seatRect = CGRect(x: sx - seatR, y: sy - seatR,
+                                       width: seatR * 2, height: seatR * 2)
+                ctx.setFillColor(filledIndices.contains(i)
+                                  ? UIColor(red: 0.79, green: 0.66, blue: 0.38, alpha: 1).cgColor
+                                  : UIColor(white: 0.84, alpha: 1).cgColor)
+                ctx.fillEllipse(in: seatRect)
+                let lbl = NSString(string: "\(i + 1)")
+                let sz = lbl.size(withAttributes: seatLabelAttrs)
+                lbl.draw(at: CGPoint(x: sx - sz.width / 2, y: sy - sz.height / 2 + 0.2),
+                         withAttributes: seatLabelAttrs)
+            }
+        } else {
+            // Rect / head
+            let tableW: CGFloat = min(panelRect.width - 10, 50)
+            let tableH: CGFloat = 10
+            let rect = CGRect(x: cx - tableW / 2, y: cy - tableH / 2,
+                              width: tableW, height: tableH)
+            ctx.setFillColor(bodyFill.cgColor)
+            ctx.setStrokeColor(bodyStroke.cgColor)
+            ctx.setLineWidth(0.7)
+            let path = UIBezierPath(roundedRect: rect, cornerRadius: 2)
+            ctx.addPath(path.cgPath)
+            ctx.drawPath(using: .fillStroke)
+
+            let oneSide = table.oneSide == true
+            let perSide = oneSide ? n : Int((CGFloat(n) / 2).rounded(.up))
+            let spacing = tableW / CGFloat(perSide + 1)
+            for i in 0..<n {
+                let side: Int
+                let pos: Int
+                if oneSide { side = 0; pos = i }
+                else { side = i < perSide ? 0 : 1; pos = side == 0 ? i : i - perSide }
+                let sx = rect.minX + spacing * CGFloat(pos + 1)
+                let sy = side == 0 ? rect.minY - 7 : rect.maxY + 7
+                let seatRect = CGRect(x: sx - seatR, y: sy - seatR,
+                                       width: seatR * 2, height: seatR * 2)
+                ctx.setFillColor(filledIndices.contains(i)
+                                  ? UIColor(red: 0.79, green: 0.66, blue: 0.38, alpha: 1).cgColor
+                                  : UIColor(white: 0.84, alpha: 1).cgColor)
+                ctx.fillEllipse(in: seatRect)
+                let lbl = NSString(string: "\(i + 1)")
+                let sz = lbl.size(withAttributes: seatLabelAttrs)
+                lbl.draw(at: CGPoint(x: sx - sz.width / 2, y: sy - sz.height / 2 + 0.2),
+                         withAttributes: seatLabelAttrs)
             }
         }
     }
 
-    static func sharePDF(plan: SeatingPlan) {
-        guard let data = generateSeatingPDF(plan: plan) else { return }
+    // MARK: - Legend (bottom of last Planner page)
 
-        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("\(plan.name) Seating.pdf")
-        try? data.write(to: tempURL)
-        shareFile(tempURL)
+    /// Web parity (App.jsx ~14391): only includes badge categories that
+    /// are actually present in the plan, so the legend stays compact.
+    private static func drawLegend(ctx: CGContext, plan: SeatingPlan, opts: PDFExportOpts,
+                                   pageWidth: CGFloat, y: CGFloat) {
+        var items: [(badge: DietaryBadge, text: String)] = []
+        if opts.includeHighChairs && plan.guests.contains(where: { $0.highChair == true }) {
+            items.append((DietaryBadge(label: "HC", color: UIColor(red: 0.89, green: 0.42, blue: 0.34, alpha: 1)),
+                          "High chair"))
+        }
+        if plan.guests.contains(where: { $0.isChild == true }) {
+            items.append((DietaryBadge(label: "KID", color: UIColor(red: 0.63, green: 0.43, blue: 0.82, alpha: 1)),
+                          "Child"))
+        }
+        if opts.includeDietary {
+            for tag in ["vegetarian", "vegan", "halal", "gluten-free", "dairy-free", "nut-allergy", "shellfish-allergy", "kosher"] {
+                let present = plan.guests.contains { ($0.dietaryTags ?? []).contains(tag) }
+                guard present, let badge = dietaryBadge(forTag: tag) else { continue }
+                items.append((badge, dietaryLegendText(forTag: tag)))
+            }
+            let hasFreeText = plan.guests.contains { g in
+                (g.dietary?.isEmpty == false) && (g.dietaryTags ?? []).isEmpty
+            }
+            if hasFreeText {
+                items.append((DietaryBadge(label: "D", color: UIColor(red: 0.39, green: 0.55, blue: 0.78, alpha: 1)),
+                              "Other dietary (see sub-line)"))
+            }
+        }
+        guard !items.isEmpty else { return }
+
+        ctx.setStrokeColor(UIColor(white: 0.88, alpha: 1).cgColor)
+        ctx.setLineWidth(0.5)
+        ctx.move(to: CGPoint(x: 40, y: y - 6))
+        ctx.addLine(to: CGPoint(x: pageWidth - 40, y: y - 6))
+        ctx.strokePath()
+
+        let labelAttrs: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 7, weight: .bold),
+            .foregroundColor: UIColor(white: 0.55, alpha: 1),
+        ]
+        NSString(string: "LEGEND").draw(at: CGPoint(x: 40, y: y),
+                                         withAttributes: labelAttrs)
+
+        var x: CGFloat = 80
+        let textAttrs: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 7, weight: .regular),
+            .foregroundColor: UIColor(white: 0.45, alpha: 1),
+        ]
+        for item in items {
+            drawDietaryBadge(item.badge, center: CGPoint(x: x, y: y + 3), ctx: ctx)
+            let label = NSString(string: item.text)
+            label.draw(at: CGPoint(x: x + 8, y: y),
+                       withAttributes: textAttrs)
+            let labelW = label.size(withAttributes: textAttrs).width
+            x += 10 + labelW + 12
+            if x > pageWidth - 80 { break }
+        }
     }
+
+    private static func dietaryLegendText(forTag tag: String) -> String {
+        switch tag {
+        case "vegetarian":        return "Vegetarian"
+        case "vegan":             return "Vegan"
+        case "halal":             return "Halal"
+        case "gluten-free":       return "Gluten-Free"
+        case "dairy-free":        return "Dairy-Free"
+        case "nut-allergy":       return "Nut Allergy"
+        case "shellfish-allergy": return "Shellfish Allergy"
+        case "kosher":            return "Kosher"
+        default:                  return tag.capitalized
+        }
+    }
+
+    /// Diagonal "Seatbee.app — Free plan — upgrade for clean prints"
+    /// stamp matching web's free-tier watermark. Drawn last so it sits on
+    /// top of all content; very low alpha so it's visible but not garish.
+    private static func drawWatermark(ctx: CGContext, pageWidth: CGFloat, pageHeight: CGFloat) {
+        ctx.saveGState()
+        ctx.translateBy(x: pageWidth / 2, y: pageHeight / 2)
+        ctx.rotate(by: -.pi / 6)  // -30°
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 38, weight: .semibold),
+            .foregroundColor: UIColor(white: 0.0, alpha: 0.07),
+        ]
+        let line1 = NSString(string: "SEATBEE.APP")
+        let l1Size = line1.size(withAttributes: attrs)
+        line1.draw(at: CGPoint(x: -l1Size.width / 2, y: -l1Size.height),
+                   withAttributes: attrs)
+        let smallAttrs: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 14, weight: .regular),
+            .foregroundColor: UIColor(white: 0.0, alpha: 0.07),
+        ]
+        let line2 = NSString(string: "Free plan — upgrade for clean prints")
+        let l2Size = line2.size(withAttributes: smallAttrs)
+        line2.draw(at: CGPoint(x: -l2Size.width / 2, y: 4),
+                   withAttributes: smallAttrs)
+        ctx.restoreGState()
+    }
+
+    /// Bottom footer line on every PDF page.
+    private static func drawFooter(ctx: CGContext, pageWidth: CGFloat, pageHeight: CGFloat, margin: CGFloat) {
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 8, weight: .regular),
+            .foregroundColor: warmColor,
+        ]
+        let footer = NSString(string: "Generated by Seatbee · seatbee.app")
+        let fSize = footer.size(withAttributes: attrs)
+        footer.draw(at: CGPoint(x: (pageWidth - fSize.width) / 2,
+                                y: pageHeight - margin - 12),
+                    withAttributes: attrs)
+    }
+
+    /// Truncate `text` so its rendered width ≤ `maxWidth`, appending an
+    /// ellipsis if a cut was made. Used by table-cell + annotation drawing
+    /// so long meals/dietary strings don't bleed into adjacent columns.
+    private static func truncate(_ text: String, attrs: [NSAttributedString.Key: Any], maxWidth: CGFloat) -> String {
+        let ns = NSString(string: text)
+        if ns.size(withAttributes: attrs).width <= maxWidth { return text }
+        var lo = 0
+        var hi = text.count
+        while lo < hi {
+            let mid = (lo + hi) / 2
+            let prefix = String(text.prefix(mid)) + "…"
+            let w = NSString(string: prefix).size(withAttributes: attrs).width
+            if w <= maxWidth { lo = mid + 1 } else { hi = mid }
+        }
+        return String(text.prefix(max(0, lo - 1))) + "…"
+    }
+
+    // MARK: - Public share entry points
+
+    static func shareSeatingChartPDF(plan: SeatingPlan, opts: PDFExportOpts, isPaid: Bool) {
+        guard let data = generateSeatingChartPDF(plan: plan, opts: opts, isPaid: isPaid) else { return }
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(plan.name) Seating Chart.pdf")
+        try? data.write(to: url)
+        shareFile(url)
+    }
+
+    static func sharePlannerViewPDF(plan: SeatingPlan, opts: PDFExportOpts, isPaid: Bool) {
+        guard let data = generatePlannerViewPDF(plan: plan, opts: opts, isPaid: isPaid) else { return }
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(plan.name) Planner View.pdf")
+        try? data.write(to: url)
+        shareFile(url)
+    }
+
 
     // MARK: - Place Cards PDF
 
@@ -292,80 +991,279 @@ final class PDFExportService {
     }
 
     // MARK: - Social Image
+    //
+    // 1080×1080 share-card built from the Seatbee branding kit: bee logo
+    // and wordmark up top, big event name, four-up stat blocks (guests
+    // / tables / seated % / rules), and a "made with seatbee" footer.
+    // Designed to drop straight into Instagram, X, or iMessage without
+    // looking generic — uses the gold/ivory/champagne palette we use
+    // across the app, and the bee mark is rendered with a champagne
+    // halo backdrop so it pops on solid feeds.
 
     @MainActor
     static func generateSocialImage(plan: SeatingPlan) -> UIImage? {
-        let width: CGFloat = 1080
-        let height: CGFloat = 1080
-
-        let renderer = UIGraphicsImageRenderer(size: CGSize(width: width, height: height))
+        let size: CGFloat = 1080
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: size, height: size))
         return renderer.image { context in
             let ctx = context.cgContext
-            let goldColor = UIColor(red: 201/255, green: 169/255, blue: 97/255, alpha: 1)
-            let ivoryColor = UIColor(red: 255/255, green: 254/255, blue: 249/255, alpha: 1)
-            let charcoalColor = UIColor(red: 45/255, green: 45/255, blue: 45/255, alpha: 1)
-
-            // Background
-            ctx.setFillColor(ivoryColor.cgColor)
-            ctx.fill(CGRect(x: 0, y: 0, width: width, height: height))
-
-            // Title
-            let titleAttrs: [NSAttributedString.Key: Any] = [
-                .font: UIFont.systemFont(ofSize: 48, weight: .medium),
-                .foregroundColor: charcoalColor
-            ]
-            let title = NSString(string: plan.name)
-            let titleSize = title.size(withAttributes: titleAttrs)
-            title.draw(at: CGPoint(x: (width - titleSize.width) / 2, y: 120), withAttributes: titleAttrs)
-
-            // Subtitle
-            let subAttrs: [NSAttributedString.Key: Any] = [
-                .font: UIFont.systemFont(ofSize: 24),
-                .foregroundColor: goldColor
-            ]
-            let sub = NSString(string: "Seating Arrangement")
-            let subSize = sub.size(withAttributes: subAttrs)
-            sub.draw(at: CGPoint(x: (width - subSize.width) / 2, y: 180), withAttributes: subAttrs)
-
-            // Stats
-            let statsY: CGFloat = 280
-            let statAttrs: [NSAttributedString.Key: Any] = [
-                .font: UIFont.systemFont(ofSize: 64, weight: .medium),
-                .foregroundColor: goldColor
-            ]
-            let labelAttrs: [NSAttributedString.Key: Any] = [
-                .font: UIFont.systemFont(ofSize: 18, weight: .semibold),
-                .foregroundColor: charcoalColor
-            ]
-
-            let stats = [("\(plan.guests.count)", "GUESTS"), ("\(plan.tables.count)", "TABLES")]
-            for (i, stat) in stats.enumerated() {
-                let x = width / 3 * CGFloat(i + 1)
-                let numStr = NSString(string: stat.0)
-                let numSize = numStr.size(withAttributes: statAttrs)
-                numStr.draw(at: CGPoint(x: x - numSize.width / 2, y: statsY), withAttributes: statAttrs)
-                let labStr = NSString(string: stat.1)
-                let labSize = labStr.size(withAttributes: labelAttrs)
-                labStr.draw(at: CGPoint(x: x - labSize.width / 2, y: statsY + 72), withAttributes: labelAttrs)
-            }
-
-            // Footer
-            let footerAttrs: [NSAttributedString.Key: Any] = [
-                .font: UIFont.systemFont(ofSize: 16),
-                .foregroundColor: UIColor.gray
-            ]
-            let footer = NSString(string: "Made with Seatbee · seatbee.app")
-            let footerSize = footer.size(withAttributes: footerAttrs)
-            footer.draw(at: CGPoint(x: (width - footerSize.width) / 2, y: height - 60), withAttributes: footerAttrs)
+            drawSocialBackground(ctx: ctx, size: size)
+            drawSocialBranding(ctx: ctx, size: size, topY: 80)
+            drawSocialEventBlock(ctx: ctx, plan: plan, size: size, centerY: 470)
+            drawSocialStatGrid(ctx: ctx, plan: plan, size: size, topY: 660)
+            drawSocialFooter(ctx: ctx, size: size)
         }
     }
 
     static func shareSocialImage(plan: SeatingPlan) {
         guard let image = generateSocialImage(plan: plan),
               let data = image.pngData() else { return }
-        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("\(plan.name) Seating.png")
-        try? data.write(to: tempURL)
-        shareFile(tempURL)
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("\(plan.name) — Seatbee.png")
+        try? data.write(to: url)
+        shareFile(url)
+    }
+
+    // MARK: - Social image — drawing helpers
+
+    private static let socialIvory = UIColor(red: 250/255, green: 246/255, blue: 236/255, alpha: 1)
+    private static let socialIvoryDeep = UIColor(red: 244/255, green: 235/255, blue: 215/255, alpha: 1)
+    private static let socialChampagne = UIColor(red: 234/255, green: 220/255, blue: 188/255, alpha: 1)
+    private static let socialGold = UIColor(red: 201/255, green: 169/255, blue: 97/255, alpha: 1)
+    private static let socialGoldDk = UIColor(red: 161/255, green: 132/255, blue: 65/255, alpha: 1)
+    private static let socialCharcoal = UIColor(red: 45/255, green: 45/255, blue: 45/255, alpha: 1)
+    private static let socialWarm = UIColor(red: 139/255, green: 134/255, blue: 128/255, alpha: 1)
+
+    /// Top-to-bottom soft ivory→champagne gradient. Subtle so it reads
+    /// as a single colour at thumbnail size but adds depth on mobile.
+    private static func drawSocialBackground(ctx: CGContext, size: CGFloat) {
+        let colors = [socialIvory.cgColor, socialIvoryDeep.cgColor] as CFArray
+        let space = CGColorSpaceCreateDeviceRGB()
+        guard let gradient = CGGradient(colorsSpace: space, colors: colors,
+                                         locations: [0, 1]) else {
+            ctx.setFillColor(socialIvory.cgColor)
+            ctx.fill(CGRect(x: 0, y: 0, width: size, height: size))
+            return
+        }
+        ctx.drawLinearGradient(gradient,
+                               start: CGPoint(x: 0, y: 0),
+                               end: CGPoint(x: 0, y: size),
+                               options: [])
+
+        // Inner border — thin gold stroke just inside the edge as a
+        // subtle frame so the card looks intentional on white feeds.
+        let inset: CGFloat = 36
+        let borderRect = CGRect(x: inset, y: inset, width: size - inset * 2, height: size - inset * 2)
+        ctx.setStrokeColor(socialGold.withAlphaComponent(0.35).cgColor)
+        ctx.setLineWidth(1.5)
+        let borderPath = UIBezierPath(roundedRect: borderRect, cornerRadius: 24)
+        ctx.addPath(borderPath.cgPath)
+        ctx.strokePath()
+    }
+
+    /// Bee logo on a champagne disc + the Seatbee wordmark below.
+    /// Both assets are drawn at their natural aspect ratio to avoid the
+    /// distortion bug from the bee-logo-rendering memory.
+    private static func drawSocialBranding(ctx: CGContext, size: CGFloat, topY: CGFloat) {
+        // Champagne halo behind the bee
+        let haloR: CGFloat = 90
+        let cx = size / 2
+        let haloRect = CGRect(x: cx - haloR, y: topY, width: haloR * 2, height: haloR * 2)
+        ctx.setFillColor(socialChampagne.withAlphaComponent(0.55).cgColor)
+        ctx.fillEllipse(in: haloRect)
+
+        // Bee logo — square asset, draw inside the halo
+        if let bee = UIImage(named: "SeatbeeLogo") {
+            let beeSide: CGFloat = 132
+            let beeRect = CGRect(x: cx - beeSide / 2,
+                                  y: topY + haloR - beeSide / 2,
+                                  width: beeSide, height: beeSide)
+            bee.draw(in: beeRect)
+        }
+
+        // Wordmark below — preserve native 6:1 aspect ratio so the
+        // letterforms aren't squished.
+        if let mark = UIImage(named: "SeatbeeWordmark") {
+            let markW: CGFloat = 360
+            let markH = markW / 6  // 720x120 native
+            let markRect = CGRect(x: cx - markW / 2,
+                                   y: topY + haloR * 2 + 18,
+                                   width: markW, height: markH)
+            mark.draw(in: markRect)
+        }
+
+        // Tag line under wordmark
+        let tagAttrs: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 18, weight: .semibold),
+            .foregroundColor: socialGoldDk,
+            .kern: 4,
+        ]
+        let tag = NSString(string: "SEATING PLANNED")
+        let tSize = tag.size(withAttributes: tagAttrs)
+        tag.draw(at: CGPoint(x: cx - tSize.width / 2, y: topY + haloR * 2 + 95),
+                 withAttributes: tagAttrs)
+    }
+
+    /// Big event title + subtitle (date · venue). Title auto-shrinks
+    /// to fit the canvas width so long event names don't bleed past
+    /// the inner border.
+    private static func drawSocialEventBlock(ctx: CGContext, plan: SeatingPlan, size: CGFloat, centerY: CGFloat) {
+        let cx = size / 2
+        let maxWidth = size - 160
+        let title = plan.name.uppercased()
+
+        // Auto-fit font: start big, shrink until it fits within maxWidth.
+        var fontSize: CGFloat = 64
+        var titleAttrs: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: fontSize, weight: .semibold),
+            .foregroundColor: socialCharcoal,
+            .kern: 1.5,
+        ]
+        var measured = NSString(string: title).size(withAttributes: titleAttrs)
+        while measured.width > maxWidth && fontSize > 28 {
+            fontSize -= 2
+            titleAttrs[.font] = UIFont.systemFont(ofSize: fontSize, weight: .semibold)
+            measured = NSString(string: title).size(withAttributes: titleAttrs)
+        }
+        NSString(string: title).draw(
+            at: CGPoint(x: cx - measured.width / 2, y: centerY - measured.height / 2),
+            withAttributes: titleAttrs)
+
+        // Decorative gold bar under title
+        let barWidth: CGFloat = 80
+        let barY = centerY + measured.height / 2 + 18
+        ctx.setStrokeColor(socialGold.cgColor)
+        ctx.setLineWidth(2)
+        ctx.move(to: CGPoint(x: cx - barWidth / 2, y: barY))
+        ctx.addLine(to: CGPoint(x: cx + barWidth / 2, y: barY))
+        ctx.strokePath()
+
+        // Subtitle: date · venue
+        var subParts: [String] = []
+        if let date = plan.eventDate {
+            let f = DateFormatter()
+            f.dateStyle = .long
+            subParts.append(f.string(from: date))
+        }
+        if let venue = plan.venue, !venue.isEmpty { subParts.append(venue) }
+        if !subParts.isEmpty {
+            let subAttrs: [NSAttributedString.Key: Any] = [
+                .font: UIFont.systemFont(ofSize: 22, weight: .regular),
+                .foregroundColor: socialWarm,
+            ]
+            let sub = NSString(string: subParts.joined(separator: " · "))
+            let sSize = sub.size(withAttributes: subAttrs)
+            sub.draw(at: CGPoint(x: cx - sSize.width / 2, y: barY + 18),
+                     withAttributes: subAttrs)
+        }
+    }
+
+    /// Adaptive stat grid: always shows GUESTS + TABLES, then adds
+    /// "MUST SIT" / "KEPT APART" people-count cards when those rules
+    /// exist. Counts PEOPLE (not rules) so the numbers read like
+    /// drama, not housekeeping — "12 must sit together" is juicier
+    /// than "3 keep-together rules". Falls back to GUESTS + TABLES +
+    /// SEATS when no rules exist.
+    private static func drawSocialStatGrid(ctx: CGContext, plan: SeatingPlan, size: CGFloat, topY: CGFloat) {
+        let totalGuests = plan.guests.filter { $0.rsvp != .no }.count
+        let totalTables = plan.tables.count
+        let totalSeats = plan.tables.reduce(0) { $0 + $1.seats }
+
+        // Tally people involved in must-together / keep-apart rules.
+        // Use sets so a guest in multiple rules is only counted once
+        // per category (otherwise the number gets weird at 200%+).
+        var mustTogetherPeople = Set<String>()
+        var keepApartPeople = Set<String>()
+        for rule in plan.rules where rule.enabled {
+            switch rule.type {
+            case .mustTogether, .preferTogether, .categoryTogether,
+                 .sideTogether, .seatAdjacent:
+                mustTogetherPeople.formUnion(rule.guests)
+            case .mustNot:
+                keepApartPeople.formUnion(rule.guests)
+                if let a = rule.sideA { keepApartPeople.formUnion(a) }
+                if let b = rule.sideB { keepApartPeople.formUnion(b) }
+            default:
+                break
+            }
+        }
+
+        var stats: [(value: String, label: String)] = [
+            ("\(totalGuests)", "GUESTS"),
+            ("\(totalTables)", "TABLES"),
+        ]
+        if !mustTogetherPeople.isEmpty {
+            stats.append(("\(mustTogetherPeople.count)", "MUST SIT"))
+        }
+        if !keepApartPeople.isEmpty {
+            stats.append(("\(keepApartPeople.count)", "KEPT APART"))
+        }
+        // No rules at all → fall back to a third stat that's always
+        // meaningful: total seats (capacity).
+        if stats.count == 2 {
+            stats.append(("\(totalSeats)", "SEATS"))
+        }
+        // Cap at 4 so cards don't get too narrow.
+        if stats.count > 4 { stats = Array(stats.prefix(4)) }
+
+        let count = stats.count
+        let outerInset: CGFloat = 70
+        let usableW = size - outerInset * 2
+        let cardSpacing: CGFloat = 16
+        let cardW = (usableW - cardSpacing * CGFloat(count - 1)) / CGFloat(count)
+        let cardH: CGFloat = 170
+
+        let valueAttrs: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 56, weight: .semibold),
+            .foregroundColor: socialGoldDk,
+        ]
+        let labelAttrs: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 12, weight: .bold),
+            .foregroundColor: socialWarm,
+            .kern: 1.8,
+        ]
+
+        for (i, stat) in stats.enumerated() {
+            let x = outerInset + CGFloat(i) * (cardW + cardSpacing)
+            let cardRect = CGRect(x: x, y: topY, width: cardW, height: cardH)
+
+            ctx.setFillColor(UIColor.white.withAlphaComponent(0.55).cgColor)
+            ctx.setStrokeColor(socialGold.withAlphaComponent(0.35).cgColor)
+            ctx.setLineWidth(1)
+            let cardPath = UIBezierPath(roundedRect: cardRect, cornerRadius: 16)
+            ctx.addPath(cardPath.cgPath)
+            ctx.drawPath(using: .fillStroke)
+
+            let value = NSString(string: stat.value)
+            let vSize = value.size(withAttributes: valueAttrs)
+            value.draw(at: CGPoint(x: cardRect.midX - vSize.width / 2, y: topY + 36),
+                       withAttributes: valueAttrs)
+            let label = NSString(string: stat.label)
+            let lSize = label.size(withAttributes: labelAttrs)
+            label.draw(at: CGPoint(x: cardRect.midX - lSize.width / 2, y: topY + 116),
+                       withAttributes: labelAttrs)
+        }
+    }
+
+    private static func drawSocialFooter(ctx: CGContext, size: CGFloat) {
+        let cx = size / 2
+        let y: CGFloat = size - 110
+        let madeAttrs: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 16, weight: .medium),
+            .foregroundColor: socialWarm,
+        ]
+        let made = NSString(string: "Made with Seatbee")
+        let mSize = made.size(withAttributes: madeAttrs)
+        made.draw(at: CGPoint(x: cx - mSize.width / 2, y: y), withAttributes: madeAttrs)
+
+        let urlAttrs: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 22, weight: .semibold),
+            .foregroundColor: socialGoldDk,
+            .kern: 1.5,
+        ]
+        let url = NSString(string: "seatbee.app")
+        let uSize = url.size(withAttributes: urlAttrs)
+        url.draw(at: CGPoint(x: cx - uSize.width / 2, y: y + 24),
+                 withAttributes: urlAttrs)
     }
 
     // MARK: - CSV exports (web parity)
