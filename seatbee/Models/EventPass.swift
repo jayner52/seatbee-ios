@@ -76,15 +76,21 @@ struct PassesSummary: Codable, Hashable {
 
 struct PassesResponse: Codable {
     let passes: [EventPass]
+    /// Passes the signed-in user has GIFTED OUT — populated by the
+    /// server side-query at api/passes.js line 145-150 (joins
+    /// profiles on user_id to get the current owner's email/name).
+    /// `giftRedeemedAt == nil` means the gift link is out there but
+    /// the recipient hasn't claimed it yet; `!= nil` means claimed.
+    let giftedPasses: [GiftedPass]?
     let summary: PassesSummary
     let nextExpiry: Date?
 
     enum CodingKeys: String, CodingKey {
-        case passes, summary
+        case passes, summary, giftedPasses
         case nextExpiry = "nextExpiry"
     }
 
-    static let empty = PassesResponse(passes: [], summary: .empty, nextExpiry: nil)
+    static let empty = PassesResponse(passes: [], giftedPasses: [], summary: .empty, nextExpiry: nil)
 
     /// Available passes grouped by tier, ordered Event → Signature → Grand.
     func availableByTier() -> [(tier: PlanTier, passes: [EventPass])] {
@@ -93,6 +99,46 @@ struct PassesResponse: Codable {
             (tier, avail.filter { $0.tier == tier })
         }
     }
+}
+
+// Mirror of the `giftedPasses` array returned by GET /api/passes.
+// Each row is a pass the SIGNED-IN user gifted to someone else; the
+// pass's user_id has already been transferred to the recipient (via
+// /api/redeem-gift-code), and `profiles` is the join showing who has
+// it now. Pre-claim, gift_redeemed_at is null and profiles still
+// reflects the original owner — the API response is the same shape
+// either way; the iOS UI uses giftRedeemedAt to decide which copy
+// to show.
+struct GiftedPass: Codable, Identifiable, Hashable {
+    let id: String
+    let giftCode: String?
+    let giftRedeemedAt: Date?
+    let packType: String
+    let purchasedAt: Date?
+    let profiles: RecipientProfile?
+
+    struct RecipientProfile: Codable, Hashable {
+        let email: String?
+        let name: String?
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id, profiles
+        case giftCode = "gift_code"
+        case giftRedeemedAt = "gift_redeemed_at"
+        case packType = "pack_type"
+        case purchasedAt = "purchased_at"
+    }
+
+    var tier: PlanTier {
+        switch packType {
+        case "pro_pass_single": return .proPass
+        case "signature_pass":  return .signaturePass
+        default:                return .eventPass
+        }
+    }
+
+    var isClaimed: Bool { giftRedeemedAt != nil }
 }
 
 struct RedeemPassResponse: Codable {

@@ -143,6 +143,92 @@ final class PassesService {
         }
     }
 
+    // MARK: - POST redeem gift code
+    //
+    // Web parity: POST /api/redeem-gift-code with `{code}`. Server
+    // validates the SEAT-XXXX-XXXX code, transfers ownership of the
+    // pass from the gifter to the signed-in user, and returns
+    // metadata for the success modal (pass type, expiry, gifter
+    // name). The pass lands in the recipient's available inventory —
+    // it's NOT auto-applied to a plan; the user picks a plan via
+    // the normal Apply flow afterwards.
+    //
+    // Server enforces a per-user rate limit (20 attempts/hour) plus
+    // single-use semantics on the underlying row.
+
+    struct RedeemGiftCodeResponse: Codable {
+        let success: Bool
+        let passType: String?       // "single" | "signature_pass" | etc
+        let expiresAt: Date?
+        let gifterName: String?     // "Jane S." style (nil if self-gift)
+        let alreadyOwned: Bool?     // true if the user already owned this pass
+        let message: String?
+
+        enum CodingKeys: String, CodingKey {
+            case success, passType, gifterName, alreadyOwned, message
+            case expiresAt = "expiresAt"
+        }
+    }
+
+    func redeemGiftCode(_ code: String) async throws -> RedeemGiftCodeResponse {
+        // Web's redeem endpoint lives at /api/redeem-gift-code (NOT
+        // /api/passes). Build the URL by swapping the trailing path.
+        let trimmed = code.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { throw PassesError.server("Code is required") }
+
+        // Derive the host from the passes URL so it stays in sync with
+        // AppConfig — same env in dev/prod.
+        guard let passesURL = URL(string: baseURL),
+              var components = URLComponents(url: passesURL, resolvingAgainstBaseURL: false) else {
+            throw PassesError.server("Invalid passes URL")
+        }
+        components.path = "/api/redeem-gift-code"
+        guard let url = components.url else {
+            throw PassesError.server("Invalid redeem URL")
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if let token = await AuthService().accessToken {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        } else {
+            throw PassesError.unauthorized
+        }
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["code": trimmed])
+
+        let (data, response): (Data, URLResponse)
+        do {
+            (data, response) = try await URLSession.shared.data(for: request)
+        } catch {
+            throw PassesError.network(error)
+        }
+
+        guard let http = response as? HTTPURLResponse else { throw PassesError.server("Invalid response") }
+
+        switch http.statusCode {
+        case 200:
+            do {
+                return try Self.dateDecoder.decode(RedeemGiftCodeResponse.self, from: data)
+            } catch {
+                throw PassesError.server("Could not parse redeem response: \(error.localizedDescription)")
+            }
+        case 400:
+            // Server returns a friendly message in `error` for the
+            // common cases (invalid / used / expired). Pass it through.
+            let body = try? JSONDecoder().decode(ErrorBody.self, from: data)
+            throw PassesError.server(body?.error ?? "Invalid code")
+        case 401:
+            throw PassesError.unauthorized
+        case 429:
+            throw PassesError.server("Too many attempts. Please wait an hour and try again.")
+        default:
+            let msg = (try? JSONDecoder().decode(ErrorBody.self, from: data))?.error
+                ?? "Server error (\(http.statusCode))"
+            throw PassesError.server(msg)
+        }
+    }
+
     private struct ErrorBody: Codable {
         let error: String?
         let code: String?
