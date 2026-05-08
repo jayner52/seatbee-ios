@@ -158,9 +158,20 @@ final class SeatService {
             }
         }
 
+        // Respect includeMaybes (web parity, App.jsx:13092). solve.js
+        // already drops rsvp == "no" guests internally, but pending/
+        // unknown only get excluded when includeMaybes == false. Filter
+        // the guest payload here so the server sees the same set of
+        // attendees web would.
+        let includeMaybes = plan.includeMaybes ?? true
+        let allGuests = (dtoDict["guests"] as? [[String: Any]]) ?? []
+        let filteredGuests: [[String: Any]] = includeMaybes
+            ? allGuests
+            : allGuests.filter { (($0["rsvp"] as? String) ?? "") == "yes" }
+
         var body: [String: Any] = [
             "tables":              dtoDict["tables"] ?? [],
-            "guests":              dtoDict["guests"] ?? [],
+            "guests":              filteredGuests,
             "rules":               dtoDict["rules"] ?? [],
             "categories":          dtoDict["categories"] ?? [],
             "parties":             dtoDict["parties"] ?? [],

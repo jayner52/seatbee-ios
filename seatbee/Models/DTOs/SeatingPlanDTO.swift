@@ -88,6 +88,7 @@ struct SeatingPlanDTO: Codable {
             roomFlipV: d?.event?.roomFlipV,
             roomZones: RoomGeometryCoder.decodeZones(d?.event?.roomZones),
             hasSweetheartTable: d?.event?.hasSweetheartTable,
+            includeMaybes: d?.includeMaybes,
             coupleType: d?.event?.coupleType,
             createdAt: created_at.flatMap { parseDate($0) },
             updatedAt: updated_at.flatMap { parseDate($0) },
@@ -133,6 +134,9 @@ struct PlanDataDTO: Codable {
     let floorPlanOpacity: Double?
     let seatOrders: [String: AnyCodable]?    // raw passthrough
     let guestQR: AnyCodable?                 // raw passthrough — see SeatingPlan.guestQR* helpers
+    // Web parity (App.jsx:3899): top-level boolean controlling whether
+    // unconfirmed/maybe guests are pulled into seating + exports.
+    let includeMaybes: Bool?
 }
 
 // MARK: - EventDataDTO

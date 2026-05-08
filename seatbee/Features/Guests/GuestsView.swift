@@ -40,6 +40,7 @@ struct GuestsView: View {
     @State private var showRules = false
     @State private var showParties = false
     @State private var showMeals = false
+    @State private var showRSVP = false
     @State private var editingGuest: Guest?
 
     private var plan: SeatingPlan? { appState.activePlan }
@@ -56,6 +57,11 @@ struct GuestsView: View {
     private static let filterAll = "__all"
     private static let filterUnseated = "__unseated"
     private static let filterDietary = "__dietary"
+    // RSVP-state filters. Web parity: "Pending" covers both .pending
+    // and .unknown — web treats null/maybe/unknown as the same bucket.
+    private static let filterRSVPYes = "__rsvp_yes"
+    private static let filterRSVPPending = "__rsvp_pending"
+    private static let filterRSVPNo = "__rsvp_no"
 
     /// Canonical id → name list, sorted alphabetically by name. Same
     /// pattern as RulesView.canonicalCategories / CategoriesSheet so
@@ -80,6 +86,17 @@ struct GuestsView: View {
             (Self.filterAll, "All"),
             (Self.filterUnseated, "Unseated"),
         ]
+        // RSVP filters surface only when the relevant bucket has guests
+        // — keeps the chip row tight on plans with all yes/all pending.
+        if guests.contains(where: { $0.rsvp == .yes }) {
+            out.append((Self.filterRSVPYes, "RSVP Yes"))
+        }
+        if guests.contains(where: { $0.rsvp == .pending || $0.rsvp == .unknown }) {
+            out.append((Self.filterRSVPPending, "RSVP Pending"))
+        }
+        if guests.contains(where: { $0.rsvp == .no }) {
+            out.append((Self.filterRSVPNo, "RSVP No"))
+        }
         for cat in canonicalCategories {
             out.append((cat.id, cat.name))
         }
@@ -166,6 +183,10 @@ struct GuestsView: View {
             }
             .sheet(isPresented: $showMeals) {
                 MealsSheet()
+                    .environment(appState)
+            }
+            .sheet(isPresented: $showRSVP) {
+                RSVPSheet()
                     .environment(appState)
             }
             .sheet(item: $editingGuest) { guest in
@@ -262,6 +283,9 @@ struct GuestsView: View {
                     }
                     SBButton(title: "Meals", icon: "fork.knife", variant: .default, size: .small) {
                         showMeals = true
+                    }
+                    SBButton(title: "RSVP", icon: "envelope", variant: .default, size: .small) {
+                        showRSVP = true
                     }
                 }
             }
@@ -738,6 +762,12 @@ struct GuestsView: View {
                 (g.dietaryTags?.isEmpty == false) ||
                 (g.dietary?.isEmpty == false)
             }
+        case Self.filterRSVPYes:
+            result = result.filter { $0.rsvp == .yes }
+        case Self.filterRSVPPending:
+            result = result.filter { $0.rsvp == .pending || $0.rsvp == .unknown }
+        case Self.filterRSVPNo:
+            result = result.filter { $0.rsvp == .no }
         default:
             // Category filter: match by canonical ID (selectedFilter holds
             // the rawCategories entry's id, not the displayed name). This
