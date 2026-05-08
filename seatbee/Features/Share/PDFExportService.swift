@@ -1170,9 +1170,16 @@ final class PDFExportService {
                 }
             }
         }
+        // Hide system "seating directive" categories from the chart —
+        // head_table / sweetheart_table are flags that drive auto-
+        // placement in solve.js, not demographic groupings, and the
+        // user already sees them as table types in the room. Showing
+        // them here just adds noise (especially on small plans where
+        // a 2-guest "Sweetheart Table" row drowns out real groupings).
+        let hiddenCategoryIds: Set<String> = ["head_table", "sweetheart_table"]
         var categoryCounts: [String: Int] = [:]
         for g in confirmed {
-            for cid in g.categories {
+            for cid in g.categories where !hiddenCategoryIds.contains(cid) {
                 categoryCounts[cid, default: 0] += 1
             }
         }
