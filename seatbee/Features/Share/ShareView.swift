@@ -69,8 +69,10 @@ struct ShareView: View {
 
                         SBOrnament(label: "Share via")
 
-                        // Social row
-                        socialRow
+                        // Two big shareable image cards (Wrapped + Floor Plan).
+                        // PDFs / Canva live in Print & Design below — different
+                        // intent, different surface.
+                        shareViaRow
 
                         // Guest QR (expandable, web parity)
                         if let plan = appState.activePlan {
@@ -320,36 +322,76 @@ struct ShareView: View {
         }
     }
 
-    // MARK: - Social Row
+    // MARK: - Share via row
+    //
+    // Replaced the old 5-channel mock buttons (iMessage / WhatsApp /
+    // IG / Email / More) with two real shareable artefacts. The old
+    // row was misleading — every channel button opened the same
+    // generic iOS activity sheet AND the URL it shared
+    // (seatbee.app/plan/<id>) didn't resolve to anything on web. The
+    // new row is content-first: pick what to share, iOS handles the
+    // channel selection itself in the activity sheet. Visual
+    // separation from the Print & Design row below: this row is
+    // images for socials, that row is PDFs / Canva for printing.
 
-    private var socialRow: some View {
-        HStack(spacing: 16) {
-            socialButton(icon: "message.fill", label: "iMessage")
-            socialButton(icon: "text.bubble.fill", label: "WhatsApp")
-            socialButton(icon: "envelope.fill", label: "Email")
-            socialButton(icon: "camera.fill", label: "IG")
-            socialButton(icon: "ellipsis", label: "More")
+    private var shareViaRow: some View {
+        HStack(spacing: 12) {
+            shareViaCard(
+                icon: "sparkles",
+                title: "Wrapped",
+                subtitle: "Branded share card with stats",
+                action: { handleShareSocial() }
+            )
+            shareViaCard(
+                icon: "square.grid.2x2",
+                title: "Floor Plan",
+                subtitle: "Hero image of your room layout",
+                action: { handleShareFloorPlan() }
+            )
         }
     }
 
-    private func socialButton(icon: String, label: String) -> some View {
-        Button {
-            sharePlan(via: label)
-        } label: {
-            VStack(spacing: 6) {
-                Image(systemName: icon)
-                    .font(.system(size: 20))
+    private func shareViaCard(icon: String, title: String, subtitle: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 8) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.sbChampagne.opacity(0.45))
+                    Image(systemName: icon)
+                        .font(.system(size: 22, weight: .semibold))
+                        .foregroundStyle(Color.sbGoldDk)
+                }
+                .frame(height: 64)
+                Text(title)
+                    .font(SBFont.bodySmallBold)
                     .foregroundStyle(Color.sbCharcoal)
-                    .frame(width: 56, height: 56)
-                    .background(Color.sbIvory2)
-                    .clipShape(Circle())
-
-                Text(label)
-                    .font(SBFont.capsLabel)
+                Text(subtitle)
+                    .font(SBFont.caption)
                     .foregroundStyle(Color.sbWarm)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(12)
+            .background(Color.sbIvory2)
+            .clipShape(RoundedRectangle(cornerRadius: SBRadius.card))
+            .overlay(
+                RoundedRectangle(cornerRadius: SBRadius.card)
+                    .strokeBorder(Color.sbLine, lineWidth: 1)
+            )
         }
         .buttonStyle(.plain)
+    }
+
+    private func handleShareSocial() {
+        guard let plan = appState.activePlan else { return }
+        PDFExportService.shareSocialImage(plan: plan)
+    }
+
+    private func handleShareFloorPlan() {
+        guard let plan = appState.activePlan else { return }
+        PDFExportService.shareFloorPlanImage(plan: plan)
     }
 
     // MARK: - Export — PRINT & DESIGN
@@ -396,12 +438,9 @@ struct ShareView: View {
                 subtitle: "Styled place cards · Poster seating charts (opens on web)",
                 action: { openPrintCardsOnWeb() }
             )
-            toolCard(
-                icon: "photo",
-                title: "Social Image",
-                subtitle: "1080×1080 share-ready PNG",
-                action: { handleSocialImage() }
-            )
+            // Social Image moved up to the Share Via row above —
+            // image-shareables and printable artefacts live in
+            // separate sections now (different user intent).
         }
     }
 
@@ -649,10 +688,6 @@ struct ShareView: View {
         }
     }
 
-    private func handleSocialImage() {
-        guard let plan = appState.activePlan else { return }
-        PDFExportService.shareSocialImage(plan: plan)
-    }
 
     private func handleGuestCSV() {
         guard let plan = appState.activePlan else { return }
@@ -818,19 +853,6 @@ struct ShareView: View {
         guard let encoded = b64.addingPercentEncoding(withAllowedCharacters: .alphanumerics) else { return }
         guard let url = URL(string: "https://www.seatbee.app\(path)#import=\(encoded)") else { return }
         UIApplication.shared.open(url)
-    }
-
-    private func sharePlan(via method: String) {
-        guard let plan = appState.activePlan else { return }
-        let shareURL = "https://seatbee.app/plan/\(plan.id)"
-        let activityVC = UIActivityViewController(
-            activityItems: ["\(plan.name) — View seating plan", URL(string: shareURL)!],
-            applicationActivities: nil
-        )
-        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-           let rootVC = windowScene.windows.first?.rootViewController {
-            rootVC.present(activityVC, animated: true)
-        }
     }
 
     // MARK: - Guest QR section

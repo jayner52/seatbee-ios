@@ -950,6 +950,100 @@ final class PDFExportService {
         }
     }
 
+    // MARK: - Floor Plan Image
+    //
+    // 1080×1080 share-card built around the actual floor plan as the
+    // hero. Same branded chrome as the Social Image (compact bee +
+    // wordmark, event title, gold underline + date·venue, footer with
+    // URL) so the two surfaces feel like a matched set, but the body
+    // is a large render of the plan's tables/objects/seats via
+    // CanvasPDFRenderer. Designed for Instagram / Stories-style "look
+    // at our gorgeous room layout" sharing — not a print artefact.
+    //
+    // Lives next to the Social Image (not in CanvasPDFRenderer or its
+    // own file) because the two share branding helpers; keeping them
+    // co-located means the next time we tweak palette / typography /
+    // footer copy, they update in lockstep.
+
+    @MainActor
+    static func generateFloorPlanImage(plan: SeatingPlan) -> UIImage? {
+        let size: CGFloat = 1080
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: size, height: size))
+        return renderer.image { context in
+            let ctx = context.cgContext
+
+            drawSocialBackground(ctx: ctx, size: size)
+
+            var y: CGFloat = 70
+            y = drawSocialBranding(ctx: ctx, size: size, topY: y)
+            y = drawSocialEventBlock(ctx: ctx, plan: plan, size: size, topY: y + 24)
+
+            // Floor plan card — generous footprint so it reads as the
+            // hero. Reserved space for the mini-stats line + footer
+            // below so the card has breathing room from the bottom.
+            let cardTop = y + 28
+            let cardBottom = size - 200
+            let cardSide: CGFloat = 70
+            let cardRect = CGRect(x: cardSide, y: cardTop,
+                                   width: size - cardSide * 2,
+                                   height: cardBottom - cardTop)
+
+            // Soft drop-shadow effect via a slightly offset darker
+            // rounded rect peeking out below the card. Subtle — adds
+            // depth without looking "Web 2.0".
+            ctx.saveGState()
+            let shadowRect = cardRect.offsetBy(dx: 0, dy: 6)
+            ctx.setFillColor(UIColor.black.withAlphaComponent(0.06).cgColor)
+            let shadowPath = UIBezierPath(roundedRect: shadowRect, cornerRadius: 18)
+            ctx.addPath(shadowPath.cgPath)
+            ctx.fillPath()
+            ctx.restoreGState()
+
+            // Card body — slightly off-white with a thin gold border
+            // matching the outer canvas border for visual consistency.
+            ctx.setFillColor(UIColor.white.withAlphaComponent(0.85).cgColor)
+            ctx.setStrokeColor(socialGold.withAlphaComponent(0.4).cgColor)
+            ctx.setLineWidth(1.2)
+            let cardPath = UIBezierPath(roundedRect: cardRect, cornerRadius: 18)
+            ctx.addPath(cardPath.cgPath)
+            ctx.drawPath(using: .fillStroke)
+
+            // Inset the actual drawing rect a hair so seat dots and
+            // labels don't kiss the card border.
+            let drawRect = cardRect.insetBy(dx: 16, dy: 16)
+            CanvasPDFRenderer.drawFloorPlan(in: ctx, rect: drawRect, plan: plan)
+
+            // Mini-stats line under the card: "110 GUESTS · 19 TABLES".
+            // Small + restrained — the floor plan is the hero, this is
+            // just context. Skip if the plan is empty.
+            let totalGuests = plan.guests.filter { $0.rsvp != .no }.count
+            let totalTables = plan.tables.count
+            if totalGuests > 0 || totalTables > 0 {
+                let statsY = cardBottom + 18
+                let statsAttrs: [NSAttributedString.Key: Any] = [
+                    .font: UIFont.systemFont(ofSize: 16, weight: .semibold),
+                    .foregroundColor: socialWarm,
+                    .kern: 1.5,
+                ]
+                let statsText = NSString(string: "\(totalGuests) GUESTS · \(totalTables) TABLES")
+                let sSize = statsText.size(withAttributes: statsAttrs)
+                statsText.draw(at: CGPoint(x: size / 2 - sSize.width / 2, y: statsY),
+                               withAttributes: statsAttrs)
+            }
+
+            drawSocialFooter(ctx: ctx, size: size)
+        }
+    }
+
+    static func shareFloorPlanImage(plan: SeatingPlan) {
+        guard let image = generateFloorPlanImage(plan: plan),
+              let data = image.pngData() else { return }
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("\(plan.name) — Floor Plan.png")
+        try? data.write(to: url)
+        shareFile(url)
+    }
+
     static func shareSocialImage(plan: SeatingPlan) {
         guard let image = generateSocialImage(plan: plan),
               let data = image.pngData() else { return }
