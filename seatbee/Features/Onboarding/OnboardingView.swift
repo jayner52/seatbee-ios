@@ -1228,108 +1228,27 @@ struct OnboardingView: View {
 
     // MARK: - Actions
 
-    /// Parse pasted guest text. CSV-shaped input (header row with
-    /// recognised column names) goes through `GuestCSVParser`; plain
-    /// line-by-line lists are treated as one name per line, with any
-    /// extra comma-separated tokens joined as the guest's dietary note.
-    /// Plus-ones are NOT parsed — Seatbee treats every guest as a real
-    /// entry, so a `+1` would need to be added as its own line.
-    /// No AI involvement — runs synchronously on every text change.
+    /// Parse pasted guest text. Delegates to
+    /// `GuestCSVParser.parseFlexible` so the same paste experience
+    /// works on the standalone Import sheet too — header-row CSV →
+    /// full parser; plain "Name, dietary" lines → one guest per line.
+    /// Runs synchronously on every text change.
     private func parsePastedGuests() {
-        let text = guestListText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else {
-            detectedGuests = []
-            detectedPartiesCount = 0
-            detectedPlatform = nil
-            return
-        }
-        // Header-row sniff — if the first line has commas AND a "name"/
-        // "email"/"guest" header, treat the whole blob as a CSV.
-        let firstLine = (text.components(separatedBy: .newlines).first ?? "").lowercased()
-        let looksLikeCSV = firstLine.contains(",") && (
-            firstLine.contains("name") || firstLine.contains("email") ||
-            firstLine.contains("guest") || firstLine.contains("rsvp")
-        )
-        if looksLikeCSV {
-            let result = GuestCSVParser.parse(text)
-            detectedGuests = result.guests
-            detectedPartiesCount = countParties(in: result.guests)
-            detectedPlatform = result.detectedPlatform
-            return
-        }
-
-        // Plain text: split by newlines, each line is one guest.
-        var guests: [Guest] = []
-        for rawLine in text.components(separatedBy: .newlines) {
-            let line = rawLine.trimmingCharacters(in: .whitespaces)
-            if line.isEmpty { continue }
-            let parts = line.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }
-            guard let name = parts.first, !name.isEmpty else { continue }
-
-            // Everything after the name joins as the dietary note.
-            // Plus-one tokens are explicitly NOT parsed — Seatbee treats
-            // every guest as their own entry, so users add their own
-            // line for a plus-one rather than flagging the host.
-            var dietary: String? = nil
-            for extra in parts.dropFirst() where !extra.isEmpty {
-                dietary = (dietary == nil ? extra : "\(dietary!), \(extra)")
-            }
-
-            let nameParts = name.split(separator: " ", maxSplits: 1)
-            guests.append(Guest(
-                id: UUID().uuidString,
-                name: name,
-                firstName: String(nameParts.first ?? ""),
-                lastName: nameParts.count > 1 ? String(nameParts.last ?? "") : nil,
-                email: nil, categories: [], dietary: dietary, notes: nil,
-                rsvp: .unknown, side: .none, vip: false,
-                accessibility: nil, plusOne: nil, party: nil, display: nil,
-                dietaryTags: nil, highChair: nil, isChild: nil, groupIds: nil,
-                isBride: nil, isGroom: nil, meal: nil, guestCreatedAt: nil
-            ))
-        }
-        detectedGuests = guests
-        detectedPartiesCount = 0
-        detectedPlatform = guests.isEmpty ? nil : "Pasted names"
+        let result = GuestCSVParser.parseFlexible(guestListText)
+        detectedGuests = result.guests
+        detectedPartiesCount = countParties(in: result.guests)
+        detectedPlatform = result.guests.isEmpty ? nil : result.detectedPlatform
     }
 
     /// Web parity (App.jsx:3100 CSV_TEMPLATES). Wedding mirrors web's
-    /// `wedding`; celebration mirrors web's `general`. iOS doesn't ship
-    /// the corporate flow yet so we omit that template.
-    private func csvTemplateBody(for type: EventTypeOption) -> String {
-        switch type {
-        case .wedding:
-            return """
-            First Name,Last Name,Email,Phone,Party/Group,RSVP,Meal Choice,Dietary Restrictions,VIP,Child,Tags,Notes
-            John,Smith,john@email.com,555-0102,Smith Family,Yes,Chicken,,No,No,"Family, Groom",Best man
-            Jane,Smith,jane@email.com,555-0103,Smith Family,Yes,Fish,Gluten-free,No,No,"Family, Groom",
-            Emily,Johnson,emily@email.com,555-0104,Johnson Party,Yes,Vegetarian,Vegan,No,No,"Friends, Bride",College friend
-            Michael,Brown,michael@email.com,,,Maybe,,Nut allergy,No,No,Coworkers,
-            David,Lee,david@email.com,555-0101,Lee Family,Yes,Chicken,,Yes,No,"Family, Head Table",Father of the bride
-            """
-        case .celebration:
-            return """
-            First Name,Last Name,Email,Phone,Party/Group,RSVP,VIP,Child,Tags,Dietary Restrictions,Notes
-            Alex,Taylor,alex@email.com,555-0120,Taylor Family,Yes,Yes,No,Host,,Guest of honour
-            Jordan,Lee,jordan@email.com,,,Yes,No,No,Guest,Vegetarian,
-            Morgan,Chen,morgan@email.com,555-0121,Chen Group,Maybe,No,No,Speaker,,Presenting at 3pm
-            Casey,Brown,casey@email.com,,,Yes,No,No,Volunteer,Gluten-free,Setup crew
-            Riley,Patel,riley@email.com,,Patel Family,Yes,No,No,Guest,,
-            """
-        }
-    }
-
     /// Writes the current event type's template to the temp dir and
-    /// caches the URL for ShareLink.
+    /// caches the URL for ShareLink. Body + filename live on
+    /// `GuestCSVParser` so the standalone Import sheet can reuse the
+    /// same templates.
     private func regenerateCSVTemplate() {
-        let body = csvTemplateBody(for: eventType)
-        // Web parity (App.jsx:3103 CSV_TEMPLATES.*.filename).
-        let filename = eventType == .wedding
-            ? "seatbee-wedding-template.csv"
-            : "seatbee-general-template.csv"
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent(filename)
-        try? body.write(to: url, atomically: true, encoding: .utf8)
-        csvTemplateURL = url
+        let templateType: GuestCSVParser.TemplateType =
+            eventType == .wedding ? .wedding : .general
+        csvTemplateURL = GuestCSVParser.writeCSVTemplate(for: templateType)
     }
 
     private func importCSVFromURL(_ url: URL) {
