@@ -16,6 +16,36 @@ import UniformTypeIdentifiers
 //     button needed.
 //   - Same dietary-syntax tip line so users discover the inline
 //     comma-separator pattern.
+// MARK: - Duplicate detection diff
+//
+// Web parity: when a re-import contains guests already in the plan,
+// match by normalised name (lowercase, trimmed, whitespace collapsed —
+// App.jsx:10884) and bucket each row as new / changed / unchanged so
+// the user doesn't get duplicate guest entries every time they pull
+// down a fresh export from Joy / Zola / The Knot.
+
+struct CSVImportFieldFlags: OptionSet {
+    let rawValue: Int
+    static let rsvp     = CSVImportFieldFlags(rawValue: 1 << 0)
+    static let meal     = CSVImportFieldFlags(rawValue: 1 << 1)
+    static let dietary  = CSVImportFieldFlags(rawValue: 1 << 2)   // covers both dietary + dietaryTags
+    static let email    = CSVImportFieldFlags(rawValue: 1 << 3)
+    static let allByDefault: CSVImportFieldFlags = [.rsvp, .meal, .dietary, .email]
+}
+
+private struct CSVImportDiff {
+    var newGuests: [Guest] = []
+    var changed: [(existingId: String, incoming: Guest, fields: CSVImportFieldFlags)] = []
+    var unchangedCount: Int = 0
+    var totalRows: Int { newGuests.count + changed.count + unchangedCount }
+}
+
+private func normaliseName(_ s: String?) -> String {
+    guard let s else { return "" }
+    let trimmed = s.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    return trimmed.split(whereSeparator: { $0.isWhitespace }).joined(separator: " ")
+}
+
 struct CSVImportSheet: View {
     @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
@@ -26,6 +56,9 @@ struct CSVImportSheet: View {
     @State private var errorMessage: String?
     @State private var tierLimitMessage: String?
     @State private var csvTemplateURL: URL?
+    /// Which fields to overwrite on duplicate-name matches. Defaults
+    /// to all four — same default web uses (App.jsx:10862).
+    @State private var updateFields: CSVImportFieldFlags = .allByDefault
 
     var body: some View {
         NavigationStack {
@@ -143,11 +176,19 @@ struct CSVImportSheet: View {
 
                     // Preview
                     if !parsedGuests.isEmpty {
+                        let diff = computeDiff()
                         VStack(alignment: .leading, spacing: 12) {
                             Text("\(parsedGuests.count) GUESTS FOUND")
                                 .font(SBFont.capsLabel)
                                 .foregroundStyle(Color.sbGoldDk)
                                 .letterSpacing(1.5)
+
+                            if !diff.changed.isEmpty || diff.unchangedCount > 0 {
+                                duplicateBreakdown(diff)
+                                if !diff.changed.isEmpty {
+                                    fieldUpdateToggles
+                                }
+                            }
 
                             ForEach(parsedGuests.prefix(10)) { guest in
                                 HStack(spacing: 10) {
@@ -176,8 +217,9 @@ struct CSVImportSheet: View {
                             }
                         }
 
-                        SBButton(title: "Import \(parsedGuests.count) guests", icon: "person.badge.plus", variant: .gold, fullWidth: true) {
-                            importGuests()
+                        SBButton(title: importButtonTitle(diff: diff),
+                                 icon: "person.badge.plus", variant: .gold, fullWidth: true) {
+                            importGuests(diff: diff)
                         }
                     }
 
@@ -260,16 +302,166 @@ struct CSVImportSheet: View {
         errorMessage = rawText.isEmpty ? nil : result.error
     }
 
+    // MARK: - Duplicate detection
+
+    /// Bucket every parsed guest as new / changed / unchanged against
+    /// the active plan's guest list, matching by normalised full name
+    /// (web parity: App.jsx:10884).
+    private func computeDiff() -> CSVImportDiff {
+        var diff = CSVImportDiff()
+        guard let existing = appState.activePlan?.guests else {
+            diff.newGuests = parsedGuests
+            return diff
+        }
+        var byName: [String: Guest] = [:]
+        for g in existing {
+            let key = normaliseName(g.name)
+            if !key.isEmpty { byName[key] = g }
+        }
+        for incoming in parsedGuests {
+            let key = normaliseName(incoming.name)
+            guard let match = byName[key] else {
+                diff.newGuests.append(incoming)
+                continue
+            }
+            var changed: CSVImportFieldFlags = []
+            // Only flag fields where incoming is non-empty AND differs;
+            // empty CSV cells shouldn't blow away existing data.
+            if incoming.rsvp != .unknown && incoming.rsvp != match.rsvp {
+                changed.insert(.rsvp)
+            }
+            if let m = incoming.meal?.nilIfEmpty,
+               (match.meal?.trimmingCharacters(in: .whitespaces) ?? "") != m.trimmingCharacters(in: .whitespaces) {
+                changed.insert(.meal)
+            }
+            let incomingDietary = incoming.dietary?.nilIfEmpty
+            let incomingTags = incoming.dietaryTags ?? []
+            let dietaryDiffers = (incomingDietary != nil && incomingDietary != match.dietary)
+                || (!incomingTags.isEmpty && Set(incomingTags) != Set(match.dietaryTags ?? []))
+            if dietaryDiffers { changed.insert(.dietary) }
+            if let e = incoming.email?.nilIfEmpty, e != match.email {
+                changed.insert(.email)
+            }
+            if changed.isEmpty {
+                diff.unchangedCount += 1
+            } else {
+                diff.changed.append((existingId: match.id, incoming: incoming, fields: changed))
+            }
+        }
+        return diff
+    }
+
+    @ViewBuilder
+    private func duplicateBreakdown(_ diff: CSVImportDiff) -> some View {
+        HStack(spacing: 8) {
+            breakdownPill(count: diff.newGuests.count, label: "new", color: .sbSage)
+            breakdownPill(count: diff.changed.count, label: "updated", color: .sbGoldDk)
+            if diff.unchangedCount > 0 {
+                breakdownPill(count: diff.unchangedCount, label: "unchanged", color: .sbWarm)
+            }
+        }
+    }
+
+    private func breakdownPill(count: Int, label: String, color: Color) -> some View {
+        HStack(spacing: 4) {
+            Text("\(count)")
+                .font(SBFont.bodySmallBold)
+                .foregroundStyle(color)
+            Text(label)
+                .font(SBFont.caption)
+                .foregroundStyle(Color.sbWarm)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(color.opacity(0.12))
+        .clipShape(Capsule())
+    }
+
+    @ViewBuilder
+    private var fieldUpdateToggles: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("UPDATE WHICH FIELDS?")
+                .font(SBFont.capsLabel)
+                .foregroundStyle(Color.sbWarm)
+                .letterSpacing(1.5)
+            HStack(spacing: 8) {
+                fieldToggleChip(.rsvp, label: "RSVP")
+                fieldToggleChip(.meal, label: "Meal")
+                fieldToggleChip(.dietary, label: "Dietary")
+                fieldToggleChip(.email, label: "Email")
+            }
+            Text("Existing guests with matching names update only the selected fields. Unselected fields keep their current value.")
+                .font(SBFont.caption)
+                .foregroundStyle(Color.sbWarm)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func fieldToggleChip(_ flag: CSVImportFieldFlags, label: String) -> some View {
+        let on = updateFields.contains(flag)
+        return Button {
+            if on { updateFields.remove(flag) } else { updateFields.insert(flag) }
+            HapticEngine.selection()
+        } label: {
+            Text(label)
+                .font(SBFont.caption)
+                .foregroundStyle(on ? Color.white : Color.sbCharcoal)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(on ? Color.sbGoldDk : Color.white)
+                .overlay(
+                    Capsule().strokeBorder(on ? Color.sbGoldDk : Color.sbLine, lineWidth: 1)
+                )
+                .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func importButtonTitle(diff: CSVImportDiff) -> String {
+        let parts: [String] = [
+            diff.newGuests.count > 0 ? "Add \(diff.newGuests.count)" : nil,
+            diff.changed.count > 0 ? "Update \(diff.changed.count)" : nil,
+        ].compactMap { $0 }
+        if parts.isEmpty { return "No changes" }
+        return parts.joined(separator: " · ")
+    }
+
     // MARK: - Import
 
-    private func importGuests() {
+    private func importGuests(diff: CSVImportDiff) {
         guard var plan = appState.activePlan else { return }
 
         // Web parity: importing guests is never blocked by the tier limit.
         // The limit only applies when SEATING guests (assigning to tables).
-        // Users should be able to build their full guest list on the free
-        // tier and only hit the gate when they try to seat more than the cap.
-        plan.guests.append(contentsOf: parsedGuests)
+
+        // Append truly new guests.
+        plan.guests.append(contentsOf: diff.newGuests)
+
+        // Patch matching guests in place. Only overwrite fields the
+        // user opted in for via updateFields; this lets people pull in
+        // a fresh RSVP-only export without nuking dietary notes etc.
+        for entry in diff.changed {
+            guard let idx = plan.guests.firstIndex(where: { $0.id == entry.existingId }) else { continue }
+            if entry.fields.contains(.rsvp), updateFields.contains(.rsvp) {
+                plan.guests[idx].rsvp = entry.incoming.rsvp
+            }
+            if entry.fields.contains(.meal), updateFields.contains(.meal) {
+                plan.guests[idx].meal = entry.incoming.meal
+            }
+            if entry.fields.contains(.dietary), updateFields.contains(.dietary) {
+                if let d = entry.incoming.dietary?.nilIfEmpty {
+                    plan.guests[idx].dietary = d
+                }
+                let incomingTags = entry.incoming.dietaryTags ?? []
+                if !incomingTags.isEmpty {
+                    plan.guests[idx].dietaryTags = incomingTags
+                }
+            }
+            if entry.fields.contains(.email), updateFields.contains(.email) {
+                plan.guests[idx].email = entry.incoming.email
+            }
+        }
+
         appState.activePlan = plan
         HapticEngine.success()
 
