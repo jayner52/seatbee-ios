@@ -208,7 +208,9 @@ struct AIGenerateView: View {
                         )
                     }
                 }
+                suggestionsPanel
                 aiInsightPanel
+                capacityPanel
                 if fellBackToRoundRobin {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Solver returned 0 — used round-robin fallback. Check your rules for conflicts.")
@@ -380,6 +382,163 @@ struct AIGenerateView: View {
         case "partial":   return Color.sbChampagne.opacity(0.50)
         default:          return Color.clear
         }
+    }
+
+    /// Suggestions card — surfaces actionable hints solve.js stamps
+    /// into scorecard.suggestions ("Move Unknown to Table 5"). Web
+    /// shows these in a champagne callout (App.jsx ~13540) above
+    /// the AI Insight; iOS mirrors that ordering. Filters out the
+    /// "Solver error: …" strings since those already render under
+    /// the fallback banner — no duplicate noise.
+    @ViewBuilder
+    private var suggestionsPanel: some View {
+        let messages = (lastResult?.scorecard?.suggestions ?? [])
+            .filter { !$0.lowercased().hasPrefix("solver error") }
+        if !messages.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 6) {
+                    Image(systemName: "lightbulb")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color.sbGoldDk)
+                    Text("SUGGESTIONS")
+                        .font(SBFont.capsLabel)
+                        .foregroundStyle(Color.sbCharcoal)
+                        .letterSpacing(1.5)
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(messages.indices, id: \.self) { i in
+                        HStack(alignment: .top, spacing: 6) {
+                            Text("→")
+                                .font(SBFont.caption)
+                                .foregroundStyle(Color.sbGoldDk.opacity(0.7))
+                            Text(messages[i])
+                                .font(SBFont.caption)
+                                .foregroundStyle(Color.sbCharcoal)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.sbChampagne.opacity(0.5))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(Color.sbGold.opacity(0.2), lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        }
+    }
+
+    /// Capacity feedback — three states keyed off how seats vs.
+    /// attending guests stack up (web App.jsx ~13580):
+    ///   - shortage > 0  → "Not Enough Seats"  (red, with breakdown)
+    ///   - empty% > 40   → "Many Empty Seats"  (gold, suggest fewer
+    ///                                          tables)
+    ///   - empty% ≤ 20   → "Good capacity match" (sage, "X/Y used")
+    /// Anything in between renders nothing — quiet for partial fits.
+    @ViewBuilder
+    private var capacityPanel: some View {
+        if let plan = appState.activePlan {
+            let totalSeats = plan.tables.reduce(0) { $0 + $1.seats }
+            let attendingCount = plan.guests.filter { $0.rsvp != .no }.count
+            let seatedCount = plan.tables.reduce(0) { $0 + $1.assignments.count }
+            let emptySeats = max(0, totalSeats - seatedCount)
+            let emptyPercent = totalSeats > 0
+                ? Int((Double(emptySeats) / Double(totalSeats) * 100).rounded())
+                : 0
+            let shortage = attendingCount - totalSeats
+
+            if shortage > 0 {
+                capacityCard(
+                    accent: Color.sbError,
+                    icon: "exclamationmark.triangle",
+                    title: "Not Enough Seats",
+                    rows: [
+                        ("Attending guests", "\(attendingCount)"),
+                        ("Total seats", "\(totalSeats)"),
+                        ("Need", "+\(shortage) more seat\(shortage == 1 ? "" : "s")"),
+                    ],
+                    footnote: "Add more tables or increase seats per table."
+                )
+            } else if emptyPercent > 40 && totalSeats > 0 {
+                let extraTables = max(1, Int((Double(emptySeats) / 8).rounded(.up)))
+                capacityCard(
+                    accent: Color.sbGoldDk,
+                    icon: "exclamationmark.triangle",
+                    title: "Many Empty Seats",
+                    rows: [
+                        ("Seated", "\(seatedCount) guest\(seatedCount == 1 ? "" : "s")"),
+                        ("Empty", "\(emptySeats) seat\(emptySeats == 1 ? "" : "s") (\(emptyPercent)%)"),
+                    ],
+                    footnote: "Consider removing \(extraTables) table\(extraTables == 1 ? "" : "s") or reducing seats per table."
+                )
+            } else if seatedCount > 0 && emptyPercent <= 20 {
+                HStack(spacing: 8) {
+                    Image(systemName: "checkmark.circle")
+                        .font(.system(size: 14))
+                        .foregroundStyle(Color.sbSage)
+                    Text("Good capacity match")
+                        .font(SBFont.bodySmallBold)
+                        .foregroundStyle(Color.sbSage)
+                    Spacer()
+                    Text("\(seatedCount)/\(totalSeats) seats used")
+                        .font(SBFont.caption)
+                        .foregroundStyle(Color.sbWarm)
+                }
+                .padding(12)
+                .background(Color.sbSage.opacity(0.10))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .strokeBorder(Color.sbSage.opacity(0.3), lineWidth: 1)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            }
+        }
+    }
+
+    private func capacityCard(accent: Color, icon: String, title: String,
+                              rows: [(label: String, value: String)],
+                              footnote: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: 12))
+                    .foregroundStyle(accent)
+                Text(title)
+                    .font(SBFont.bodySmallBold)
+                    .foregroundStyle(accent)
+            }
+            VStack(spacing: 2) {
+                ForEach(rows.indices, id: \.self) { i in
+                    HStack {
+                        Text(rows[i].label)
+                            .font(SBFont.caption)
+                            .foregroundStyle(accent.opacity(0.85))
+                        Spacer()
+                        Text(rows[i].value)
+                            .font(SBFont.bodySmallBold)
+                            .foregroundStyle(accent)
+                    }
+                    if i == rows.count - 2 {
+                        Divider().background(accent.opacity(0.25))
+                    }
+                }
+            }
+            Text(footnote)
+                .font(SBFont.caption)
+                .foregroundStyle(accent.opacity(0.85))
+                .padding(.top, 4)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(accent.opacity(0.10))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(accent.opacity(0.30), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
     /// Web-parity AI Insight panel under the scorecard. Renders a
