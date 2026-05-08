@@ -454,8 +454,35 @@ struct DashboardView: View {
     private func loadPlans() async {
         do {
             plans = try await appState.database.fetchPlans()
-            appState.activePlan = plans.first
-            print("[Dashboard] Loaded \(plans.count) plans, active: \(plans.first?.name ?? "none")")
+            // Preserve the user's current plan selection across
+            // re-renders. The Plans tab's .task fires every time the
+            // tab re-appears (e.g., user taps Guests then taps Plans
+            // again); without the guard below, this method clobbered
+            // the selection by re-pinning to plans.first — which
+            // shifts as plans get re-sorted by updated_at after any
+            // edit. Three cases:
+            //   - No selection yet (initial load): pin to first.
+            //   - Selection still valid: refresh its data from the
+            //     latest fetch so edits made elsewhere flow through,
+            //     but keep it as the active plan.
+            //   - Selection was deleted: fall back to first.
+            if let currentId = appState.activePlan?.id,
+               let freshIdx = plans.firstIndex(where: { $0.id == currentId }) {
+                let fresh = plans[freshIdx]
+                appState.activePlan = fresh
+                // Pin the active plan to the top of the visible list
+                // so the user's selection stays visually anchored as
+                // they navigate around. Without this, the list re-
+                // sorts by updated_at on every fetch and the user's
+                // selection can fall to the middle of a long list.
+                if freshIdx != 0 {
+                    plans.remove(at: freshIdx)
+                    plans.insert(fresh, at: 0)
+                }
+            } else {
+                appState.activePlan = plans.first
+            }
+            print("[Dashboard] Loaded \(plans.count) plans, active: \(appState.activePlan?.name ?? "none")")
         } catch {
             print("[Dashboard] Error loading plans: \(error)")
             loadError = error.localizedDescription
