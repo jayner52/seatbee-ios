@@ -85,6 +85,14 @@ struct OnboardingView: View {
     @State private var isCreating = false
     @State private var errorMessage: String?
 
+    // Pass-selector state (web parity — OnboardingWizard step 1).
+    // Stored in memory only until plan creation; after the plan
+    // exists in Supabase we redeem the pass against it via
+    // POST /api/passes. Web uses pendingPassRedemption on the store;
+    // iOS keeps it local to the view since it doesn't need to
+    // survive cross-component navigation the way web does.
+    @State private var pendingPassId: String?
+
     // MARK: - Local enums
 
     enum FileImportMode: Equatable { case csv, floorPlan }
@@ -410,7 +418,282 @@ struct OnboardingView: View {
             sectionLabel("WHERE? (OPTIONAL)")
             SBVenueSearch(venueName: $venueName)
 
+            // Optional pass-application section. Mirrors web's step-1
+            // pass picker (App.jsx OnboardingWizard ~line 20272). User
+            // can pick a pass they already own, or tap a Buy tile to
+            // bounce to web pricing. Skipping is implicit — they
+            // continue without selecting and ship a free plan.
+            passApplicationSection
+
             Spacer(minLength: 40)
+        }
+    }
+
+    // MARK: - Pass picker (Step 1)
+    //
+    // Three tier tiles. For tiers the user owns at least one of, the
+    // tile is selectable (tap to set pendingPassId); for tiers with
+    // no inventory, the tile shows a "Buy" action that opens web
+    // pricing (Phase 2 / Apple IAP replaces this later — Shayan).
+    // Selection is stored as a pass ID; we re-derive the displayed
+    // tier from `userPasses` whenever rendering. Tapping the
+    // currently-selected pass clears the selection.
+
+    private var passApplicationSection: some View {
+        let avail = appState.userPasses.passes.filter { $0.isAvailable }
+        let byTier: [PlanTier: [EventPass]] = Dictionary(
+            grouping: avail,
+            by: { $0.tier }
+        )
+
+        return VStack(alignment: .leading, spacing: 8) {
+            sectionLabel("APPLY AN EVENT PASS? (OPTIONAL)")
+            Text(passApplicationHelpText)
+                .font(SBFont.caption)
+                .foregroundStyle(Color.sbWarm)
+
+            VStack(spacing: 8) {
+                passTierTile(.eventPass,    available: byTier[.eventPass] ?? [])
+                passTierTile(.signaturePass, available: byTier[.signaturePass] ?? [])
+                passTierTile(.proPass,       available: byTier[.proPass] ?? [])
+            }
+
+            // Active-selection footnote — mirrors web's wizard banner
+            // (App.jsx ~line 20233) so users see what'll be applied
+            // without scrolling back to the tile.
+            if let pendingPassId,
+               let selected = avail.first(where: { $0.id == pendingPassId }) {
+                HStack(spacing: 6) {
+                    Image(systemName: "checkmark.seal.fill")
+                        .foregroundStyle(Color.sbSage)
+                        .font(.system(size: 12))
+                    Text("\(selected.tier.displayName) will be applied to this event.")
+                        .font(SBFont.caption)
+                        .foregroundStyle(Color.sbCharcoal)
+                    Spacer()
+                    Button("Remove") {
+                        self.pendingPassId = nil
+                        HapticEngine.selection()
+                    }
+                    .font(SBFont.caption)
+                    .foregroundStyle(Color.sbGoldDk)
+                }
+                .padding(10)
+                .background(Color.sbChampagne.opacity(0.5))
+                .clipShape(RoundedRectangle(cornerRadius: SBRadius.small))
+            }
+        }
+    }
+
+    private var passApplicationHelpText: String {
+        if appState.userPasses.passes.contains(where: { $0.isAvailable }) {
+            return "Tap a pass you own to apply it. Skip to start free, up to 100 seated guests."
+        }
+        return "You don't have any passes yet. Skip to start free (up to 100 seated), or tap Buy to upgrade — passes unlock larger events, AI seating, and watermark-free exports."
+    }
+
+    /// One tile per tier. If the user has at least one pass of this
+    /// tier, the tile is selectable and shows the inventory count;
+    /// otherwise it shows a "Buy" affordance that bounces to web
+    /// pricing via the existing showUpgrade plumbing.
+    @ViewBuilder
+    private func passTierTile(_ tier: PlanTier, available: [EventPass]) -> some View {
+        let count = available.count
+        let owns = count > 0
+        // Pick the soonest-expiring pass of this tier when there are
+        // multiples — same heuristic web uses to pick which pass to
+        // burn first. Lets us assign a stable pendingPassId per tile
+        // even though the user has multiple of the tier.
+        let firstId = available
+            .sorted { (a, b) in (a.expiresAt ?? .distantFuture) < (b.expiresAt ?? .distantFuture) }
+            .first?.id
+        let isSelected = firstId.map { $0 == pendingPassId } ?? false
+        let _ = owns  // silence unused if nothing references it later
+
+        Button {
+            if owns {
+                if isSelected {
+                    pendingPassId = nil
+                } else {
+                    pendingPassId = firstId
+                }
+                HapticEngine.selection()
+            } else {
+                // No inventory — open the upgrade flow. AppRouter
+                // routes this to web pricing today (Apple IAP is
+                // Phase 2, Shayan).
+                appState.showUpgrade = true
+            }
+        } label: {
+            HStack(spacing: 12) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(passTileTint(tier))
+                        .frame(width: 36, height: 36)
+                    Text(passTileLetter(tier))
+                        .font(SBFont.bodySmallBold)
+                        .foregroundStyle(passTileForeground(tier))
+                }
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(tier.displayName)
+                        .font(SBFont.bodySmallBold)
+                        .foregroundStyle(Color.sbCharcoal)
+                    Text(passTileSubtitle(tier, count: count))
+                        .font(SBFont.caption)
+                        .foregroundStyle(Color.sbWarm)
+                }
+
+                Spacer()
+
+                if owns {
+                    if isSelected {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 18))
+                            .foregroundStyle(Color.sbGoldDk)
+                    } else {
+                        Text("\(count) available")
+                            .font(SBFont.capsLabel)
+                            .foregroundStyle(Color.sbGoldDk)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(Color.sbChampagne)
+                            .clipShape(Capsule())
+                    }
+                } else {
+                    Text("Buy")
+                        .font(SBFont.label)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.sbGoldDk)
+                        .clipShape(Capsule())
+                }
+            }
+            .padding(12)
+            .background(isSelected ? Color.sbChampagne.opacity(0.5) : Color.sbIvory2)
+            .clipShape(RoundedRectangle(cornerRadius: SBRadius.button))
+            .overlay(
+                RoundedRectangle(cornerRadius: SBRadius.button)
+                    .strokeBorder(isSelected ? Color.sbGoldDk : Color.sbLine,
+                                  lineWidth: isSelected ? 2 : 1)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func passTileLetter(_ tier: PlanTier) -> String {
+        switch tier {
+        case .free:           return "F"
+        case .eventPass:      return "E"
+        case .signaturePass:  return "S"
+        case .proPass:        return "G"
+        }
+    }
+
+    private func passTileTint(_ tier: PlanTier) -> Color {
+        switch tier {
+        case .eventPass:      return Color.sbChampagne
+        case .signaturePass:  return Color.sbGold.opacity(0.30)
+        case .proPass:        return Color.sbCharcoal.opacity(0.15)
+        case .free:           return Color.sbIvory2
+        }
+    }
+
+    private func passTileForeground(_ tier: PlanTier) -> Color {
+        switch tier {
+        case .eventPass:      return Color.sbGoldDk
+        case .signaturePass:  return Color.sbGoldDk
+        case .proPass:        return Color.sbCharcoal
+        case .free:           return Color.sbWarm
+        }
+    }
+
+    private func passTileSubtitle(_ tier: PlanTier, count: Int) -> String {
+        let cap: String = {
+            switch tier {
+            case .eventPass:      return "250 guests"
+            case .signaturePass:  return "500 guests"
+            case .proPass:        return "1,000 guests"
+            case .free:           return "100 guests"
+            }
+        }()
+        if count == 0 {
+            return "\(cap) · No passes yet"
+        }
+        return cap
+    }
+
+    // MARK: - Large-room contextual nudge (Step 3)
+
+    /// Yellow soft-warning banner shown on the room-setup step when
+    /// the user picks Large / Ballroom / Grand AND hasn't already
+    /// chosen a pass on step 1. Intentionally not a gate — they can
+    /// continue and run a free plan, then hit the seating cap later.
+    /// "Apply a pass" jumps back to step 1; "Get a pass" opens web
+    /// pricing via the existing showUpgrade router.
+    @ViewBuilder
+    private var largeRoomPassNudge: some View {
+        let isLargeRoom = roomPreset == .large
+            || roomPreset == .ballroom
+            || roomPreset == .grand
+        let alreadySelected = pendingPassId != nil
+        let hasAnyPass = appState.userPasses.passes.contains(where: { $0.isAvailable })
+
+        if isLargeRoom && !alreadySelected {
+            HStack(alignment: .top, spacing: 10) {
+                Image("SeatbeeLogo")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 22, height: 22)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(largeRoomPromptTitle)
+                        .font(SBFont.bodySmallBold)
+                        .foregroundStyle(Color.sbCharcoal)
+                    Text(largeRoomPromptBody)
+                        .font(SBFont.caption)
+                        .foregroundStyle(Color.sbCharcoal2)
+                        .fixedSize(horizontal: false, vertical: true)
+                    HStack(spacing: 8) {
+                        if hasAnyPass {
+                            Button("Apply a pass") {
+                                step = 1
+                                HapticEngine.selection()
+                            }
+                            .font(SBFont.bodySmallBold)
+                            .foregroundStyle(Color.sbGoldDk)
+                        }
+                        Button(hasAnyPass ? "Buy more" : "Get a pass") {
+                            appState.showUpgrade = true
+                        }
+                        .font(SBFont.bodySmallBold)
+                        .foregroundStyle(hasAnyPass ? Color.sbWarm : Color.sbGoldDk)
+                    }
+                    .padding(.top, 2)
+                }
+                Spacer()
+            }
+            .padding(12)
+            .background(Color.sbGold.opacity(0.10))
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        }
+    }
+
+    private var largeRoomPromptTitle: String {
+        switch roomPreset {
+        case .ballroom, .grand: return "Hosting a big crowd?"
+        default:                return "Seating more than 100 guests?"
+        }
+    }
+
+    private var largeRoomPromptBody: String {
+        switch roomPreset {
+        case .grand:
+            return "A Grand Pass seats up to 1,000. Free plans cap at 100 seated guests."
+        case .ballroom:
+            return "A Signature Pass seats up to 500 — Grand goes to 1,000. Free plans cap at 100 seated guests."
+        default:
+            return "An Event Pass seats up to 250 guests. Free plans cap at 100 seated guests."
         }
     }
 
@@ -521,6 +804,13 @@ struct OnboardingView: View {
             Spacer(minLength: 40)
         }
         .task(id: eventType) { regenerateCSVTemplate() }
+        // Refresh the user's pass inventory once when onboarding
+        // opens so the step-1 pass tiles show real counts. Without
+        // this, users who bought a pass on web would land on
+        // onboarding with a stale (likely empty) inventory and never
+        // see their passes offered. id: 0 keeps it as a one-shot
+        // (web's onboarding fetches once on mount too).
+        .task(id: 0) { await appState.refreshPasses() }
     }
 
     private var detectedSummary: some View {
@@ -601,6 +891,14 @@ struct OnboardingView: View {
                     roomPresetCard(preset)
                 }
             }
+
+            // Soft contextual upsell — fires when the user picks a
+            // large/grand room AND hasn't already selected a pass on
+            // step 1. Mirrors web's same-step nudge (App.jsx ~line
+            // 20757-20792) and is intentionally a suggestion, not a
+            // gate. The "Apply a pass" button bumps them back to
+            // step 1 if they own one; otherwise routes to web pricing.
+            largeRoomPassNudge
 
             sectionLabel("ROOM SHAPE")
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
@@ -1352,6 +1650,38 @@ struct OnboardingView: View {
                 }
 
                 try await appState.database.savePlanData(plan: plan)
+
+                // Apply the pre-selected pass (if any) BEFORE setting
+                // activePlan so the editor doesn't briefly show as
+                // free-tier and then upgrade. POST /api/passes is
+                // the same endpoint Settings → Event Passes →
+                // Apply uses; failures here are non-fatal — plan is
+                // already saved, user can re-apply via Settings.
+                if let passId = pendingPassId {
+                    do {
+                        let result = try await appState.passes.redeemPass(
+                            planId: plan.id,
+                            passId: passId
+                        )
+                        if let newTier = result.tier {
+                            plan.tier = newTier
+                        }
+                        if let exp = result.expiresAt {
+                            plan.eventPassExpiresAt = exp
+                        }
+                        // Refresh inventory so the redeemed pass
+                        // moves out of Available -> Redeemed in the
+                        // user's view next time they open Event
+                        // Passes.
+                        await appState.refreshPasses()
+                    } catch {
+                        // Non-fatal: log + continue. Plan is created;
+                        // user can apply manually if this races. Web
+                        // does the same (App.jsx ~line 4742).
+                        print("[Onboarding] Pass redeem failed: \(error.localizedDescription)")
+                    }
+                }
+
                 appState.activePlan = plan
                 HapticEngine.success()
                 try? await Task.sleep(for: .seconds(0.6))
