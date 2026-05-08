@@ -43,11 +43,17 @@ final class SeatService {
             let totalSatisfied: Int
             let hardConstraints: RuleBucket
             let softPreferences: RuleBucket
-            // Server's `scorecard.suggestions` array — when solve()
-            // throws, the first entry is "Solver error: <message>",
-            // which is the only place the actual exception text is
-            // exposed. Plumb it so the AI Generate screen can surface
-            // it instead of a generic "Error" label.
+            // Server's `scorecard.suggestions` is heterogeneous:
+            //   - { type, message, ruleId, … } objects from solve.js
+            //     (the actionable "Move X to Table 5" suggestions
+            //     shown on web's Suggestions card)
+            //   - "Solver error: <message>" strings stamped by the
+            //     /api/seat error handler when solve() throws
+            // Decode lenient so either shape ends up as a plain
+            // string we can render. Drops the typed metadata; iOS
+            // doesn't yet do guided-fix actions like web's
+            // suggestion buttons, but the message is the high
+            // value.
             let suggestions: [String]
 
             init(from decoder: Decoder) throws {
@@ -58,8 +64,36 @@ final class SeatService {
                 totalSatisfied  = (try? c.decode(Int.self, forKey: .totalSatisfied)) ?? 0
                 hardConstraints = (try? c.decode(RuleBucket.self, forKey: .hardConstraints)) ?? .empty
                 softPreferences = (try? c.decode(RuleBucket.self, forKey: .softPreferences)) ?? .empty
-                suggestions     = (try? c.decode([String].self, forKey: .suggestions)) ?? []
+
+                // Suggestions: try [String] first (legacy + solver-error
+                // shape), then [{message: String, …}] (actionable
+                // suggestions from solve.js generateSuggestions). Any
+                // entry we can't extract a message from is dropped.
+                if let asStrings = try? c.decode([String].self, forKey: .suggestions) {
+                    suggestions = asStrings
+                } else if var arr = try? c.nestedUnkeyedContainer(forKey: .suggestions) {
+                    var parsed: [String] = []
+                    while !arr.isAtEnd {
+                        if let s = try? arr.decode(String.self) {
+                            parsed.append(s)
+                        } else if let dict = try? arr.decode(SuggestionEntry.self) {
+                            parsed.append(dict.message)
+                        } else {
+                            // Skip the unknown entry so the loop
+                            // doesn't get stuck.
+                            _ = try? arr.decode(EmptyDecodable.self)
+                        }
+                    }
+                    suggestions = parsed
+                } else {
+                    suggestions = []
+                }
             }
+
+            private struct SuggestionEntry: Decodable {
+                let message: String
+            }
+            private struct EmptyDecodable: Decodable {}
 
             enum CodingKeys: String, CodingKey {
                 case overallPercent, overallLabel, totalRules, totalSatisfied
