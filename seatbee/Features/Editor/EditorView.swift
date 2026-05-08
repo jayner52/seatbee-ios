@@ -381,6 +381,35 @@ struct EditorView: View {
                             .background(.regularMaterial)
                             .clipShape(Circle())
                     }
+                    // Less-frequent actions tucked into a menu so the
+                    // toolbar stays readable. Duplicate is handy for
+                    // mirrored stages / dance floors; forward/back
+                    // matter when overlapping objects need a layer
+                    // tweak (e.g. dance floor under a chandelier).
+                    Menu {
+                        Button {
+                            duplicateObject(id: objId)
+                        } label: {
+                            Label("Duplicate", systemImage: "plus.square.on.square")
+                        }
+                        Button {
+                            bringObjectForward(id: objId)
+                        } label: {
+                            Label("Bring Forward", systemImage: "square.3.layers.3d.top.filled")
+                        }
+                        Button {
+                            sendObjectBackward(id: objId)
+                        } label: {
+                            Label("Send Backward", systemImage: "square.3.layers.3d.bottom.filled")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(Color.sbCharcoal)
+                            .frame(width: 34, height: 34)
+                            .background(.regularMaterial)
+                            .clipShape(Circle())
+                    }
                 }
                 .padding(14)
                 .background(.regularMaterial)
@@ -716,6 +745,56 @@ struct EditorView: View {
         let next = (current + delta).truncatingRemainder(dividingBy: 360)
         p.objects[idx].rotation = next < 0 ? next + 360 : next
         appState.activePlan = p
+        Task { try? await appState.database.savePlanData(plan: p) }
+    }
+
+    /// Clone the object with a fresh ID and a small offset so the
+    /// duplicate is visible (otherwise it'd land directly on top of
+    /// the original). New object becomes the selection so the user
+    /// can immediately drag/edit it.
+    private func duplicateObject(id: String) {
+        guard var p = appState.activePlan,
+              let idx = p.objects.firstIndex(where: { $0.id == id }) else { return }
+        let src = p.objects[idx]
+        // RoomObject.id is `let`, so construct a fresh RoomObject
+        // rather than mutating the clone.
+        let clone = RoomObject(
+            id: "obj_\(UUID().uuidString.prefix(8))",
+            type: src.type, name: src.name,
+            x: src.x + 24, y: src.y + 24,
+            width: src.width, height: src.height,
+            rotation: src.rotation,
+            color: src.color, category: src.category, icon: src.icon,
+            isObstacle: src.isObstacle, locked: false
+        )
+        // Insert immediately after the source so the duplicate sits
+        // one layer above the original.
+        p.objects.insert(clone, at: idx + 1)
+        appState.activePlan = p
+        selectedObjectId = clone.id
+        HapticEngine.success()
+        Task { try? await appState.database.savePlanData(plan: p) }
+    }
+
+    /// z-order is array order in the objects[] array — later index =
+    /// drawn on top. Swap with next/previous neighbour to nudge.
+    private func bringObjectForward(id: String) {
+        guard var p = appState.activePlan,
+              let idx = p.objects.firstIndex(where: { $0.id == id }),
+              idx < p.objects.count - 1 else { return }
+        p.objects.swapAt(idx, idx + 1)
+        appState.activePlan = p
+        HapticEngine.selection()
+        Task { try? await appState.database.savePlanData(plan: p) }
+    }
+
+    private func sendObjectBackward(id: String) {
+        guard var p = appState.activePlan,
+              let idx = p.objects.firstIndex(where: { $0.id == id }),
+              idx > 0 else { return }
+        p.objects.swapAt(idx, idx - 1)
+        appState.activePlan = p
+        HapticEngine.selection()
         Task { try? await appState.database.savePlanData(plan: p) }
     }
 
