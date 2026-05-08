@@ -77,7 +77,20 @@ let venueObjectTypes: [VenueObjectDef] = [
             .init(label: "Large",  w: 270, h: 270),
             .init(label: "XL",     w: 360, h: 360),
           ]),
-    .init(.entertainment, type: "stage",     name: "Stage",            icon: "star",       color: "#D4A5A5", width: 160, height: 60, minW: 100, maxW: 1500, minH: 40, maxH: 600),
+    .init(.entertainment, type: "stage",     name: "Stage",            icon: "star",       color: "#D4A5A5",
+          width: 160, height: 60, minW: 100, maxW: 1500, minH: 40, maxH: 600,
+          sizes: [
+            // Without explicit sizes the default fallback is
+            // Small=min, Medium=default, Large=max — and Large at
+            // (1500×600 px) ended up as 100×40 ft, a wild jump from
+            // Medium's 10.7×4 ft. min/max stay generous for manual
+            // entry; the presets are the realistic stage sizes
+            // people actually want from a one-tap pick.
+            .init(label: "Small",  w: 100, h: 40),   // 6.7×2.7ft — small platform
+            .init(label: "Medium", w: 160, h: 60),   // 10.7×4ft — ceremony
+            .init(label: "Large",  w: 240, h: 90),   // 16×6ft — band stage
+            .init(label: "XL",     w: 360, h: 120),  // 24×8ft — concert
+          ]),
     .init(.entertainment, type: "dj",        name: "DJ Booth",         icon: "headphones", color: "#2D2D2D", width: 80,  height: 50, minW: 60,  maxW: 150,  minH: 40, maxH: 100),
     .init(.entertainment, type: "band",      name: "Band Area",        icon: "music",      color: "#8B9DC3", width: 200, height: 100),
     .init(.entertainment, type: "piano",     name: "Piano",            icon: "music",      color: "#2D2D2D", width: 80,  height: 50),
