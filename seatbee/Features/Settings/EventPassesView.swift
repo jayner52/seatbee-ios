@@ -16,6 +16,11 @@ struct EventPassesView: View {
     /// applying spinner — we don't track per-pass loading state up
     /// here anymore.
     @State private var pickingPlanForPass: EventPass?
+    /// Redeem-a-gift-code form state. Submission goes to web's
+    /// /api/redeem-gift-code; on success the pass lands in the user's
+    /// inventory and they pick a plan via the normal Apply flow.
+    @State private var giftCodeInput = ""
+    @State private var redeemingGiftCode = false
 
     private struct AlertMessage: Identifiable {
         let id = UUID()
@@ -28,6 +33,8 @@ struct EventPassesView: View {
             summarySection
             availableSection
             if !redeemedPasses.isEmpty { redeemedSection }
+            if !giftedPasses.isEmpty { giftedSection }
+            redeemGiftCodeSection
             if !expiredPasses.isEmpty { expiredSection }
             buyMoreSection
         }
@@ -178,31 +185,51 @@ struct EventPassesView: View {
     }
 
     private func availablePassRow(_ pass: EventPass) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: "ticket")
-                .foregroundStyle(Color.sbGoldDk)
-                .frame(width: 22)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 12) {
+                Image(systemName: "ticket")
+                    .foregroundStyle(Color.sbGoldDk)
+                    .frame(width: 22)
 
-            VStack(alignment: .leading, spacing: 2) {
-                if let exp = pass.expiresAt {
-                    Text("Expires \(exp.formatted(date: .abbreviated, time: .omitted))")
-                        .font(SBFont.bodySmallBold)
-                        .foregroundStyle(pass.isExpiringSoon ? Color.sbError : Color.sbCharcoal)
-                } else {
-                    Text("No expiry")
-                        .font(SBFont.bodySmallBold)
-                        .foregroundStyle(Color.sbCharcoal)
+                VStack(alignment: .leading, spacing: 2) {
+                    if let exp = pass.expiresAt {
+                        Text("Expires \(exp.formatted(date: .abbreviated, time: .omitted))")
+                            .font(SBFont.bodySmallBold)
+                            .foregroundStyle(pass.isExpiringSoon ? Color.sbError : Color.sbCharcoal)
+                    } else {
+                        Text("No expiry")
+                            .font(SBFont.bodySmallBold)
+                            .foregroundStyle(Color.sbCharcoal)
+                    }
+                    if let code = pass.giftCode {
+                        Text(code)
+                            .font(.system(size: 11, weight: .medium, design: .monospaced))
+                            .foregroundStyle(Color.sbWarm)
+                    }
                 }
-                if let code = pass.giftCode {
-                    Text(code)
-                        .font(.system(size: 11, weight: .medium, design: .monospaced))
-                        .foregroundStyle(Color.sbWarm)
-                }
+
+                Spacer()
+
+                applyButton(for: pass)
             }
-
-            Spacer()
-
-            applyButton(for: pass)
+            // Secondary action — Gift this pass. Web parity (App.jsx
+            // ~24700: "Gift This Pass" button reveals share panel).
+            // iOS uses the system share sheet directly so users can
+            // pick iMessage / WhatsApp / Mail / Copy Link in one tap.
+            if pass.giftCode != nil {
+                Button {
+                    giftPass(pass)
+                } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: "gift")
+                            .font(.system(size: 11, weight: .semibold))
+                        Text("Gift this pass")
+                            .font(SBFont.caption)
+                    }
+                    .foregroundStyle(Color.sbGoldDk)
+                }
+                .buttonStyle(.borderless)
+            }
         }
         .padding(.vertical, 4)
     }
@@ -302,6 +329,200 @@ struct EventPassesView: View {
             }
         } header: {
             Text("Expired")
+        }
+    }
+
+    // MARK: - Gifted passes (passes the user has sent out)
+
+    private var giftedPasses: [GiftedPass] {
+        appState.userPasses.giftedPasses ?? []
+    }
+
+    private var giftedSection: some View {
+        Section {
+            ForEach(giftedPasses) { gift in
+                HStack(spacing: 12) {
+                    Image(systemName: gift.isClaimed ? "checkmark.seal.fill" : "paperplane")
+                        .foregroundStyle(gift.isClaimed ? Color.sbSage : Color.sbGoldDk)
+                        .frame(width: 22)
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(gift.tier.displayName)
+                            .font(SBFont.bodySmallBold)
+                            .foregroundStyle(Color.sbCharcoal)
+                        // Status line: claimed (with recipient + date)
+                        // OR awaiting-claim (with code so the user can
+                        // re-share / re-copy the original link).
+                        if gift.isClaimed {
+                            VStack(alignment: .leading, spacing: 1) {
+                                if let email = gift.profiles?.email {
+                                    Text("Claimed by \(email)")
+                                        .font(SBFont.caption)
+                                        .foregroundStyle(Color.sbWarm)
+                                        .lineLimit(1)
+                                }
+                                if let claimed = gift.giftRedeemedAt {
+                                    Text(claimed.formatted(date: .abbreviated, time: .omitted))
+                                        .font(SBFont.caption)
+                                        .foregroundStyle(Color.sbWarm2)
+                                }
+                            }
+                        } else {
+                            HStack(spacing: 4) {
+                                Text("Awaiting claim")
+                                    .font(SBFont.caption)
+                                    .foregroundStyle(Color.sbWarm)
+                                if let code = gift.giftCode {
+                                    Text("·")
+                                        .foregroundStyle(Color.sbWarm2)
+                                    Text(code)
+                                        .font(.system(size: 11, weight: .medium, design: .monospaced))
+                                        .foregroundStyle(Color.sbWarm)
+                                }
+                            }
+                        }
+                    }
+                    Spacer()
+                    if !gift.isClaimed, let code = gift.giftCode {
+                        // Re-share affordance for unclaimed gifts in
+                        // case the recipient lost the link. No revoke
+                        // — web doesn't support it either.
+                        Button {
+                            shareGiftLink(code: code, packType: gift.packType)
+                        } label: {
+                            Image(systemName: "square.and.arrow.up")
+                                .font(.system(size: 14))
+                                .foregroundStyle(Color.sbGoldDk)
+                        }
+                        .buttonStyle(.borderless)
+                    }
+                }
+                .padding(.vertical, 4)
+            }
+        } header: {
+            Text("Gifted")
+        } footer: {
+            Text("Once you've gifted a pass, the recipient can claim it with the SEAT code on either iOS or web. Gifts can't be revoked.")
+                .font(SBFont.caption)
+        }
+    }
+
+    // MARK: - Redeem a gift code
+
+    private var redeemGiftCodeSection: some View {
+        Section {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Got a SEAT-XXXX-XXXX code from someone? Enter it below to add the pass to your inventory.")
+                    .font(SBFont.caption)
+                    .foregroundStyle(Color.sbWarm)
+
+                HStack(spacing: 8) {
+                    TextField("SEAT-XXXX-XXXX", text: $giftCodeInput)
+                        .font(.system(size: 13, weight: .medium, design: .monospaced))
+                        .textInputAutocapitalization(.characters)
+                        .autocorrectionDisabled()
+                        .padding(.vertical, 8)
+                        .padding(.horizontal, 10)
+                        .background(Color.sbIvory2)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                    Button {
+                        Task { await submitGiftCode() }
+                    } label: {
+                        if redeemingGiftCode {
+                            ProgressView()
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 6)
+                        } else {
+                            Text("Redeem")
+                                .font(SBFont.label)
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 8)
+                                .background(canSubmitGiftCode ? Color.sbGoldDk : Color.sbWarm2)
+                                .clipShape(Capsule())
+                        }
+                    }
+                    .buttonStyle(.borderless)
+                    .disabled(!canSubmitGiftCode)
+                }
+            }
+            .padding(.vertical, 4)
+        } header: {
+            Text("Redeem a Gift Code")
+        }
+    }
+
+    /// Loose validation — server is authoritative, this just stops
+    /// users from tapping Redeem with an empty / obviously-wrong input.
+    private var canSubmitGiftCode: Bool {
+        !redeemingGiftCode &&
+        giftCodeInput.trimmingCharacters(in: .whitespaces).count >= 4
+    }
+
+    private func submitGiftCode() async {
+        let code = giftCodeInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !code.isEmpty else { return }
+        redeemingGiftCode = true
+        defer { redeemingGiftCode = false }
+        do {
+            let result = try await appState.passes.redeemGiftCode(code)
+            HapticEngine.success()
+            // Refresh inventory so the new pass shows up under
+            // Available immediately.
+            await appState.refreshPasses()
+            giftCodeInput = ""
+            let body: String = {
+                if result.alreadyOwned == true {
+                    return result.message ?? "You already own this pass."
+                }
+                let tierName = passTierDisplay(for: result.passType)
+                if let gifter = result.gifterName, !gifter.isEmpty {
+                    return "\(tierName) added to your inventory — gifted by \(gifter). Tap Apply to use it on an event."
+                }
+                return result.message ?? "\(tierName) added to your inventory. Tap Apply to use it on an event."
+            }()
+            alertMessage = AlertMessage(title: "Pass Redeemed", body: body)
+        } catch let err as PassesService.PassesError {
+            HapticEngine.error()
+            alertMessage = AlertMessage(title: "Couldn't redeem code", body: err.localizedDescription)
+        } catch {
+            HapticEngine.error()
+            alertMessage = AlertMessage(title: "Couldn't redeem code", body: error.localizedDescription)
+        }
+    }
+
+    private func passTierDisplay(for packType: String?) -> String {
+        switch packType {
+        case "pro_pass_single": return PlanTier.proPass.displayName
+        case "signature_pass":  return PlanTier.signaturePass.displayName
+        default:                return PlanTier.eventPass.displayName
+        }
+    }
+
+    // MARK: - Send a gift (system share sheet)
+
+    /// Open the iOS share sheet pre-filled with the gift link + a
+    /// short message. Web parity URL: `https://seatbee.app/?gift=CODE`.
+    /// We deliberately use the system share sheet (not an in-app
+    /// channel picker) so iMessage / WhatsApp / Mail / Copy Link all
+    /// work in one tap, and the user picks whichever they actually use.
+    private func giftPass(_ pass: EventPass) {
+        guard let code = pass.giftCode else { return }
+        shareGiftLink(code: code, packType: pass.packType)
+    }
+
+    private func shareGiftLink(code: String, packType: String) {
+        let tierName = passTierDisplay(for: packType)
+        let url = URL(string: "https://seatbee.app/?gift=\(code)")
+        let message = "I'm gifting you a \(tierName) on Seatbee 🐝\n\nClaim it at the link below — code: \(code)"
+
+        var items: [Any] = [message]
+        if let url { items.append(url) }
+        let activityVC = UIActivityViewController(activityItems: items, applicationActivities: nil)
+        if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let root = scene.windows.first?.rootViewController {
+            (root.presentedViewController ?? root).present(activityVC, animated: true)
         }
     }
 
