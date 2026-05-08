@@ -31,16 +31,20 @@ struct EventPassesView: View {
     var body: some View {
         List {
             summarySection
-            // Redeem-a-gift-code sits up top so users arriving from
-            // the new Settings → "Redeem a Gift Code" entry point can
-            // act immediately without scrolling past their inventory.
-            // Discoverable for users coming in via Event Passes too.
+            // Buy-more sits right under the inventory grid — the
+            // logical "do I have enough?" moment is right after the
+            // user reads their counts. Was at the bottom; users
+            // weren't reaching it.
+            buyMoreSection
+            // Redeem-a-gift-code stays near the top so users
+            // arriving from the new Settings → "Redeem a Gift Code"
+            // entry point can act immediately without scrolling
+            // past their inventory.
             redeemGiftCodeSection
             availableSection
             if !redeemedPasses.isEmpty { redeemedSection }
             if !giftedPasses.isEmpty { giftedSection }
             if !expiredPasses.isEmpty { expiredSection }
-            buyMoreSection
         }
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
