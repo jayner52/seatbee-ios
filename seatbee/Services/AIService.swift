@@ -143,23 +143,71 @@ final class AIService {
 
     // MARK: - Conflict Detection
 
-    func detectConflicts(guests: [Guest], tables: [SeatTable]) async throws -> ConflictResult {
+    /// Mirrors src/lib/ai.js:detectConflicts so the iOS AI Insight
+    /// panel ends up with the same narrative web shows. Web parity
+    /// notes:
+    ///   - context is `{ guests, assignments, customContext }` where
+    ///     assignments maps guestId → table NAME (not id) so the
+    ///     model can say "Table 5" instead of a uuid
+    ///   - rules are stringified into customContext so the model can
+    ///     reason about which rules are violated
+    ///   - prompts come straight from web for behavioural identity
+    func detectConflicts(plan: SeatingPlan) async throws -> ConflictResult {
         let systemPrompt = """
         You are analyzing a seating arrangement for potential conflicts.
         Look for: people who shouldn't sit together, dietary issues, accessibility needs, family dynamics.
         Return a JSON object with:
-        - conflicts: array of {type ("critical"|"warning"|"suggestion"), guests (array of names), message, suggestion}
+        - conflicts: array of conflicts, each with type ("critical" | "warning" | "suggestion"), guests (array of guest names involved), message (explanation), suggestion (how to fix)
         - score: 1-100 rating of overall arrangement quality
-        - summary: brief text summary
+        - summary: brief text summary of the arrangement
         """
 
-        struct ConflictContext: Codable {
-            let guests: [Guest]
-            let tables: [SeatTable]
+        // Build guestId → tableName map (web App.jsx:13055)
+        var tableNameById: [String: String] = [:]
+        for t in plan.tables { tableNameById[t.id] = t.name }
+        var namedAssignments: [String: String] = [:]
+        for t in plan.tables {
+            let tableName = tableNameById[t.id] ?? t.id
+            for guestId in t.assignments.keys {
+                namedAssignments[guestId] = tableName
+            }
         }
 
-        let context = ConflictContext(guests: guests, tables: tables)
-        let contextData = try JSONEncoder().encode(context)
+        // Encode context. Use AnyCodable wrappers wouldn't help here —
+        // a plain dictionary serialised via JSONSerialization is enough
+        // and matches web's JSON.stringify shape.
+        let guestPayload: [[String: Any]] = plan.guests.map { g in
+            [
+                "id": g.id,
+                "name": g.name,
+                "rsvp": g.rsvp.rawValue,
+                "side": g.side.rawValue,
+                "vip": g.vip,
+                "categories": g.categories,
+                "dietary": g.dietary ?? "",
+                "dietaryTags": g.dietaryTags ?? [],
+                "isChild": g.isChild ?? false,
+            ]
+        }
+        let rulesPayload: [[String: Any]] = plan.rules
+            .filter { $0.enabled }
+            .map { r in
+                [
+                    "id": r.id,
+                    "type": r.type.rawValue,
+                    "guests": r.guests,
+                    "tableId": r.tableId ?? "",
+                    "weight": r.weight,
+                    "hard": r.hard,
+                    "desc": r.desc ?? "",
+                ]
+            }
+        let context: [String: Any] = [
+            "guests": guestPayload,
+            "assignments": namedAssignments,
+            "customContext": (try? String(data: JSONSerialization.data(withJSONObject: rulesPayload), encoding: .utf8)) ?? "[]",
+        ]
+        let contextData = try JSONSerialization.data(withJSONObject: context, options: [.prettyPrinted])
         let contextString = String(data: contextData, encoding: .utf8) ?? "{}"
 
         let resultString = try await call(
@@ -168,11 +216,25 @@ final class AIService {
             userMessage: "Check for conflicts:\n\n\(contextString)"
         )
 
-        guard let responseData = resultString.data(using: String.Encoding.utf8) else {
+        // Web also handles the case where the model wraps JSON in
+        // prose. Strip to the first {...} block before decoding.
+        guard let responseData = resultString.data(using: .utf8) else {
             throw AIError.parseError
         }
-
-        return try JSONDecoder().decode(ConflictResult.self, from: responseData)
+        if let direct = try? JSONDecoder().decode(ConflictResult.self, from: responseData) {
+            return direct
+        }
+        if let match = resultString.range(
+            of: "\\{[\\s\\S]*\\}",
+            options: .regularExpression
+        ) {
+            let inner = String(resultString[match])
+            if let innerData = inner.data(using: .utf8),
+               let parsed = try? JSONDecoder().decode(ConflictResult.self, from: innerData) {
+                return parsed
+            }
+        }
+        throw AIError.parseError
     }
 
     // MARK: - Tag Classification
