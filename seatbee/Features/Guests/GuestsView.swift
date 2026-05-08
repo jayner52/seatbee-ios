@@ -32,7 +32,7 @@ enum GuestSortMode: String, CaseIterable {
 struct GuestsView: View {
     @Environment(AppState.self) private var appState
     @State private var searchText = ""
-    @State private var selectedFilter = "All"
+    @State private var selectedFilter = "__all"
     @State private var sortMode: GuestSortMode = .byTable
     @State private var showAddGuest = false
     @State private var showCSVImport = false
@@ -44,7 +44,50 @@ struct GuestsView: View {
     private var plan: SeatingPlan? { appState.activePlan }
     private var guests: [Guest] { plan?.guests ?? [] }
 
-    private let filters = ["All", "Unseated", "Family", "Friends", "Dietary"]
+    // Filter chip identity: stable string token. Built-in filters use
+    // reserved tokens prefixed with `__` so they can't collide with a
+    // user-named category. Category filters use the canonical category
+    // ID — looked up via `rawCategories` for the display name. This
+    // replaces the old hardcoded `["All","Unseated","Family",...]` list
+    // which only worked when web's category IDs happened to match those
+    // literal strings (default iOS-created categories did, web-created
+    // ones with random IDs didn't, so they never appeared in the row).
+    private static let filterAll = "__all"
+    private static let filterUnseated = "__unseated"
+    private static let filterDietary = "__dietary"
+
+    /// Canonical id → name list, sorted alphabetically by name. Same
+    /// pattern as RulesView.canonicalCategories / CategoriesSheet so
+    /// add/delete in the Categories sheet shows up here immediately.
+    private var canonicalCategories: [(id: String, name: String, color: String?)] {
+        guard let raw = plan?.rawCategories else { return [] }
+        return raw.compactMap { entry -> (String, String, String?)? in
+            guard let id = entry["id"]?.value as? String else { return nil }
+            let name = (entry["name"]?.value as? String) ?? id
+            let color = entry["color"]?.value as? String
+            return (id, name, color)
+        }
+        .sorted { $0.1.localizedCaseInsensitiveCompare($1.1) == .orderedAscending }
+    }
+
+    /// `[(token, displayLabel)]` chip set: All + Unseated + every
+    /// canonical category + Dietary (only when guests exist with
+    /// dietary tags or free-text). Always the same order so chips
+    /// don't shuffle as users seat people.
+    private var filterChipsData: [(token: String, label: String)] {
+        var out: [(String, String)] = [
+            (Self.filterAll, "All"),
+            (Self.filterUnseated, "Unseated"),
+        ]
+        for cat in canonicalCategories {
+            out.append((cat.id, cat.name))
+        }
+        let hasDietary = guests.contains { ($0.dietaryTags?.isEmpty == false) || ($0.dietary?.isEmpty == false) }
+        if hasDietary {
+            out.append((Self.filterDietary, "Dietary"))
+        }
+        return out
+    }
 
     var body: some View {
         NavigationStack {
@@ -243,18 +286,34 @@ struct GuestsView: View {
     private var filterChips: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                ForEach(filters, id: \.self) { filter in
+                ForEach(filterChipsData, id: \.token) { chip in
                     Button {
-                        withAnimation(.seatbee) { selectedFilter = filter }
+                        withAnimation(.seatbee) {
+                            // Tap-to-toggle: re-tapping the active chip
+                            // clears back to All (same gesture as deselect
+                            // on the chip itself, no separate clear button
+                            // needed).
+                            selectedFilter = (selectedFilter == chip.token)
+                                ? Self.filterAll
+                                : chip.token
+                        }
                         HapticEngine.selection()
                     } label: {
                         SBChip(
-                            text: filter,
-                            variant: selectedFilter == filter ? .gold : .default
+                            text: chip.label,
+                            variant: selectedFilter == chip.token ? .gold : .default
                         )
                     }
                     .buttonStyle(.plain)
                 }
+            }
+        }
+        // If the selected category gets deleted (e.g. via the Categories
+        // sheet) while we're filtering on it, the chip row would keep
+        // the highlight on a missing token. Snap back to All.
+        .onChange(of: filterChipsData.map(\.token)) { _, tokens in
+            if !tokens.contains(selectedFilter) {
+                selectedFilter = Self.filterAll
             }
         }
     }
@@ -662,19 +721,21 @@ struct GuestsView: View {
         }
 
         switch selectedFilter {
-        case "Unseated":
+        case Self.filterAll:
+            break
+        case Self.filterUnseated:
             result = result.filter { assignedTable(for: $0) == nil }
-        case "Family":
-            result = result.filter { $0.categories.contains("family") || $0.categories.contains("Family") }
-        case "Friends":
-            result = result.filter { $0.categories.contains("friends") || $0.categories.contains("Friends") }
-        case "Dietary":
+        case Self.filterDietary:
             result = result.filter { g in
                 (g.dietaryTags?.isEmpty == false) ||
                 (g.dietary?.isEmpty == false)
             }
         default:
-            break
+            // Category filter: match by canonical ID (selectedFilter holds
+            // the rawCategories entry's id, not the displayed name). This
+            // means renaming a category in the sheet doesn't break the
+            // filter, and web-created categories with random IDs work too.
+            result = result.filter { $0.categories.contains(selectedFilter) }
         }
 
         return result
