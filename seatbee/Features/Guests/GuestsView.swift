@@ -459,19 +459,39 @@ struct GuestsView: View {
                         }
                     }
                 }
-                .padding(.horizontal, section.isUnseated ? 12 : 0)
-                .padding(.vertical, section.isUnseated ? 8 : 0)
-                .background(section.isUnseated ? Color.sbGold.opacity(0.06) : Color.clear)
-                .overlay(
-                    Group {
-                        if section.isUnseated {
-                            RoundedRectangle(cornerRadius: SBRadius.small)
-                                .strokeBorder(Color.sbGold.opacity(0.25), lineWidth: 1)
-                        }
-                    }
-                )
+                .padding(.horizontal, sectionPadHoriz(section))
+                .padding(.vertical, sectionPadVert(section))
+                .background(sectionBackground(section))
+                .overlay(sectionBorder(section))
                 .clipShape(RoundedRectangle(cornerRadius: SBRadius.small))
+                // Web parity: declined section dimmed (App.jsx ~10582
+                // uses opacity-60). Sets the whole section, including
+                // the header, so the visual "this is past tense"
+                // reads at a glance.
+                .opacity(section.isDeclined ? 0.6 : 1)
             }
+        }
+    }
+
+    private func sectionPadHoriz(_ s: GuestSection) -> CGFloat {
+        s.isUnseated || s.isDeclined ? 12 : 0
+    }
+    private func sectionPadVert(_ s: GuestSection) -> CGFloat {
+        s.isUnseated || s.isDeclined ? 8 : 0
+    }
+    private func sectionBackground(_ s: GuestSection) -> Color {
+        if s.isUnseated { return Color.sbGold.opacity(0.06) }
+        if s.isDeclined { return Color.sbError.opacity(0.05) }
+        return .clear
+    }
+    @ViewBuilder
+    private func sectionBorder(_ s: GuestSection) -> some View {
+        if s.isUnseated {
+            RoundedRectangle(cornerRadius: SBRadius.small)
+                .strokeBorder(Color.sbGold.opacity(0.25), lineWidth: 1)
+        } else if s.isDeclined {
+            RoundedRectangle(cornerRadius: SBRadius.small)
+                .strokeBorder(Color.sbError.opacity(0.25), lineWidth: 1)
         }
     }
 
@@ -492,6 +512,10 @@ struct GuestsView: View {
                 Text("NEEDS SEATING")
                     .font(SBFont.capsLabel)
                     .foregroundStyle(Color.sbGoldDk)
+            } else if section.isDeclined {
+                Text("DECLINED")
+                    .font(SBFont.capsLabel)
+                    .foregroundStyle(Color.sbError)
             } else {
                 if let color = section.colorHex.flatMap({ Color(hex: $0) }) {
                     Circle().fill(color).frame(width: 8, height: 8)
@@ -534,8 +558,21 @@ struct GuestsView: View {
         let title: String
         let guests: [Guest]
         let isUnseated: Bool
+        let isDeclined: Bool
         let capacity: Int?
         let colorHex: String?
+
+        init(id: String, title: String, guests: [Guest],
+             isUnseated: Bool = false, isDeclined: Bool = false,
+             capacity: Int? = nil, colorHex: String? = nil) {
+            self.id = id
+            self.title = title
+            self.guests = guests
+            self.isUnseated = isUnseated
+            self.isDeclined = isDeclined
+            self.capacity = capacity
+            self.colorHex = colorHex
+        }
     }
 
     private var guestSections: [GuestSection] {
@@ -552,16 +589,18 @@ struct GuestsView: View {
 
         var sections: [GuestSection] = []
 
-        // Unseated section (no rsvp filter — show even declined so users see them)
-        let unseated = filteredGuests.filter { assignmentByGuest[$0.id] == nil }
-        if !unseated.isEmpty {
+        // Web parity (App.jsx:10438): "Needs Seating" excludes
+        // rsvp == .no — declined guests don't need to be seated, so
+        // they get their own section at the bottom (see end of method).
+        let unseatedAttending = filteredGuests.filter {
+            assignmentByGuest[$0.id] == nil && $0.rsvp != .no
+        }
+        if !unseatedAttending.isEmpty {
             sections.append(.init(
                 id: "__unseated",
                 title: "Needs Seating",
-                guests: unseated,
-                isUnseated: true,
-                capacity: nil,
-                colorHex: nil
+                guests: unseatedAttending,
+                isUnseated: true
             ))
         }
 
@@ -591,6 +630,20 @@ struct GuestsView: View {
                 isUnseated: false,
                 capacity: table.seats,
                 colorHex: table.color
+            ))
+        }
+
+        // Web parity (App.jsx ~10582): declined guests render in
+        // their own section at the very bottom, dimmed so they
+        // visually fall away from the active list.
+        let declined = filteredGuests.filter { $0.rsvp == .no }
+            .sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
+        if !declined.isEmpty {
+            sections.append(.init(
+                id: "__declined",
+                title: "Declined",
+                guests: declined,
+                isDeclined: true
             ))
         }
 
