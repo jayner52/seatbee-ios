@@ -737,7 +737,12 @@ struct AIGenerateView: View {
             lastResult = result
             appState.lastGenResult = (planId: plan.id, result: result)
             fellBackToRoundRobin = result.fallback ?? false
-            resultMessage = "Seated \(plan.tables.reduce(0) { $0 + $1.assignments.count }) of \(activeGuestCount) guests."
+            // Use guestsSeated (which already filters rsvp == .no)
+            // for the numerator so the message stays consistent with
+            // the denominator. Without the filter, a stale declined
+            // guest sitting in plan.tables.assignments produced a
+            // "Seated 114 of 108" overshoot.
+            resultMessage = "Seated \(guestsSeated) of \(activeGuestCount) guests."
             HapticEngine.success()
             phase = .complete
         } catch let error as SeatService.SeatError {
