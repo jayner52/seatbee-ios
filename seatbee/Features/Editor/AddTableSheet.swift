@@ -90,9 +90,21 @@ struct AddTableSheet: View {
 
         let tableCount = plan.tables.count
         let dims = TableDefaults.dimensions(for: type)
+        // Default-name policy: shape-only types (round / oval / rect)
+        // get the generic "Table N" — users were finding "Round Table 5"
+        // wordy and shape-redundant since the canvas already shows the
+        // shape. Functional types (head / sweetheart) keep their
+        // descriptive names because they communicate role, not shape.
+        let assignedName: String = {
+            switch type {
+            case .head:        return "Head Table"
+            case .sweetheart:  return "Sweetheart"
+            default:           return "Table \(tableCount + 1)"
+            }
+        }()
         let newTable = SeatTable(
             id: UUID().uuidString,
-            name: "\(name) \(tableCount + 1)",
+            name: assignedName,
             type: type,
             seats: seats,
             x: Double(100 + (tableCount % 3) * 150),
