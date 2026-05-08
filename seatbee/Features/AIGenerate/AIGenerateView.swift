@@ -254,7 +254,7 @@ struct AIGenerateView: View {
                     if !s.overallLabel.isEmpty {
                         Text(s.overallLabel)
                             .font(SBFont.bodySemibold)
-                            .foregroundStyle(Color.sbSage)
+                            .foregroundStyle(labelColor(for: s.overallLabel))
                     }
                 }
                 Spacer()
@@ -267,12 +267,16 @@ struct AIGenerateView: View {
                         .foregroundStyle(Color.sbWarm)
                 }
             }
-            // Progress bar — fill width = overallPercent / 100.
+            // Progress bar — fill width = overallPercent / 100,
+            // colour keyed off the same percentage bands as the
+            // label and the web app's getProgressColor (App.jsx
+            // ~12968): sage at 80%+, gold at 70%+, blush/orange at
+            // 50%+, error red below 50.
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     Capsule().fill(Color.sbWarm2.opacity(0.25))
                     Capsule()
-                        .fill(Color.sbSage)
+                        .fill(progressBarColor(for: s.overallPercent))
                         .frame(width: geo.size.width * (CGFloat(max(0, min(100, s.overallPercent))) / 100))
                 }
             }
@@ -362,6 +366,28 @@ struct AIGenerateView: View {
         case "violated":  return Color.sbError.opacity(0.10)
         case "partial":   return Color.sbChampagne.opacity(0.50)
         default:          return Color.clear
+        }
+    }
+
+    /// Tier-coloured progress bar — same bands as the "getLabel"
+    /// thresholds in solve.js.
+    private func progressBarColor(for percent: Int) -> Color {
+        switch percent {
+        case 80...:    return Color.sbSage     // Perfect / Excellent / Great
+        case 70...:    return Color.sbGold     // Good
+        case 50...:    return Color.sbBlush    // Fair
+        default:       return Color.sbError    // Needs Work
+        }
+    }
+
+    /// Coloured label text matching the bar's tier so a 94%
+    /// "Excellent" reads as green typography, not red.
+    private func labelColor(for label: String) -> Color {
+        switch label {
+        case "Perfect", "Excellent", "Great": return Color.sbSage
+        case "Good":                          return Color.sbGoldDk
+        case "Fair":                          return Color.sbBlush
+        default:                              return Color.sbError
         }
     }
 
