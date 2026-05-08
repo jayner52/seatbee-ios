@@ -174,6 +174,131 @@ enum GuestCSVParser {
         )
     }
 
+    // MARK: - Flexible entry point
+    //
+    // Used by both the onboarding paste textarea and the Guest tab's
+    // Import sheet. Sniffs the first line for a CSV-header shape:
+    //   - If it looks like CSV (commas + name/email/guest/rsvp keyword
+    //     in line 1) → run the full GuestCSVParser pipeline above.
+    //   - Otherwise → treat each line as one guest. Optional comma-
+    //     separated extras after the name join into the dietary
+    //     field. No plus-one parsing — Seatbee treats every guest as
+    //     a real entry, so a `+1` would need its own line.
+    //
+    // Both surfaces share this so the paste experience is identical:
+    // type "Sarah Chen, vegetarian" and either parser sees the same
+    // shape.
+
+    static func parseFlexible(_ text: String) -> Result {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return Result(guests: [], detectedPlatform: "", error: nil)
+        }
+        let firstLine = (trimmed.components(separatedBy: .newlines).first ?? "").lowercased()
+        let looksLikeCSV = firstLine.contains(",") && (
+            firstLine.contains("name") || firstLine.contains("email") ||
+            firstLine.contains("guest") || firstLine.contains("rsvp")
+        )
+        if looksLikeCSV {
+            return parse(trimmed)
+        }
+        return parsePlainTextLines(trimmed)
+    }
+
+    /// Plain-text-per-line fallback. Each non-empty line is one guest.
+    /// `Name` is the first comma-segment; everything after joins into
+    /// `dietary`. Names without a space land in `firstName`.
+    private static func parsePlainTextLines(_ text: String) -> Result {
+        var guests: [Guest] = []
+        for rawLine in text.components(separatedBy: .newlines) {
+            let line = rawLine.trimmingCharacters(in: .whitespaces)
+            if line.isEmpty { continue }
+            let parts = line.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }
+            guard let name = parts.first, !name.isEmpty else { continue }
+            var dietary: String? = nil
+            for extra in parts.dropFirst() where !extra.isEmpty {
+                dietary = (dietary == nil ? extra : "\(dietary!), \(extra)")
+            }
+            let nameParts = name.split(separator: " ", maxSplits: 1)
+            guests.append(Guest(
+                id: UUID().uuidString,
+                name: name,
+                firstName: String(nameParts.first ?? ""),
+                lastName: nameParts.count > 1 ? String(nameParts.last ?? "") : nil,
+                email: nil, categories: [], dietary: dietary, notes: nil,
+                rsvp: .unknown, side: .none, vip: false,
+                accessibility: nil, plusOne: nil, party: nil, display: nil,
+                dietaryTags: nil, highChair: nil, isChild: nil, groupIds: nil,
+                isBride: nil, isGroom: nil, meal: nil, guestCreatedAt: nil
+            ))
+        }
+        return Result(
+            guests: guests,
+            detectedPlatform: guests.isEmpty ? "" : "Pasted names",
+            error: guests.isEmpty ? "No guests found" : nil
+        )
+    }
+
+    // MARK: - CSV templates
+    //
+    // Templates pre-fill all the columns GuestCSVParser recognises so
+    // a user without an existing export can download the file, fill
+    // it in their own spreadsheet, and re-upload. Two flavours:
+    // wedding (mirrors web's `wedding`) + general (mirrors web's
+    // `general` — used for celebration / corporate). Onboarding picks
+    // by event type; the Import sheet uses the active plan's event
+    // type, falling back to wedding.
+
+    enum TemplateType {
+        case wedding
+        case general
+    }
+
+    static func csvTemplateBody(for type: TemplateType) -> String {
+        switch type {
+        case .wedding:
+            return """
+            First Name,Last Name,Email,Phone,Party/Group,RSVP,Meal Choice,Dietary Restrictions,VIP,Child,Tags,Notes
+            John,Smith,john@email.com,555-0102,Smith Family,Yes,Chicken,,No,No,"Family, Groom",Best man
+            Jane,Smith,jane@email.com,555-0103,Smith Family,Yes,Fish,Gluten-free,No,No,"Family, Groom",
+            Emily,Johnson,emily@email.com,555-0104,Johnson Party,Yes,Vegetarian,Vegan,No,No,"Friends, Bride",College friend
+            Michael,Brown,michael@email.com,,,Maybe,,Nut allergy,No,No,Coworkers,
+            David,Lee,david@email.com,555-0101,Lee Family,Yes,Chicken,,Yes,No,"Family, Head Table",Father of the bride
+            """
+        case .general:
+            return """
+            First Name,Last Name,Email,Phone,Party/Group,RSVP,VIP,Child,Tags,Dietary Restrictions,Notes
+            Alex,Taylor,alex@email.com,555-0120,Taylor Family,Yes,Yes,No,Host,,Guest of honour
+            Jordan,Lee,jordan@email.com,,,Yes,No,No,Guest,Vegetarian,
+            Morgan,Chen,morgan@email.com,555-0121,Chen Group,Maybe,No,No,Speaker,,Presenting at 3pm
+            Casey,Brown,casey@email.com,,,Yes,No,No,Volunteer,Gluten-free,Setup crew
+            Riley,Patel,riley@email.com,,Patel Family,Yes,No,No,Guest,,
+            """
+        }
+    }
+
+    static func csvTemplateFilename(for type: TemplateType) -> String {
+        switch type {
+        case .wedding:  return "seatbee-wedding-template.csv"
+        case .general:  return "seatbee-general-template.csv"
+        }
+    }
+
+    /// Writes the chosen template to the temp directory and returns the
+    /// URL. Both onboarding and the Import sheet feed this into a
+    /// SwiftUI `ShareLink`.
+    static func writeCSVTemplate(for type: TemplateType) -> URL? {
+        let body = csvTemplateBody(for: type)
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent(csvTemplateFilename(for: type))
+        do {
+            try body.write(to: url, atomically: true, encoding: .utf8)
+            return url
+        } catch {
+            return nil
+        }
+    }
+
     // MARK: - Helpers
 
     /// Splits a single CSV row honouring quoted fields containing commas.
