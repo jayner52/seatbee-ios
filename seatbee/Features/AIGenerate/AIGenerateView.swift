@@ -16,8 +16,20 @@ struct AIGenerateView: View {
     @State private var clearConfirm: ClearAction?
     @State private var showResetSheet = false
     @State private var showLastRunDetail = false
+    @State private var aiInsight: AIInsightState = .idle
 
     enum Phase { case ready, generating, complete, error }
+
+    /// State of the post-generate AI Insight call. Mirrors web's
+    /// `aiAnalysis` object shape so each render branch maps to the
+    /// same UX (loading / error / unparseable / real summary).
+    enum AIInsightState {
+        case idle
+        case loading
+        case ready(AIService.ConflictResult)
+        case unparseable
+        case failed(String)
+    }
 
     private struct TierGateAlert: Identifiable {
         let id = UUID()
@@ -196,6 +208,7 @@ struct AIGenerateView: View {
                         )
                     }
                 }
+                aiInsightPanel
                 if fellBackToRoundRobin {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Solver returned 0 — used round-robin fallback. Check your rules for conflicts.")
@@ -367,6 +380,73 @@ struct AIGenerateView: View {
         case "partial":   return Color.sbChampagne.opacity(0.50)
         default:          return Color.clear
         }
+    }
+
+    /// Web-parity AI Insight panel under the scorecard. Renders a
+    /// distinct view per state so silent failures stay visible — same
+    /// design lesson learned on web (App.jsx:13556 had a single
+    /// guarded render that hid every failure mode).
+    @ViewBuilder
+    private var aiInsightPanel: some View {
+        switch aiInsight {
+        case .idle:
+            EmptyView()
+        case .loading:
+            insightCard(
+                accent: Color.sbGoldDk,
+                icon: "sparkles",
+                heading: "AI Insight",
+                body: "Analyzing seating arrangement…",
+                bodyStyle: .italic
+            )
+        case .unparseable:
+            insightCard(
+                accent: Color.sbGoldDk,
+                icon: "sparkles",
+                heading: "AI Insight",
+                body: "AI returned an unparseable response — try again to get a summary.",
+                bodyStyle: .italic
+            )
+        case .failed(let message):
+            insightCard(
+                accent: Color.sbError,
+                icon: "exclamationmark.triangle",
+                heading: "AI insight unavailable",
+                body: message,
+                bodyStyle: .plain
+            )
+        case .ready(let result):
+            insightCard(
+                accent: Color.sbGoldDk,
+                icon: "sparkles",
+                heading: "AI Insight",
+                body: "\u{201C}\(result.summary)\u{201D}",
+                bodyStyle: .italic
+            )
+        }
+    }
+
+    private enum InsightBodyStyle { case italic, plain }
+
+    private func insightCard(accent: Color, icon: String, heading: String, body: String, bodyStyle: InsightBodyStyle) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: 12))
+                    .foregroundStyle(accent)
+                Text(heading)
+                    .font(SBFont.bodySmallBold)
+                    .foregroundStyle(Color.sbCharcoal)
+            }
+            Text(body)
+                .font(bodyStyle == .italic ? SBFont.body.italic() : SBFont.caption)
+                .foregroundStyle(Color.sbWarm)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.sbCharcoal.opacity(0.05))
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
     /// Tier-coloured progress bar — same bands as the "getLabel"
@@ -776,6 +856,9 @@ struct AIGenerateView: View {
         resultMessage = nil
         fellBackToRoundRobin = false
         lastResult = nil
+        // Clear any previous insight so the panel doesn't show
+        // stale narrative against a freshly-generated layout.
+        aiInsight = .idle
 
         do {
             let result = try await appState.seat.generateSeating(plan: plan)
@@ -793,6 +876,16 @@ struct AIGenerateView: View {
             resultMessage = "Seated \(guestsSeated) of \(activeGuestCount) guests."
             HapticEngine.success()
             phase = .complete
+
+            // Post-generate AI Insight (web parity App.jsx:13229).
+            // Fire only when there's at least one enabled rule —
+            // matches web — and only on a successful (non-fallback)
+            // result. Background Task so the "Seating generated"
+            // UI doesn't block on the LLM round-trip.
+            let hasEnabledRules = plan.rules.contains { $0.enabled }
+            if hasEnabledRules && !(result.fallback ?? false) {
+                Task { await fetchAIInsight(for: plan) }
+            }
         } catch let error as SeatService.SeatError {
             HapticEngine.error()
             resultMessage = error.localizedDescription
@@ -801,6 +894,33 @@ struct AIGenerateView: View {
             HapticEngine.error()
             resultMessage = error.localizedDescription
             phase = .error
+        }
+    }
+
+    /// Background AI Insight call. Web-parity narrative analysis
+    /// (App.jsx:13051 analyzeWithAI). Failures are swallowed into
+    /// state — never throw to caller — so a flaky LLM doesn't ruin
+    /// the "Seating generated" UX.
+    @MainActor
+    private func fetchAIInsight(for plan: SeatingPlan) async {
+        aiInsight = .loading
+        do {
+            let result = try await appState.ai.detectConflicts(plan: plan)
+            // Web treats `summary == "Could not analyze"` as a
+            // separate "unparseable" bucket — same here so the user
+            // sees a meaningful retry hint instead of a confusing
+            // canned string.
+            if result.summary.trimmingCharacters(in: .whitespaces) == "Could not analyze" {
+                aiInsight = .unparseable
+            } else if result.summary.trimmingCharacters(in: .whitespaces).isEmpty {
+                aiInsight = .unparseable
+            } else {
+                aiInsight = .ready(result)
+            }
+        } catch let err as AIService.AIError {
+            aiInsight = .failed(err.localizedDescription)
+        } catch {
+            aiInsight = .failed(error.localizedDescription)
         }
     }
 
