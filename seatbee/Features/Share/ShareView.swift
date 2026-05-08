@@ -74,6 +74,9 @@ struct ShareView: View {
                         // Export row
                         exportSection
 
+                        // Seatbee Tools (web parity)
+                        seatbeeToolsSection
+
                         Spacer(minLength: 100)
                     }
                     .padding(.horizontal, SBSpacing.screenMargin)
@@ -379,6 +382,163 @@ struct ShareView: View {
             }
             .padding(.top, 4)
         }
+    }
+
+    // MARK: - Seatbee Tools (web parity)
+    //
+    // Two web tools that pre-fill from the active plan: Alphabetical
+    // Seating Display (A–Z escort cards) and Dietary Summary
+    // Generator (caterer brief). Web's Export panel hands off via
+    // localStorage; iOS hands off via URL hash since Safari can't
+    // share localStorage with the iOS process. Web tools accept
+    // either source — see web commit 130f4db.
+
+    private var seatbeeToolsSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("SEATBEE TOOLS")
+                .font(SBFont.capsLabel)
+                .foregroundStyle(Color.sbWarm)
+                .letterSpacing(1.5)
+            toolCard(
+                icon: "list.bullet.indent",
+                title: "Alphabetical Seating Display",
+                subtitle: "A–Z escort card display, pre-filled from your plan",
+                action: openAlphabeticalSeatingTool
+            )
+            toolCard(
+                icon: "clipboard",
+                title: "Dietary Summary Generator",
+                subtitle: "Pre-filled caterer brief from your guest dietary data",
+                action: openDietarySummaryTool
+            )
+        }
+    }
+
+    private func toolCard(icon: String, title: String, subtitle: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Image(systemName: icon)
+                    .font(.system(size: 18))
+                    .foregroundStyle(Color.sbGoldDk)
+                    .frame(width: 40, height: 40)
+                    .background(Color.sbChampagne.opacity(0.4))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(SBFont.bodySmallBold)
+                        .foregroundStyle(Color.sbCharcoal)
+                    Text(subtitle)
+                        .font(SBFont.caption)
+                        .foregroundStyle(Color.sbWarm)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                }
+                Spacer()
+                Image(systemName: "arrow.up.right.square")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Color.sbWarm2)
+            }
+            .padding(12)
+            .background(Color.sbIvory2)
+            .clipShape(RoundedRectangle(cornerRadius: SBRadius.card))
+            .overlay(
+                RoundedRectangle(cornerRadius: SBRadius.card)
+                    .strokeBorder(Color.sbLine, lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func openAlphabeticalSeatingTool() {
+        guard let plan = appState.activePlan else { return }
+        // Web parity (App.jsx ~14751): build a `Guest Name, Table` CSV
+        // from sorted seated guests, payload as { csv, event }. Use the
+        // displayName (falls back to firstName+lastName, then name) so
+        // guests whose `name` field is empty but `display`/`firstName`
+        // is populated still surface in the alphabetical display.
+        var rows: [[String]] = [["Guest Name", "Table"]]
+        var seated: [(name: String, table: String)] = []
+        for table in plan.tables {
+            for gid in table.assignments.keys {
+                guard let g = plan.guests.first(where: { $0.id == gid }) else { continue }
+                let displayed = g.displayName  // tries display → first+last → name
+                let name = displayed.isEmpty ? g.name : displayed
+                guard !name.isEmpty else { continue }
+                seated.append((name, table.name))
+            }
+        }
+        seated.sort { $0.name.lowercased() < $1.name.lowercased() }
+        for s in seated { rows.append([s.name, s.table]) }
+        let csv = rows.map { r in r.map { c in
+            "\"" + c.replacingOccurrences(of: "\"", with: "\"\"") + "\""
+        }.joined(separator: ",") }.joined(separator: "\n")
+        let payload: [String: Any] = ["csv": csv, "event": plan.name]
+        openToolURL(path: "/tools/alphabetical-seating", payload: payload)
+    }
+
+    private func openDietarySummaryTool() {
+        guard let plan = appState.activePlan else { return }
+        // Web parity (App.jsx ~14820): build meals[] + crossRef from
+        // seated guests' meal + dietaryTags. Payload mirrors web's
+        // localStorage shape so the page can hydrate identically.
+        let guestById = Dictionary(uniqueKeysWithValues: plan.guests.map { ($0.id, $0) })
+        let assignedIds = Set(plan.tables.flatMap { $0.assignments.keys })
+
+        // Meals: tally seated guests by meal short.
+        var mealCounts: [String: Int] = [:]
+        for g in plan.guests where assignedIds.contains(g.id) {
+            if let m = g.meal, !m.isEmpty {
+                mealCounts[m, default: 0] += 1
+            }
+        }
+        let meals: [[String: Any]] = mealCounts
+            .sorted { $0.key < $1.key }
+            .map { ["name": $0.key, "count": $0.value] }
+
+        // crossRef: dietary key → { mealId: count }. Standard guests
+        // (no dietary tags) go under `std`; tagged guests under their
+        // tag's diet key. Mirrors web's tagToDietKey logic.
+        let dietKeyByTag: [String: String] = [
+            "vegetarian": "veg", "vegan": "vgn", "gluten-free": "gf",
+            "dairy-free": "df", "nut-allergy": "nut",
+            "shellfish-allergy": "sh", "halal": "hal", "kosher": "kos"
+        ]
+        var crossRef: [String: [String: Int]] = [:]
+        for g in plan.guests where assignedIds.contains(g.id) {
+            guard let m = g.meal, !m.isEmpty else { continue }
+            let mealId = m
+            let tags = g.dietaryTags ?? []
+            let dietKeys = tags.compactMap { dietKeyByTag[$0] }
+            let bucket = dietKeys.isEmpty ? ["std"] : dietKeys
+            for k in bucket {
+                crossRef[k, default: [:]][mealId, default: 0] += 1
+            }
+        }
+
+        let payload: [String: Any] = [
+            "eventName": plan.name,
+            "eventDate": plan.eventDate.map { ISO8601DateFormatter().string(from: $0) } ?? "",
+            "venueName": plan.venue ?? "",
+            "meals": meals,
+            "crossRef": crossRef,
+        ]
+        openToolURL(path: "/tools/dietary-summary", payload: payload)
+    }
+
+    /// Encodes the payload as JSON → base64 → URL-encoded, appends as
+    /// `#import=…` so the web tool can decode it on mount. Hash
+    /// fragments aren't sent to the server so payload stays client-only.
+    ///
+    /// Uses `.alphanumerics` for percent-encoding so the base64 special
+    /// chars `+`, `/`, `=` all become `%2B`, `%2F`, `%3D` instead of
+    /// being passed literal — `+` in particular gets transformed to
+    /// space by some URL parsers, which silently corrupts the payload.
+    private func openToolURL(path: String, payload: [String: Any]) {
+        guard let json = try? JSONSerialization.data(withJSONObject: payload, options: []) else { return }
+        let b64 = json.base64EncodedString()
+        guard let encoded = b64.addingPercentEncoding(withAllowedCharacters: .alphanumerics) else { return }
+        guard let url = URL(string: "https://www.seatbee.app\(path)#import=\(encoded)") else { return }
+        UIApplication.shared.open(url)
     }
 
     private func sharePlan(via method: String) {
