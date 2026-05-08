@@ -322,6 +322,33 @@ struct EditorView: View {
                         .font(SBFont.bodySmallBold)
                         .foregroundStyle(Color.sbCharcoal)
                     Spacer()
+                    // Quick rotation — 45° steps either direction.
+                    // Disabled when the object is locked so the user
+                    // can't accidentally rotate something they pinned.
+                    Button {
+                        rotateObject(id: objId, by: -45)
+                        HapticEngine.selection()
+                    } label: {
+                        Image(systemName: "rotate.left")
+                            .font(.system(size: 14))
+                            .foregroundStyle(obj.locked == true ? Color.sbWarm2 : Color.sbCharcoal)
+                            .frame(width: 34, height: 34)
+                            .background(.regularMaterial)
+                            .clipShape(Circle())
+                    }
+                    .disabled(obj.locked == true)
+                    Button {
+                        rotateObject(id: objId, by: 45)
+                        HapticEngine.selection()
+                    } label: {
+                        Image(systemName: "rotate.right")
+                            .font(.system(size: 14))
+                            .foregroundStyle(obj.locked == true ? Color.sbWarm2 : Color.sbCharcoal)
+                            .frame(width: 34, height: 34)
+                            .background(.regularMaterial)
+                            .clipShape(Circle())
+                    }
+                    .disabled(obj.locked == true)
                     Button {
                         toggleObjectLock(id: objId)
                         HapticEngine.selection()
@@ -675,6 +702,19 @@ struct EditorView: View {
         guard var p = appState.activePlan,
               let idx = p.objects.firstIndex(where: { $0.id == id }) else { return }
         p.objects[idx].locked = !(p.objects[idx].locked ?? false)
+        appState.activePlan = p
+        Task { try? await appState.database.savePlanData(plan: p) }
+    }
+
+    /// Add `delta` degrees to the object's rotation, normalised to
+    /// 0..<360 so the slider in the VenueObjects sheet shows a sane
+    /// value if the user opens it next.
+    private func rotateObject(id: String, by delta: Double) {
+        guard var p = appState.activePlan,
+              let idx = p.objects.firstIndex(where: { $0.id == id }) else { return }
+        let current = p.objects[idx].rotation ?? 0
+        let next = (current + delta).truncatingRemainder(dividingBy: 360)
+        p.objects[idx].rotation = next < 0 ? next + 360 : next
         appState.activePlan = p
         Task { try? await appState.database.savePlanData(plan: p) }
     }
