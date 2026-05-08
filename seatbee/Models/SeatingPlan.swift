@@ -27,6 +27,11 @@ struct SeatingPlan: Identifiable, Codable {
     var roomFlipV: Bool? = nil
     var roomZones: [RoomZone]? = nil
     var hasSweetheartTable: Bool? = nil
+    // Web parity (App.jsx:3899): controls whether unconfirmed/maybe
+    // guests are included in AI seating, exports, and unassigned
+    // counts. nil/true == include; false == exclude. Persisted to
+    // plan.data so the preference survives across sessions.
+    var includeMaybes: Bool? = nil
     // Wedding-only: derived from each partner's role marker on onboarding.
     // Values: "bride_groom" (default) | "bride_bride" | "groom_groom".
     // Web stores the same string at App.jsx OnboardingWizard line ~19223.
@@ -561,7 +566,8 @@ extension SeatingPlan {
             floorPlanImage: rawFloorPlanImage,
             floorPlanOpacity: rawFloorPlanOpacity,
             seatOrders: rawSeatOrders,
-            guestQR: rawGuestQR
+            guestQR: rawGuestQR,
+            includeMaybes: includeMaybes
         )
     }
 }

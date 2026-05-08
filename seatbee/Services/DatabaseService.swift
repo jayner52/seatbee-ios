@@ -53,7 +53,8 @@ final class DatabaseService {
             floorPlanImage: nil,
             floorPlanOpacity: nil,
             seatOrders: nil,
-            guestQR: nil
+            guestQR: nil,
+            includeMaybes: nil
         )
 
         struct CreatePlanPayload: Codable {
