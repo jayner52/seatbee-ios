@@ -23,6 +23,12 @@ struct ShareView: View {
     @State private var qrSyncing = false
     @State private var qrError: String?
 
+    // PDF export options (mirrors web's PDF Options panel — meals,
+    // dietary, high chairs). Toggles are persisted only for the current
+    // session; web doesn't persist these either.
+    @State private var pdfOpts: PDFExportOpts = .default
+    @State private var showCanvaSheet = false
+
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
@@ -71,8 +77,9 @@ struct ShareView: View {
                             guestQRSection(plan: plan)
                         }
 
-                        // Export row
-                        exportSection
+                        // Export — Print & Design + Spreadsheet sections
+                        printDesignSection
+                        spreadsheetSection
 
                         // Seatbee Tools (web parity)
                         seatbeeToolsSection
@@ -89,6 +96,11 @@ struct ShareView: View {
                 if appState.activePlan == nil {
                     let plans = (try? await appState.database.fetchPlans()) ?? []
                     if let first = plans.first { appState.activePlan = first }
+                }
+            }
+            .sheet(isPresented: $showCanvaSheet) {
+                if let plan = appState.activePlan {
+                    CanvaExportSheet(plan: plan)
                 }
             }
         }
@@ -340,48 +352,286 @@ struct ShareView: View {
         .buttonStyle(.plain)
     }
 
-    // MARK: - Export
+    // MARK: - Export — PRINT & DESIGN
+    //
+    // Web parity (App.jsx ExpPanel ~13800). iOS surfaces the same three
+    // PDF toggles (meals / dietary / high chairs), the same two PDFs
+    // (Seating Chart + Planner View), and the Canva handoff. Place cards
+    // and Social image are iOS-only fallbacks that web doesn't carry.
+    //
+    // Free-tier PDFs render with a diagonal SEATBEE.APP watermark; paid
+    // tier renders cleanly. Canva is fully paid-gated (mirrors web).
 
-    private var exportSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("EXPORT")
+    private var printDesignSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("PRINT & DESIGN")
                 .font(SBFont.capsLabel)
                 .foregroundStyle(Color.sbWarm)
                 .letterSpacing(1.5)
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
-                    exportCard(icon: "doc.text", title: "PDF")
-                    exportCard(icon: "rectangle.stack", title: "Printable cards")
-                    exportCard(icon: "photo", title: "Social image")
-                    exportCard(icon: "person.2", title: "Guest CSV")
-                    exportCard(icon: "square.grid.3x2", title: "Tables CSV")
-                }
-            }
+            pdfOptionsCard
 
-            // Pointer at the polished web export catalogue. iOS print
-            // exports use a stripped-down native renderer; the full place
-            // card / table card / seating chart designs live on web until
-            // the WKWebView pipeline lands (see PARITY.md).
-            Link(destination: URL(string: "https://www.seatbee.app")!) {
-                HStack(spacing: 6) {
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 11))
-                    Text("Need name cards, table cards, or a printable seating chart?")
-                        .font(SBFont.caption)
-                    Text("Visit seatbee.app")
-                        .font(SBFont.bodySmallBold)
-                    Image(systemName: "arrow.up.right")
-                        .font(.system(size: 10, weight: .semibold))
-                }
-                .foregroundStyle(Color.sbGoldDk)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 8)
-                .background(Color.sbChampagne.opacity(0.5))
-                .clipShape(RoundedRectangle(cornerRadius: SBRadius.small))
-            }
-            .padding(.top, 4)
+            toolCard(
+                icon: "doc.text",
+                title: "Seating Chart (PDF)",
+                subtitle: "Printable chart with all tables",
+                action: { handleSeatingChartPDF() }
+            )
+            toolCard(
+                icon: "rectangle.split.3x1",
+                title: "Planner View (PDF)",
+                subtitle: "Table diagrams with seat-by-seat details",
+                action: { handlePlannerViewPDF() }
+            )
+            canvaCard
+            toolCard(
+                icon: "rectangle.stack",
+                title: "Place Cards (PDF)",
+                subtitle: "Printable place cards, sorted alphabetically",
+                action: { handlePlaceCardsPDF() }
+            )
+            toolCard(
+                icon: "photo",
+                title: "Social Image",
+                subtitle: "1080×1080 share-ready PNG",
+                action: { handleSocialImage() }
+            )
         }
+    }
+
+    private var spreadsheetSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("SPREADSHEET / DATA")
+                .font(SBFont.capsLabel)
+                .foregroundStyle(Color.sbWarm)
+                .letterSpacing(1.5)
+
+            gatedToolCard(
+                icon: "person.2",
+                title: "Guest List (CSV)",
+                subtitle: "Full guest data — Excel, Google Sheets, vendors",
+                isPaidGate: true,
+                action: { handleGuestCSV() }
+            )
+            gatedToolCard(
+                icon: "square.grid.3x2",
+                title: "Table Summary (CSV)",
+                subtitle: "Per-table assignments + meal counts",
+                isPaidGate: true,
+                action: { handleTablesCSV() }
+            )
+        }
+    }
+
+    /// Three-toggle card matching web's "PDF Options" panel. State lives
+    /// in `pdfOpts` and is threaded into the Seating Chart + Planner View
+    /// PDF generators.
+    private var pdfOptionsCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("PDF OPTIONS")
+                .font(SBFont.capsLabel)
+                .foregroundStyle(Color.sbWarm2)
+                .letterSpacing(1.5)
+                .padding(.horizontal, 12)
+                .padding(.top, 10)
+                .padding(.bottom, 6)
+            optionToggleRow(
+                title: "Include meal selections",
+                isOn: Binding(get: { pdfOpts.includeMeals },
+                              set: { pdfOpts.includeMeals = $0 })
+            )
+            Divider().background(Color.sbLine).padding(.leading, 12)
+            optionToggleRow(
+                title: "Include dietary restrictions",
+                isOn: Binding(get: { pdfOpts.includeDietary },
+                              set: { pdfOpts.includeDietary = $0 })
+            )
+            Divider().background(Color.sbLine).padding(.leading, 12)
+            optionToggleRow(
+                title: "Flag high chairs",
+                isOn: Binding(get: { pdfOpts.includeHighChairs },
+                              set: { pdfOpts.includeHighChairs = $0 })
+            )
+        }
+        .background(Color.sbIvory2)
+        .clipShape(RoundedRectangle(cornerRadius: SBRadius.card))
+        .overlay(
+            RoundedRectangle(cornerRadius: SBRadius.card)
+                .strokeBorder(Color.sbLine, lineWidth: 1)
+        )
+    }
+
+    private func optionToggleRow(title: String, isOn: Binding<Bool>) -> some View {
+        HStack {
+            Text(title)
+                .font(SBFont.bodySmall)
+                .foregroundStyle(Color.sbCharcoal)
+            Spacer()
+            Toggle("", isOn: isOn)
+                .labelsHidden()
+                .tint(.sbGold)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+    }
+
+    /// Canva card — paid-gated, opens the modal on tap when paid,
+    /// routes to upgrade otherwise. Visually identical to other tool
+    /// cards but with a lock badge + "Upgrade" pill on free tier.
+    private var canvaCard: some View {
+        let isPaid = appState.activePlanTier != .free && !appState.isActivePlanExpired
+        return Button {
+            if isPaid {
+                showCanvaSheet = true
+            } else {
+                appState.showUpgrade = true
+            }
+        } label: {
+            HStack(spacing: 12) {
+                ZStack {
+                    // Canva logo on a tinted square. The SVG has a 1900×1900
+                    // viewBox (circle in square), so square frame = no
+                    // distortion. A small lock chip overlays when locked.
+                    Image("CanvaLogo")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 28, height: 28)
+                    if !isPaid {
+                        Image(systemName: "lock.fill")
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(Color.sbGoldDk)
+                            .padding(3)
+                            .background(Color.sbChampagne)
+                            .clipShape(Circle())
+                            .offset(x: 13, y: 13)
+                    }
+                }
+                .frame(width: 40, height: 40)
+                .background(Color(red: 0/255, green: 196/255, blue: 204/255).opacity(0.10))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        Text("Export to Canva")
+                            .font(SBFont.bodySmallBold)
+                            .foregroundStyle(Color.sbCharcoal)
+                        if !isPaid {
+                            Text("UPGRADE")
+                                .font(SBFont.capsLabel)
+                                .foregroundStyle(Color.sbGoldDk)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.sbChampagne)
+                                .clipShape(Capsule())
+                        }
+                    }
+                    Text("Place cards or table seating cards")
+                        .font(SBFont.caption)
+                        .foregroundStyle(Color.sbWarm)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                }
+                Spacer()
+                Image(systemName: "arrow.up.right.square")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Color.sbWarm2)
+            }
+            .padding(12)
+            .background(Color.sbIvory2)
+            .clipShape(RoundedRectangle(cornerRadius: SBRadius.card))
+            .overlay(
+                RoundedRectangle(cornerRadius: SBRadius.card)
+                    .strokeBorder(Color.sbLine, lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// Variant of `toolCard` that shows a lock badge + Upgrade pill when
+    /// `isPaidGate` is true and the active plan is on the free tier.
+    private func gatedToolCard(icon: String, title: String, subtitle: String,
+                               isPaidGate: Bool, action: @escaping () -> Void) -> some View {
+        let locked = isPaidGate && (appState.activePlanTier == .free || appState.isActivePlanExpired)
+        return Button {
+            if locked { appState.showUpgrade = true } else { action() }
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: locked ? "lock.fill" : icon)
+                    .font(.system(size: 18))
+                    .foregroundStyle(Color.sbGoldDk)
+                    .frame(width: 40, height: 40)
+                    .background(Color.sbChampagne.opacity(0.4))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        Text(title)
+                            .font(SBFont.bodySmallBold)
+                            .foregroundStyle(Color.sbCharcoal)
+                        if locked {
+                            Text("UPGRADE")
+                                .font(SBFont.capsLabel)
+                                .foregroundStyle(Color.sbGoldDk)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.sbChampagne)
+                                .clipShape(Capsule())
+                        }
+                    }
+                    Text(subtitle)
+                        .font(SBFont.caption)
+                        .foregroundStyle(Color.sbWarm)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                }
+                Spacer()
+                Image(systemName: "square.and.arrow.up")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Color.sbWarm2)
+            }
+            .padding(12)
+            .background(Color.sbIvory2)
+            .clipShape(RoundedRectangle(cornerRadius: SBRadius.card))
+            .overlay(
+                RoundedRectangle(cornerRadius: SBRadius.card)
+                    .strokeBorder(Color.sbLine, lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Export action handlers
+
+    private var isPaidPlan: Bool {
+        appState.activePlanTier != .free && !appState.isActivePlanExpired
+    }
+
+    private func handleSeatingChartPDF() {
+        guard let plan = appState.activePlan else { return }
+        PDFExportService.shareSeatingChartPDF(plan: plan, opts: pdfOpts, isPaid: isPaidPlan)
+    }
+
+    private func handlePlannerViewPDF() {
+        guard let plan = appState.activePlan else { return }
+        PDFExportService.sharePlannerViewPDF(plan: plan, opts: pdfOpts, isPaid: isPaidPlan)
+    }
+
+    private func handlePlaceCardsPDF() {
+        guard let plan = appState.activePlan else { return }
+        PDFExportService.sharePlaceCards(plan: plan)
+    }
+
+    private func handleSocialImage() {
+        guard let plan = appState.activePlan else { return }
+        PDFExportService.shareSocialImage(plan: plan)
+    }
+
+    private func handleGuestCSV() {
+        guard let plan = appState.activePlan else { return }
+        PDFExportService.shareGuestListCSV(plan: plan)
+    }
+
+    private func handleTablesCSV() {
+        guard let plan = appState.activePlan else { return }
+        PDFExportService.shareTablesCSV(plan: plan)
     }
 
     // MARK: - Seatbee Tools (web parity)
@@ -481,7 +731,6 @@ struct ShareView: View {
         // Web parity (App.jsx ~14820): build meals[] + crossRef from
         // seated guests' meal + dietaryTags. Payload mirrors web's
         // localStorage shape so the page can hydrate identically.
-        let guestById = Dictionary(uniqueKeysWithValues: plan.guests.map { ($0.id, $0) })
         let assignedIds = Set(plan.tables.flatMap { $0.assignments.keys })
 
         // Meals: tally seated guests by meal short.
@@ -828,64 +1077,6 @@ struct ShareView: View {
         }
     }
 
-    private func exportCard(icon: String, title: String) -> some View {
-        // Free-tier CSV exports are paywalled to match web (App.jsx
-        // ExpPanel) and PARITY.md. PDFs / images stay free for now —
-        // the larger watermark + WKWebView export pipeline is parked.
-        let isCSV = title == "Guest CSV" || title == "Tables CSV"
-        let isPaid = appState.activePlanTier != .free && !appState.isActivePlanExpired
-        let locked = isCSV && !isPaid
-        return Button {
-            if locked {
-                appState.showUpgrade = true
-                return
-            }
-            if let plan = appState.activePlan {
-                switch title {
-                case "PDF":
-                    PDFExportService.sharePDF(plan: plan)
-                case "Printable cards":
-                    PDFExportService.sharePlaceCards(plan: plan)
-                case "Social image":
-                    PDFExportService.shareSocialImage(plan: plan)
-                case "Guest CSV":
-                    PDFExportService.shareGuestListCSV(plan: plan)
-                case "Tables CSV":
-                    PDFExportService.shareTablesCSV(plan: plan)
-                default:
-                    sharePlan(via: title)
-                }
-            }
-        } label: {
-            ZStack(alignment: .topTrailing) {
-                VStack(spacing: 8) {
-                    Image(systemName: icon)
-                        .font(.system(size: 24))
-                        .foregroundStyle(locked ? Color.sbWarm : Color.sbGoldDk)
-                    Text(title)
-                        .font(SBFont.caption)
-                        .foregroundStyle(Color.sbCharcoal)
-                }
-                .frame(width: 100, height: 80)
-                .background(Color.sbIvory2)
-                .clipShape(RoundedRectangle(cornerRadius: SBRadius.chip))
-                .overlay(
-                    RoundedRectangle(cornerRadius: SBRadius.chip)
-                        .strokeBorder(Color.sbLine, lineWidth: 1)
-                )
-                if locked {
-                    Image(systemName: "lock.fill")
-                        .font(.system(size: 9, weight: .semibold))
-                        .foregroundStyle(Color.sbGoldDk)
-                        .padding(5)
-                        .background(Color.sbChampagne)
-                        .clipShape(Circle())
-                        .padding(6)
-                }
-            }
-        }
-        .buttonStyle(.plain)
-    }
 
     // MARK: - Collaborator API
     //
