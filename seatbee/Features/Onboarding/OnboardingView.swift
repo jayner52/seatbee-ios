@@ -1752,10 +1752,28 @@ struct OnboardingView: View {
 
     private func coupleGuest(name: String, role: PartnerRole) -> Guest {
         let cat = role == .bride ? "bride" : "groom"
+        // Couples get exactly one seating-directive category, mirroring
+        // web (App.jsx:19816). Sweetheart wins when the user opted in
+        // for a sweetheart table — that's where the couple sits. Head
+        // Table is the fallback for couples who'd rather sit with the
+        // wider VIP set. Tagging both was producing a redundant chart
+        // row on the SEATING SNAPSHOT and (until cddb38c on web)
+        // letting the head-table phase swallow the couple before
+        // the sweetheart phase ran.
+        let seatTag: String
+        if includeSweetheartTable {
+            seatTag = "sweetheart_table"
+        } else if includeHeadTable {
+            seatTag = "head_table"
+        } else {
+            seatTag = ""
+        }
+        var categories = [cat]
+        if !seatTag.isEmpty { categories.append(seatTag) }
         return Guest(
             id: "guest_\(cat)_\(UUID().uuidString.prefix(8))",
             name: name, firstName: nil, lastName: nil, email: nil,
-            categories: [cat, "head_table", "sweetheart_table"],
+            categories: categories,
             dietary: nil, notes: nil, rsvp: .yes,
             side: role == .bride ? .bride : .groom,
             vip: true, accessibility: nil, plusOne: nil, party: nil, display: name,
