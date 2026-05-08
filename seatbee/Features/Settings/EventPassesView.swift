@@ -217,12 +217,28 @@ struct EventPassesView: View {
                 applyButton(for: pass)
             }
             // Secondary action — Gift this pass. Web parity (App.jsx
-            // ~24700: "Gift This Pass" button reveals share panel).
-            // iOS uses the system share sheet directly so users can
-            // pick iMessage / WhatsApp / Mail / Copy Link in one tap.
-            if pass.giftCode != nil {
-                Button {
-                    giftPass(pass)
+            // ~24700: "Gift This Pass" button reveals a share panel).
+            // iOS uses a SwiftUI Menu with two paths so the user can:
+            //   - Send link → iOS share sheet (iMessage / WhatsApp /
+            //     Email / Copy Link). The recipient taps the link and
+            //     lands on web's gift welcome modal.
+            //   - Copy code → just the SEAT-XXXX-XXXX onto the
+            //     clipboard, ready to paste into a chat. The
+            //     recipient pastes it into "Redeem a Gift Code" on
+            //     iOS, never following a link to web. Avoids the
+            //     iOS-installed-but-link-goes-to-web round-trip.
+            if let code = pass.giftCode {
+                Menu {
+                    Button {
+                        shareGiftLink(code: code, packType: pass.packType)
+                    } label: {
+                        Label("Send link", systemImage: "square.and.arrow.up")
+                    }
+                    Button {
+                        copyGiftCode(code)
+                    } label: {
+                        Label("Copy code", systemImage: "doc.on.doc")
+                    }
                 } label: {
                     HStack(spacing: 5) {
                         Image(systemName: "gift")
@@ -232,7 +248,6 @@ struct EventPassesView: View {
                     }
                     .foregroundStyle(Color.sbGoldDk)
                 }
-                .buttonStyle(.borderless)
             }
         }
         .padding(.vertical, 4)
@@ -389,16 +404,26 @@ struct EventPassesView: View {
                     Spacer()
                     if !gift.isClaimed, let code = gift.giftCode {
                         // Re-share affordance for unclaimed gifts in
-                        // case the recipient lost the link. No revoke
-                        // — web doesn't support it either.
-                        Button {
-                            shareGiftLink(code: code, packType: gift.packType)
+                        // case the recipient lost the link. Same two
+                        // options as the primary Gift menu — Send link
+                        // OR Copy code. No revoke (web doesn't support
+                        // that either).
+                        Menu {
+                            Button {
+                                shareGiftLink(code: code, packType: gift.packType)
+                            } label: {
+                                Label("Send link", systemImage: "square.and.arrow.up")
+                            }
+                            Button {
+                                copyGiftCode(code)
+                            } label: {
+                                Label("Copy code", systemImage: "doc.on.doc")
+                            }
                         } label: {
-                            Image(systemName: "square.and.arrow.up")
-                                .font(.system(size: 14))
+                            Image(systemName: "ellipsis.circle")
+                                .font(.system(size: 16))
                                 .foregroundStyle(Color.sbGoldDk)
                         }
-                        .buttonStyle(.borderless)
                     }
                 }
                 .padding(.vertical, 4)
@@ -506,16 +531,26 @@ struct EventPassesView: View {
 
     // MARK: - Send a gift (system share sheet)
 
+    /// Copies just the SEAT-XXXX-XXXX code onto the system clipboard.
+    /// Used when the sender wants to paste only the code into a chat
+    /// (not the whole "Claim it at..." link), so the recipient can
+    /// type it into "Redeem a Gift Code" inside iOS without ever
+    /// following a link to web. Side-steps the iOS-app-installed-
+    /// but-link-still-goes-to-web round-trip.
+    private func copyGiftCode(_ code: String) {
+        UIPasteboard.general.string = code
+        HapticEngine.success()
+        alertMessage = AlertMessage(
+            title: "Code Copied",
+            body: "\(code) is on your clipboard. Paste it into a message — the recipient can redeem it inside the iOS app or at seatbee.app."
+        )
+    }
+
     /// Open the iOS share sheet pre-filled with the gift link + a
     /// short message. Web parity URL: `https://seatbee.app/?gift=CODE`.
     /// We deliberately use the system share sheet (not an in-app
     /// channel picker) so iMessage / WhatsApp / Mail / Copy Link all
     /// work in one tap, and the user picks whichever they actually use.
-    private func giftPass(_ pass: EventPass) {
-        guard let code = pass.giftCode else { return }
-        shareGiftLink(code: code, packType: pass.packType)
-    }
-
     private func shareGiftLink(code: String, packType: String) {
         let tierName = passTierDisplay(for: packType)
         let url = URL(string: "https://seatbee.app/?gift=\(code)")
