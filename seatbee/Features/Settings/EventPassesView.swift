@@ -565,17 +565,48 @@ struct EventPassesView: View {
         }
     }
 
-    // MARK: - Buy more (Phase 2 placeholder)
+    // MARK: - Buy more
+    //
+    // Routes through appState.showUpgrade — same plumbing the rest of
+    // the paywall surfaces use. Today (iapEnabled == false) it opens
+    // seatbee.app/pricing in Safari; when in-app purchases ship the
+    // same trigger flips to the native UpgradeView (AppRouter.swift).
 
     private var buyMoreSection: some View {
         Section {
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 8) {
                 Text("Get More Passes")
                     .font(SBFont.bodySmallBold)
                     .foregroundStyle(Color.sbCharcoal)
-                Text("In-app purchases are coming soon. For now, purchase passes on seatbee.app and they will appear here automatically.")
+                Text("Browse Event, Signature, and Grand passes — purchases land here automatically.")
                     .font(SBFont.caption)
                     .foregroundStyle(Color.sbWarm)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Button {
+                    appState.showUpgrade = true
+                    HapticEngine.selection()
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "cart")
+                            .font(.system(size: 12, weight: .semibold))
+                        Text("Buy more passes")
+                            .font(SBFont.bodySmallBold)
+                        Spacer()
+                        Image(systemName: "arrow.up.forward")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(.white.opacity(0.85))
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 11)
+                    .background(
+                        LinearGradient(colors: [Color.sbGold, Color.sbGoldDk],
+                                       startPoint: .top, endPoint: .bottom)
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: SBRadius.button))
+                }
+                .buttonStyle(.plain)
             }
             .padding(.vertical, 4)
         }
