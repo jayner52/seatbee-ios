@@ -109,7 +109,7 @@ struct PlanPickerSheet: View {
     /// plans render dimmed with an explanatory caption so the user
     /// understands why they can't select that plan.
     private func planRow(_ plan: SeatingPlan) -> some View {
-        let currentTier = resolvedTier(for: plan)
+        let currentTier = plan.resolvedTier(against: appState.userPasses)
         let eligible = pass.tier.rank > currentTier.rank
         let isApplying = applyingPlanId == plan.id
 
@@ -266,37 +266,7 @@ struct PlanPickerSheet: View {
         }
     }
 
-    /// Same resolution chain as `AppState.activePlanTier` but for
-    /// arbitrary plans (the active-tier helper only covers the
-    /// currently-open one). Catches plans whose `tier` column is stale
-    /// or nil but whose `event_pass_expires_at` / pass inventory says
-    /// they're already on a paid tier — without this the picker would
-    /// list them as "Free" and the server would 400 with
-    /// ALREADY_HAS_PASS the moment the user picked them.
-    private func resolvedTier(for plan: SeatingPlan) -> PlanTier {
-        // 1. Direct tier column, respecting expiry.
-        let raw = plan.tier ?? "free"
-        if raw != "free" {
-            if let exp = plan.eventPassExpiresAt, Date() > exp {
-                // Paid tier but pass has expired — fall through.
-            } else {
-                return PlanTier.from(raw)
-            }
-        }
-        // 2. event_pass_expires_at fallback (covers web's older
-        //    write path where the tier column wasn't kept in lockstep).
-        if let exp = plan.eventPassExpiresAt, Date() < exp {
-            return .eventPass
-        }
-        // 3. Cross-reference the user's redeemed-pass inventory — most
-        //    reliable for promo / signature / grand applied via web.
-        if let pass = appState.userPasses.passes.first(where: { p in
-            p.status == "redeemed"
-            && p.redeemedForPlanId == plan.id
-            && (p.expiresAt.map { Date() < $0 } ?? true)
-        }) {
-            return pass.tier
-        }
-        return .free
-    }
+    // resolvedTier moved to SeatingPlan.resolvedTier(against:) so
+    // multiple surfaces (this picker + the Plans tab tier badges)
+    // stay in lockstep. See SeatingPlan.swift.
 }

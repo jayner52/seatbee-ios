@@ -651,3 +651,44 @@ extension SeatingPlan {
         ((rawGuestQR?.value as? [String: Any])?["enabled"] as? Bool) ?? false
     }
 }
+
+// MARK: - Tier resolution
+//
+// Same chain as AppState.activePlanTier, but parameterised so any
+// plan (not just the active one) can be resolved. Surfaces that
+// render tier badges for arbitrary plans use this — Plans tab list,
+// Plan Picker sheet, etc. Without going through this helper, plans
+// whose `tier` column is stale but `event_pass_expires_at` is in
+// the future would render as "Free" and confuse the user.
+
+extension SeatingPlan {
+    /// Resolves the plan's effective paid tier:
+    ///   1. The `tier` column itself, respecting expiry.
+    ///   2. `event_pass_expires_at` fallback (web's older write
+    ///      paths sometimes set this without updating tier).
+    ///   3. Cross-reference the user's redeemed-pass inventory —
+    ///      most reliable for promo / signature / grand applied
+    ///      via web.
+    ///   4. Free.
+    func resolvedTier(against userPasses: PassesResponse) -> PlanTier {
+        let raw = tier ?? "free"
+        if raw != "free" {
+            if let exp = eventPassExpiresAt, Date() > exp {
+                // Paid tier but pass has expired — fall through.
+            } else {
+                return PlanTier.from(raw)
+            }
+        }
+        if let exp = eventPassExpiresAt, Date() < exp {
+            return .eventPass
+        }
+        if let pass = userPasses.passes.first(where: { p in
+            p.status == "redeemed"
+            && p.redeemedForPlanId == id
+            && (p.expiresAt.map { Date() < $0 } ?? true)
+        }) {
+            return pass.tier
+        }
+        return .free
+    }
+}
