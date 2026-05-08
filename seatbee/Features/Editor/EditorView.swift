@@ -409,7 +409,10 @@ struct EditorView: View {
                 .padding(.bottom, 8)
             }
 
-            // Action bar
+            // Action bar (stats caption is overlaid on this so it
+            // sits visually flush with the top of the FAB / AI
+            // buttons, instead of getting pushed up by the VStack
+            // flow above 44pt-tall buttons).
             HStack(spacing: 16) {
                 Menu {
                     Button { showAddTable = true } label: {
@@ -445,7 +448,22 @@ struct EditorView: View {
                 .buttonStyle(.plain)
             }
             .padding(.horizontal, 12)
-            .padding(.bottom, 90)
+            .padding(.bottom, 6)
+
+            // Stats caption — sits in the safe-area gap between the
+            // FAB / AI buttons and the iOS tab bar, so it reads as a
+            // status footer for the canvas without ever occluding
+            // the action row above it.
+            if (plan?.tables.isEmpty == false) || (plan?.guests.isEmpty == false) {
+                statsCaption
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 70)
+            } else {
+                // Keep the same vertical reservation when the
+                // caption is hidden so a fresh-empty plan doesn't
+                // pull the FAB row down toward the tab bar.
+                Color.clear.frame(height: 70)
+            }
         }
     }
 
@@ -746,9 +764,100 @@ struct EditorView: View {
         Task { try? await appState.database.savePlanData(plan: p) }
     }
 
+    /// Tiny caption above the action bar — four numbers, separated
+    /// by middots, in muted gold. Single line of 10pt text, no
+    /// pill / no shadow, sits flush above the FAB / AI row so it
+    /// reads as a status footer rather than a UI element. Each
+    /// number labels itself ("108 guests" not "108") so a glance
+    /// is enough.
+    private var statsCaption: some View {
+        HStack(spacing: 8) {
+            captionSegment(value: attendingCount, label: "guest")
+            captionDivider
+            captionSegment(value: unseatedCount, label: "to seat")
+            captionDivider
+            captionSegment(value: totalSeatsCount, label: "seat")
+            captionDivider
+            captionSegment(value: openSeatsCount, label: "open")
+        }
+        // Monospaced design + .monospacedDigit so the numbers feel
+        // like a stats readout / clock-radio segment, with constant
+        // glyph width so segments don't shimmy as values change.
+        .font(.system(size: 10, weight: .semibold, design: .monospaced))
+        .monospacedDigit()
+        .tracking(0.5)
+        .foregroundStyle(Color.sbGoldDk.opacity(0.85))
+        .frame(maxWidth: .infinity)
+        .multilineTextAlignment(.center)
+        .lineLimit(1)
+        .minimumScaleFactor(0.8)
+    }
+
+    /// "108 guests" / "0 to seat" — pluralisation handled per label.
+    /// "to seat" doesn't pluralise the way nouns do; everything else
+    /// gets a trailing s when count != 1.
+    private func captionSegment(value: Int, label: String) -> some View {
+        let suffix: String = {
+            if label == "to seat" { return label }
+            return value == 1 ? label : label + "s"
+        }()
+        return Text("\(value) \(suffix)")
+    }
+
+    private var captionDivider: some View {
+        Text("·").foregroundStyle(Color.sbGoldDk.opacity(0.45))
+    }
+
+    /// Whether a guest counts as "to be seated" — same rule the AI
+    /// seat call uses (web App.jsx:13092, iOS SeatService): drop
+    /// declined; pending/unknown only count when includeMaybes is on.
+    private func isAttending(_ g: Guest) -> Bool {
+        if g.rsvp == .no { return false }
+        let includeMaybes = plan?.includeMaybes ?? true
+        if includeMaybes { return true }
+        return g.rsvp == .yes
+    }
+
+    /// Attending guests currently assigned to a seat — drives the
+    /// editor's "X seated" stat.
+    private var attendingSeatedCount: Int {
+        guard let plan else { return 0 }
+        let attendingIds = Set(plan.guests.filter { isAttending($0) }.map(\.id))
+        return plan.tables.reduce(0) { sum, t in
+            sum + t.assignments.keys.filter { attendingIds.contains($0) }.count
+        }
+    }
+
+    /// Total attending guests on the plan (the "108 guests" segment).
+    /// Same attending rule as the seater so all four caption numbers
+    /// share a consistent basis.
+    private var attendingCount: Int {
+        plan?.guests.filter { isAttending($0) }.count ?? 0
+    }
+
+    /// Total chairs across the whole room.
+    private var totalSeatsCount: Int {
+        plan?.tables.reduce(0) { $0 + $1.seats } ?? 0
+    }
+
+    /// Chairs with no occupant. Counts every assignment (including
+    /// stale declined / pending sitters) as "filled" because the
+    /// seat is still physically taken on the canvas — what the user
+    /// cares about is "do I have room to drop someone here?".
+    private var openSeatsCount: Int {
+        guard let plan else { return 0 }
+        let assignedCount = plan.tables.reduce(0) { $0 + $1.assignments.count }
+        return max(0, totalSeatsCount - assignedCount)
+    }
+
+    /// Attending guests waiting on a seat. Used by the AI pill +
+    /// the new stat ribbon. Web parity: declined never count
+    /// regardless of includeMaybes; pending only counts when
+    /// includeMaybes is on.
     private var unseatedCount: Int {
         guard let plan else { return 0 }
-        return max(0, plan.guests.count - plan.tables.reduce(0) { $0 + $1.filledCount })
+        let seatedIds = Set(plan.tables.flatMap { $0.assignments.keys })
+        return plan.guests.filter { isAttending($0) && !seatedIds.contains($0.id) }.count
     }
 
     private func updateTablePosition(id: String, x: Double, y: Double) {
