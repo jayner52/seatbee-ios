@@ -943,16 +943,41 @@ final class PDFExportService {
 
             let availableHeight = badgesTopY - y
 
+            // Adaptive row sizing: when the plan is sparse (few
+            // categories, few highlights) we'd otherwise leave a big
+            // void between the highlights and the badges row. Compute
+            // each section's "natural" height at base row sizes, then
+            // distribute any leftover space as taller rows so the card
+            // stays balanced top-to-bottom regardless of plan density.
+            let chartRows = min(metrics.topCategories.count, 5)
+            let highlightItemsCount = countHighlightCandidates(metrics)
+            let baseChartRow: CGFloat = 36
+            let baseHlRow: CGFloat = 56
+            // Section overheads: title + 18 (chart) / title + 16 (hl).
+            let chartOverhead: CGFloat = chartRows > 0 ? 30 : 0
+            let hlOverhead: CGFloat = highlightItemsCount > 0 ? 28 : 0
+            let interGap: CGFloat = (chartRows > 0 && highlightItemsCount > 0) ? 24 : 0
+            let chartNat = chartOverhead + CGFloat(chartRows) * baseChartRow + max(0, CGFloat(chartRows - 1)) * 8
+            let hlNat = hlOverhead + CGFloat(highlightItemsCount) * baseHlRow
+            let naturalTotal = 18 /* lead-in to chart */ + chartNat + interGap + hlNat
+            let slack = max(0, availableHeight - naturalTotal)
+            let totalRowsForSlack = max(1, chartRows + highlightItemsCount)
+            let perRowSlack = slack / CGFloat(totalRowsForSlack)
+            let chartRowH: CGFloat = min(56, baseChartRow + perRowSlack)
+            let hlRowH: CGFloat = min(80, baseHlRow + perRowSlack)
+
             // Category chart — only if categorised guests exist.
             if !metrics.topCategories.isEmpty {
-                let chartHeight = min(360, availableHeight * 0.55)
+                let chartHeight = min(420, availableHeight * 0.6)
                 y = drawSocialCategoryChart(ctx: ctx, metrics: metrics, size: size,
-                                             topY: y + 18, maxHeight: chartHeight)
+                                             topY: y + 18, maxHeight: chartHeight,
+                                             rowHeight: chartRowH)
             }
 
             // Highlights — fills space between chart and badges.
             drawSocialHighlights(ctx: ctx, metrics: metrics, size: size,
-                                 topY: y + 24, bottomY: highlightsBottomY)
+                                 topY: y + 24, bottomY: highlightsBottomY,
+                                 rowHeight: hlRowH)
 
             // Badges row — pinned just above the footer.
             _ = drawSocialBadges(ctx: ctx, badges: badges, size: size, topY: badgesTopY)
@@ -1109,6 +1134,20 @@ final class PDFExportService {
         // Table shape mix — used for the TABLES sub-line and (down the
         // road) badges. Counts by SeatTable.TableType.
         let tableTypeCounts: [SeatTable.TableType: Int]
+    }
+
+    /// Mirrors the candidate-building order in drawSocialHighlights so
+    /// generateSocialImage can size the section before drawing it.
+    /// Capped at 4 to match the visible row cap.
+    private static func countHighlightCandidates(_ m: SocialMetrics) -> Int {
+        var n = 0
+        if m.topMeal != nil { n += 1 }
+        if m.mustSitPeople > 0 { n += 1 }
+        if m.dietaryGuests > 0 { n += 1 }
+        if m.keepApartPeopleCount > 0 { n += 1 }
+        if m.vipGuests > 0 { n += 1 }
+        if m.childGuests > 0 { n += 1 }
+        return min(4, n)
     }
 
     private static func computeSocialMetrics(plan: SeatingPlan) -> SocialMetrics {
@@ -1571,38 +1610,43 @@ final class PDFExportService {
     /// the bottom Y of the strip so the next section can stack.
     private static func drawSocialBranding(ctx: CGContext, size: CGSize, topY: CGFloat,
                                            tagline: String? = nil) -> CGFloat {
+        // Stacked layout: bee at top (centered), wordmark beneath it,
+        // optional tagline beneath that. Reads more like a poster /
+        // stamp than a horizontal lockup, and gives the bee enough
+        // weight to feel like the hero of the card.
         let cx = size.width / 2
-        let beeSide: CGFloat = 64
-        let wordmarkW: CGFloat = 200
+        let beeSide: CGFloat = 96
+        let wordmarkW: CGFloat = 240
         let wordmarkH: CGFloat = wordmarkW / 6        // 720x120 native ratio
-        let gap: CGFloat = 16
-        let totalW = beeSide + gap + wordmarkW
-        let startX = cx - totalW / 2
+        let beeToWordmarkGap: CGFloat = 14
 
         // Halo behind bee
-        let haloR: CGFloat = beeSide / 2 + 8
-        let haloRect = CGRect(x: startX + beeSide / 2 - haloR,
+        let haloR: CGFloat = beeSide / 2 + 10
+        let haloRect = CGRect(x: cx - haloR,
                               y: topY + beeSide / 2 - haloR,
                               width: haloR * 2, height: haloR * 2)
         ctx.setFillColor(socialChampagne.withAlphaComponent(0.55).cgColor)
         ctx.fillEllipse(in: haloRect)
 
-        // Bee logo
+        // Bee logo — centered horizontally
         if let bee = UIImage(named: "SeatbeeLogo") {
-            bee.draw(in: CGRect(x: startX, y: topY, width: beeSide, height: beeSide))
+            bee.draw(in: CGRect(x: cx - beeSide / 2, y: topY,
+                                width: beeSide, height: beeSide))
         }
-        // Wordmark — centred vertically against the bee
+        // Wordmark — centered horizontally, directly below bee
+        let wordmarkY = topY + beeSide + beeToWordmarkGap
         if let mark = UIImage(named: "SeatbeeWordmark") {
-            mark.draw(in: CGRect(x: startX + beeSide + gap,
-                                 y: topY + (beeSide - wordmarkH) / 2,
+            mark.draw(in: CGRect(x: cx - wordmarkW / 2, y: wordmarkY,
                                  width: wordmarkW, height: wordmarkH))
         }
 
-        // Optional tagline. The Wrapped image passes "SEATING SNAPSHOT";
+        let wordmarkBottom = wordmarkY + wordmarkH
+
+        // Optional tagline. The Snapshot passes "SEATING SNAPSHOT";
         // the Floor Plan image leaves it nil because the floor plan
         // diagram already labels itself.
         guard let tagline, !tagline.isEmpty else {
-            return topY + beeSide
+            return wordmarkBottom
         }
         let tagAttrs: [NSAttributedString.Key: Any] = [
             .font: UIFont.systemFont(ofSize: 13, weight: .bold),
@@ -1611,10 +1655,10 @@ final class PDFExportService {
         ]
         let tag = NSString(string: tagline)
         let tSize = tag.size(withAttributes: tagAttrs)
-        tag.draw(at: CGPoint(x: cx - tSize.width / 2, y: topY + beeSide + 14),
+        tag.draw(at: CGPoint(x: cx - tSize.width / 2, y: wordmarkBottom + 14),
                  withAttributes: tagAttrs)
 
-        return topY + beeSide + 14 + tSize.height
+        return wordmarkBottom + 14 + tSize.height
     }
 
     /// Big event title + decorative gold bar + date · venue subtitle.
@@ -1777,7 +1821,9 @@ final class PDFExportService {
     /// proportional to the largest category. Bounded by `maxHeight`.
     /// Returns the bottom Y so the next section can stack.
     private static func drawSocialCategoryChart(ctx: CGContext, metrics: SocialMetrics,
-                                                size: CGSize, topY: CGFloat, maxHeight: CGFloat) -> CGFloat {
+                                                size: CGSize, topY: CGFloat,
+                                                maxHeight: CGFloat,
+                                                rowHeight: CGFloat = 36) -> CGFloat {
         let outerInset: CGFloat = 90
         let chartLeft = outerInset
         let chartRight = size.width - outerInset
@@ -1794,8 +1840,9 @@ final class PDFExportService {
         title.draw(at: CGPoint(x: size.width / 2 - titleSize.width / 2, y: topY),
                    withAttributes: titleAttrs)
 
-        // Cap rows so we never blow past maxHeight
-        let rowH: CGFloat = 36
+        // Cap rows so we never blow past maxHeight. rowH adapts upward
+        // when the surrounding layout has slack — caller computes it.
+        let rowH: CGFloat = rowHeight
         let rowGap: CGFloat = 8
         let availableForRows = maxHeight - titleSize.height - 18
         let maxRows = max(1, Int((availableForRows + rowGap) / (rowH + rowGap)))
@@ -1820,6 +1867,10 @@ final class PDFExportService {
             .foregroundColor: socialGoldDk,
         ]
 
+        // Bar height grows gently with row height so the chart still
+        // looks like a chart at larger row sizes.
+        let barH: CGFloat = min(20, max(12, rowH * 0.28))
+
         for cat in rows {
             // Category dot
             let dotR: CGFloat = 5
@@ -1836,7 +1887,6 @@ final class PDFExportService {
                          withAttributes: nameAttrs)
 
             // Bar background
-            let barH: CGFloat = 12
             let barY = y + rowH / 2 - barH / 2
             let bgRect = CGRect(x: barLeft, y: barY, width: barFullW, height: barH)
             ctx.setFillColor(socialChampagne.withAlphaComponent(0.5).cgColor)
@@ -1870,7 +1920,8 @@ final class PDFExportService {
     /// only renders if its source data exists. Picked in priority
     /// order so the most interesting stats rise to the top.
     private static func drawSocialHighlights(ctx: CGContext, metrics: SocialMetrics,
-                                             size: CGSize, topY: CGFloat, bottomY: CGFloat) {
+                                             size: CGSize, topY: CGFloat, bottomY: CGFloat,
+                                             rowHeight: CGFloat = 56) {
         let outerInset: CGFloat = 90
         let leftX = outerInset
         let rightX = size.width - outerInset
@@ -1938,7 +1989,7 @@ final class PDFExportService {
             .foregroundColor: socialWarm,
         ]
 
-        let rowH: CGFloat = 56
+        let rowH: CGFloat = rowHeight
         let availableHeight = bottomY - (topY + titleSize.height + 16)
         let maxRows = max(1, Int(availableHeight / rowH))
         let chosen = Array(candidates.prefix(min(4, maxRows)))
