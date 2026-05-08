@@ -409,18 +409,10 @@ struct EditorView: View {
                 .padding(.bottom, 8)
             }
 
-            // Stats caption — intentionally tiny + centred so the
-            // canvas stays the focus. Four numbers: guests, to
-            // seat, seats, open. Renders only when the plan has
-            // at least one table or one attending guest, so a
-            // brand-new plan doesn't print "0 guests · 0 to seat".
-            if (plan?.tables.isEmpty == false) || (plan?.guests.isEmpty == false) {
-                statsCaption
-                    .padding(.horizontal, 12)
-                    .padding(.bottom, 4)
-            }
-
-            // Action bar
+            // Action bar (stats caption is overlaid on this so it
+            // sits visually flush with the top of the FAB / AI
+            // buttons, instead of getting pushed up by the VStack
+            // flow above 44pt-tall buttons).
             HStack(spacing: 16) {
                 Menu {
                     Button { showAddTable = true } label: {
@@ -457,6 +449,17 @@ struct EditorView: View {
             }
             .padding(.horizontal, 12)
             .padding(.bottom, 90)
+            // Stats caption overlaid right above the action row.
+            // Using overlay (not a VStack child) so the caption
+            // doesn't take layout flow space — it sits visually
+            // glued to the top edge of the action bar instead of
+            // being pushed up by the FAB's 44pt height.
+            .overlay(alignment: .top) {
+                if (plan?.tables.isEmpty == false) || (plan?.guests.isEmpty == false) {
+                    statsCaption
+                        .offset(y: -2)
+                }
+            }
         }
     }
 
@@ -764,7 +767,7 @@ struct EditorView: View {
     /// number labels itself ("108 guests" not "108") so a glance
     /// is enough.
     private var statsCaption: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 8) {
             captionSegment(value: attendingCount, label: "guest")
             captionDivider
             captionSegment(value: unseatedCount, label: "to seat")
@@ -773,12 +776,17 @@ struct EditorView: View {
             captionDivider
             captionSegment(value: openSeatsCount, label: "open")
         }
-        .font(.system(size: 10, weight: .medium))
-        .foregroundStyle(Color.sbGoldDk.opacity(0.75))
+        // Monospaced design + .monospacedDigit so the numbers feel
+        // like a stats readout / clock-radio segment, with constant
+        // glyph width so segments don't shimmy as values change.
+        .font(.system(size: 10, weight: .semibold, design: .monospaced))
+        .monospacedDigit()
+        .tracking(0.5)
+        .foregroundStyle(Color.sbGoldDk.opacity(0.85))
         .frame(maxWidth: .infinity)
         .multilineTextAlignment(.center)
         .lineLimit(1)
-        .minimumScaleFactor(0.85)
+        .minimumScaleFactor(0.8)
     }
 
     /// "108 guests" / "0 to seat" — pluralisation handled per label.
