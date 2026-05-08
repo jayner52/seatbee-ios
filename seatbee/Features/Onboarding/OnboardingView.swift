@@ -487,7 +487,11 @@ struct OnboardingView: View {
                     .font(SBFont.body).scrollContentBackground(.hidden).padding(8)
                     .onChange(of: guestListText) { _, _ in parsePastedGuests() }
                 if guestListText.isEmpty {
-                    Text("Sarah Chen, vegetarian\nJon Park\nMia Khalid, +1\n…")
+                    // Two-line example: a vanilla name and a name + dietary
+                    // note. The "+1" example was removed because Seatbee
+                    // treats every guest as a real entry — plus-ones are
+                    // their own row, not a flag.
+                    Text("Sarah Chen, vegetarian\nJon Park\nAmir Patel, gluten-free\n…")
                         .font(SBFont.body).foregroundStyle(Color.sbWarm2)
                         .padding(.horizontal, 14).padding(.vertical, 16)
                         .allowsHitTesting(false)
@@ -496,6 +500,19 @@ struct OnboardingView: View {
             .frame(height: 140)
             .background(Color.sbIvory2)
             .clipShape(RoundedRectangle(cornerRadius: SBRadius.button))
+
+            // Inline syntax hint — discoverability for the dietary-after-
+            // comma feature. Meals / VIP / child / party stay in the
+            // post-paste editor (too many inline fields = parse ambiguity).
+            HStack(spacing: 4) {
+                Image(systemName: "lightbulb")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Color.sbGoldDk)
+                Text("Tip: add a comma + dietary note (e.g. \"Sarah Chen, vegetarian\"). Add meals and parties after.")
+                    .font(SBFont.caption)
+                    .foregroundStyle(Color.sbWarm)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
 
             if !detectedGuests.isEmpty {
                 detectedSummary
@@ -1213,8 +1230,10 @@ struct OnboardingView: View {
 
     /// Parse pasted guest text. CSV-shaped input (header row with
     /// recognised column names) goes through `GuestCSVParser`; plain
-    /// line-by-line lists are treated as one name per line, with optional
-    /// `, dietary text` and `, +1` after the name on the same line.
+    /// line-by-line lists are treated as one name per line, with any
+    /// extra comma-separated tokens joined as the guest's dietary note.
+    /// Plus-ones are NOT parsed — Seatbee treats every guest as a real
+    /// entry, so a `+1` would need to be added as its own line.
     /// No AI involvement — runs synchronously on every text change.
     private func parsePastedGuests() {
         let text = guestListText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -1247,15 +1266,13 @@ struct OnboardingView: View {
             let parts = line.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }
             guard let name = parts.first, !name.isEmpty else { continue }
 
+            // Everything after the name joins as the dietary note.
+            // Plus-one tokens are explicitly NOT parsed — Seatbee treats
+            // every guest as their own entry, so users add their own
+            // line for a plus-one rather than flagging the host.
             var dietary: String? = nil
-            var plusOne: Bool? = nil
-            for extra in parts.dropFirst() {
-                let lower = extra.lowercased()
-                if lower.contains("+1") || lower.contains("plus one") || lower.contains("plus-one") {
-                    plusOne = true
-                } else if !extra.isEmpty {
-                    dietary = (dietary == nil ? extra : "\(dietary!), \(extra)")
-                }
+            for extra in parts.dropFirst() where !extra.isEmpty {
+                dietary = (dietary == nil ? extra : "\(dietary!), \(extra)")
             }
 
             let nameParts = name.split(separator: " ", maxSplits: 1)
@@ -1266,7 +1283,7 @@ struct OnboardingView: View {
                 lastName: nameParts.count > 1 ? String(nameParts.last ?? "") : nil,
                 email: nil, categories: [], dietary: dietary, notes: nil,
                 rsvp: .unknown, side: .none, vip: false,
-                accessibility: nil, plusOne: plusOne, party: nil, display: nil,
+                accessibility: nil, plusOne: nil, party: nil, display: nil,
                 dietaryTags: nil, highChair: nil, isChild: nil, groupIds: nil,
                 isBride: nil, isGroom: nil, meal: nil, guestCreatedAt: nil
             ))
