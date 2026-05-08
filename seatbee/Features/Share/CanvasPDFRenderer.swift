@@ -20,22 +20,35 @@ enum CanvasPDFRenderer {
     /// Draw the entire floor plan (room outline + objects + tables + seats)
     /// scaled to fit `rect` on the given context. No-op if the plan has no
     /// tables and no objects.
-    static func drawFloorPlan(in ctx: CGContext, rect: CGRect, plan: SeatingPlan) {
+    ///
+    /// `showGuestNames` controls whether each filled seat dot is labelled
+    /// with the guest's first name (radially placed for round/oval/sweet
+    /// tables, stacked above/below for rect/head). Used by the Floor Plan
+    /// share image — turning it on gives caterers / venues an actual
+    /// "who sits where" reference; off keeps the plan readable as a
+    /// pure room layout.
+    static func drawFloorPlan(in ctx: CGContext, rect: CGRect, plan: SeatingPlan,
+                              showGuestNames: Bool = false) {
         let bounds = computeWorldBounds(plan)
         guard bounds.width > 0, bounds.height > 0 else {
             drawEmptyMessage(in: ctx, rect: rect)
             return
         }
 
+        // When labels are on, the world bounds need extra perimeter room
+        // so names don't get clipped at the edges of the target rect.
+        let labelPad: CGFloat = showGuestNames ? 36 : 0
+        let inflatedBounds = bounds.insetBy(dx: -labelPad, dy: -labelPad)
+
         // Fit-to-rect with a small inner padding so seats/labels don't
         // touch the edge.
         let pad: CGFloat = 12
         let target = rect.insetBy(dx: pad, dy: pad)
-        let scale = min(target.width / bounds.width, target.height / bounds.height)
-        let scaledW = bounds.width * scale
-        let scaledH = bounds.height * scale
-        let offsetX = target.midX - scaledW / 2 - bounds.minX * scale
-        let offsetY = target.midY - scaledH / 2 - bounds.minY * scale
+        let scale = min(target.width / inflatedBounds.width, target.height / inflatedBounds.height)
+        let scaledW = inflatedBounds.width * scale
+        let scaledH = inflatedBounds.height * scale
+        let offsetX = target.midX - scaledW / 2 - inflatedBounds.minX * scale
+        let offsetY = target.midY - scaledH / 2 - inflatedBounds.minY * scale
 
         ctx.saveGState()
         ctx.translateBy(x: offsetX, y: offsetY)
@@ -43,7 +56,9 @@ enum CanvasPDFRenderer {
 
         drawRoomOutline(plan: plan, ctx: ctx)
         for obj in plan.objects { drawRoomObject(obj, ctx: ctx) }
-        for table in plan.tables { drawTable(table, ctx: ctx) }
+        for table in plan.tables {
+            drawTable(table, plan: plan, showGuestNames: showGuestNames, ctx: ctx)
+        }
 
         ctx.restoreGState()
     }
@@ -196,7 +211,7 @@ enum CanvasPDFRenderer {
 
     // MARK: - Tables
 
-    private static func drawTable(_ t: SeatTable, ctx: CGContext) {
+    private static func drawTable(_ t: SeatTable, plan: SeatingPlan, showGuestNames: Bool, ctx: CGContext) {
         let body = bodySize(for: t)
         let center = CGPoint(x: t.x, y: t.y)
 
@@ -248,6 +263,13 @@ enum CanvasPDFRenderer {
                        withAttributes: countAttrs)
         }
 
+        // First-name labels at each filled seat — turned on by the
+        // "Include guest names" toggle on the Share Via row. Drawn last
+        // so they sit on top of everything else.
+        if showGuestNames {
+            drawSeatGuestNames(table: t, plan: plan, body: body, center: center, ctx: ctx)
+        }
+
         ctx.restoreGState()
     }
 
@@ -267,6 +289,102 @@ enum CanvasPDFRenderer {
             ctx.setLineWidth(0.5)
             ctx.fillEllipse(in: rect)
             ctx.strokeEllipse(in: rect)
+        }
+    }
+
+    /// Per-seat first-name labels, positioned outward from the seat dot
+    /// so the table name + count inside the body remain readable.
+    /// Truncated to 9 chars + ellipsis to keep things tidy at typical
+    /// floor-plan render sizes. Only labels FILLED seats — empty seats
+    /// stay as bare dots so the eye finds them as gaps.
+    private static func drawSeatGuestNames(table: SeatTable, plan: SeatingPlan,
+                                           body: CGSize, center: CGPoint, ctx: CGContext) {
+        let positions = seatPositions(for: table, body: body, center: center)
+        guard !positions.isEmpty else { return }
+
+        // Reverse map: seatIndex -> guestId. plan.tables.assignments is
+        // guestId -> seatIndex; flip it so we can look up by index.
+        var guestBySeat: [Int: Guest] = [:]
+        let byId = Dictionary(uniqueKeysWithValues: plan.guests.map { ($0.id, $0) })
+        for (gid, idx) in table.assignments {
+            if let g = byId[gid] { guestBySeat[idx] = g }
+        }
+
+        let labelAttrs: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 7.5, weight: .semibold),
+            .foregroundColor: UIColor(red: 0.18, green: 0.18, blue: 0.18, alpha: 1),
+        ]
+        let labelOffset: CGFloat = 10  // distance from seat dot to label centre
+
+        for (i, p) in positions.enumerated() {
+            guard let g = guestBySeat[i] else { continue }
+            let label = firstNameTruncated(for: g)
+            guard !label.isEmpty else { continue }
+            let s = NSString(string: label)
+            let size = s.size(withAttributes: labelAttrs)
+
+            // Position the label OUTWARD from the table centre — radial
+            // for round/oval/sweet, vertical for rect/head. Centred on
+            // the offset point.
+            let target = labelPosition(for: table, seatPoint: p, tableCenter: center,
+                                       offset: labelOffset, labelSize: size)
+
+            // Draw a soft ivory pill behind the text so it stays
+            // legible when it overlaps another table's perimeter or a
+            // room object.
+            let padX: CGFloat = 3, padY: CGFloat = 1.5
+            let pill = CGRect(x: target.x - size.width / 2 - padX,
+                              y: target.y - size.height / 2 - padY,
+                              width: size.width + padX * 2,
+                              height: size.height + padY * 2)
+            ctx.setFillColor(UIColor(white: 0.99, alpha: 0.88).cgColor)
+            let pillPath = UIBezierPath(roundedRect: pill, cornerRadius: 3)
+            ctx.addPath(pillPath.cgPath)
+            ctx.fillPath()
+
+            s.draw(at: CGPoint(x: target.x - size.width / 2,
+                               y: target.y - size.height / 2),
+                   withAttributes: labelAttrs)
+        }
+    }
+
+    /// First name (or full display name if there's no space) truncated
+    /// to 9 chars + ellipsis. 9 is a sweet spot for typical wedding
+    /// names ("Alexander" → "Alexande…") that fits without crowding
+    /// neighbouring seats.
+    private static func firstNameTruncated(for g: Guest) -> String {
+        let raw = g.displayName.isEmpty ? g.name : g.displayName
+        let first = raw.split(separator: " ").first.map(String.init) ?? raw
+        if first.count <= 9 { return first }
+        return String(first.prefix(8)) + "…"
+    }
+
+    /// Compute where a seat label should sit. Round / oval / sweet
+    /// tables get radial placement (label flies outward along the
+    /// vector from table centre to seat). Rect / head tables get
+    /// vertical placement (above for top-row seats, below for bottom).
+    private static func labelPosition(for table: SeatTable, seatPoint p: CGPoint,
+                                       tableCenter c: CGPoint, offset: CGFloat,
+                                       labelSize: CGSize) -> CGPoint {
+        switch table.type {
+        case .round, .oval, .sweetheart:
+            let dx = p.x - c.x
+            let dy = p.y - c.y
+            let dist = sqrt(dx * dx + dy * dy)
+            guard dist > 0 else {
+                return CGPoint(x: p.x, y: p.y + offset + labelSize.height / 2)
+            }
+            let nx = dx / dist
+            let ny = dy / dist
+            return CGPoint(x: p.x + nx * (offset + labelSize.height / 2),
+                           y: p.y + ny * (offset + labelSize.height / 2))
+        case .rect, .head:
+            // Top row of seats sits above the body, bottom row below.
+            // Push the label further in the same direction so it's
+            // beyond the seat dot.
+            let above = p.y < c.y
+            return CGPoint(x: p.x,
+                           y: p.y + (above ? -offset : offset))
         }
     }
 

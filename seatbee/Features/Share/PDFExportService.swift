@@ -925,7 +925,7 @@ final class PDFExportService {
             drawSocialBackground(ctx: ctx, size: size)
 
             var y: CGFloat = 70
-            y = drawSocialBranding(ctx: ctx, size: size, topY: y)
+            y = drawSocialBranding(ctx: ctx, size: size, topY: y, tagline: "SEATING SNAPSHOT")
             y = drawSocialEventBlock(ctx: ctx, plan: plan, size: size, topY: y + 24)
             y = drawSocialHeadlineStats(ctx: ctx, metrics: metrics, size: size, topY: y + 28)
 
@@ -966,7 +966,7 @@ final class PDFExportService {
     // footer copy, they update in lockstep.
 
     @MainActor
-    static func generateFloorPlanImage(plan: SeatingPlan) -> UIImage? {
+    static func generateFloorPlanImage(plan: SeatingPlan, showGuestNames: Bool = false) -> UIImage? {
         let size: CGFloat = 1080
         let renderer = UIGraphicsImageRenderer(size: CGSize(width: size, height: size))
         return renderer.image { context in
@@ -975,7 +975,10 @@ final class PDFExportService {
             drawSocialBackground(ctx: ctx, size: size)
 
             var y: CGFloat = 70
-            y = drawSocialBranding(ctx: ctx, size: size, topY: y)
+            // No tagline — the floor plan diagram IS the content, and
+            // the bee + wordmark already establishes brand. Avoids the
+            // visual noise of "FLOOR PLAN" labelled twice.
+            y = drawSocialBranding(ctx: ctx, size: size, topY: y, tagline: nil)
             y = drawSocialEventBlock(ctx: ctx, plan: plan, size: size, topY: y + 24)
 
             // Floor plan card — generous footprint so it reads as the
@@ -1011,7 +1014,8 @@ final class PDFExportService {
             // Inset the actual drawing rect a hair so seat dots and
             // labels don't kiss the card border.
             let drawRect = cardRect.insetBy(dx: 16, dy: 16)
-            CanvasPDFRenderer.drawFloorPlan(in: ctx, rect: drawRect, plan: plan)
+            CanvasPDFRenderer.drawFloorPlan(in: ctx, rect: drawRect, plan: plan,
+                                             showGuestNames: showGuestNames)
 
             // Mini-stats line under the card: "110 GUESTS · 19 TABLES".
             // Small + restrained — the floor plan is the hero, this is
@@ -1035,11 +1039,14 @@ final class PDFExportService {
         }
     }
 
-    static func shareFloorPlanImage(plan: SeatingPlan) {
-        guard let image = generateFloorPlanImage(plan: plan),
+    static func shareFloorPlanImage(plan: SeatingPlan, showGuestNames: Bool = false) {
+        guard let image = generateFloorPlanImage(plan: plan, showGuestNames: showGuestNames),
               let data = image.pngData() else { return }
+        // Filename hints at the variant so the user can tell two
+        // exports apart in their Photos / Files app.
+        let suffix = showGuestNames ? "Seating Chart" : "Floor Plan"
         let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("\(plan.name) — Floor Plan.png")
+            .appendingPathComponent("\(plan.name) — \(suffix).png")
         try? data.write(to: url)
         shareFile(url)
     }
@@ -1208,7 +1215,8 @@ final class PDFExportService {
     /// to the right of it (single horizontal line, not stacked) so the
     /// header steals less vertical space than the v1 layout. Returns
     /// the bottom Y of the strip so the next section can stack.
-    private static func drawSocialBranding(ctx: CGContext, size: CGFloat, topY: CGFloat) -> CGFloat {
+    private static func drawSocialBranding(ctx: CGContext, size: CGFloat, topY: CGFloat,
+                                           tagline: String? = nil) -> CGFloat {
         let cx = size / 2
         let beeSide: CGFloat = 64
         let wordmarkW: CGFloat = 200
@@ -1236,13 +1244,18 @@ final class PDFExportService {
                                  width: wordmarkW, height: wordmarkH))
         }
 
-        // "Seating Wrapped" tagline
+        // Optional tagline. The Wrapped image passes "SEATING SNAPSHOT";
+        // the Floor Plan image leaves it nil because the floor plan
+        // diagram already labels itself.
+        guard let tagline, !tagline.isEmpty else {
+            return topY + beeSide
+        }
         let tagAttrs: [NSAttributedString.Key: Any] = [
             .font: UIFont.systemFont(ofSize: 13, weight: .bold),
             .foregroundColor: socialGoldDk,
             .kern: 4,
         ]
-        let tag = NSString(string: "SEATING WRAPPED")
+        let tag = NSString(string: tagline)
         let tSize = tag.size(withAttributes: tagAttrs)
         tag.draw(at: CGPoint(x: cx - tSize.width / 2, y: topY + beeSide + 14),
                  withAttributes: tagAttrs)

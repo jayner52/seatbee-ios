@@ -29,6 +29,11 @@ struct ShareView: View {
     @State private var pdfOpts: PDFExportOpts = .default
     @State private var showCanvaSheet = false
 
+    // Floor Plan share toggle — when on, names are drawn at each
+    // filled seat in the Floor Plan share image. Defaults to ON
+    // because a "seating plan" without names is just a room diagram.
+    @State private var includeGuestNamesOnFloorPlan = true
+
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
@@ -335,19 +340,46 @@ struct ShareView: View {
     // images for socials, that row is PDFs / Canva for printing.
 
     private var shareViaRow: some View {
-        HStack(spacing: 12) {
-            shareViaCard(
-                icon: "sparkles",
-                title: "Wrapped",
-                subtitle: "Branded share card with stats",
-                action: { handleShareSocial() }
-            )
-            shareViaCard(
-                icon: "square.grid.2x2",
-                title: "Floor Plan",
-                subtitle: "Hero image of your room layout",
-                action: { handleShareFloorPlan() }
-            )
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 12) {
+                shareViaCard(
+                    icon: "sparkles",
+                    title: "Snapshot",
+                    subtitle: "Branded share card with stats",
+                    action: { handleShareSocial() }
+                )
+                shareViaCard(
+                    icon: "square.grid.2x2",
+                    title: includeGuestNamesOnFloorPlan ? "Seating Chart" : "Floor Plan",
+                    subtitle: includeGuestNamesOnFloorPlan
+                        ? "Room layout with each guest's name"
+                        : "Room layout — tables only, no names",
+                    action: { handleShareFloorPlan() }
+                )
+            }
+
+            // Inline toggle row for the Floor Plan variant. Drawn as a
+            // tappable check pill rather than a SwiftUI Toggle so it
+            // sits flush with the share-card row's typography.
+            Button {
+                includeGuestNamesOnFloorPlan.toggle()
+                HapticEngine.selection()
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: includeGuestNamesOnFloorPlan ? "checkmark.square.fill" : "square")
+                        .font(.system(size: 16))
+                        .foregroundStyle(includeGuestNamesOnFloorPlan ? Color.sbGoldDk : Color.sbWarm2)
+                    Text("Include guest names on Floor Plan")
+                        .font(SBFont.caption)
+                        .foregroundStyle(Color.sbCharcoal)
+                    Spacer()
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(Color.sbIvory2)
+                .clipShape(RoundedRectangle(cornerRadius: SBRadius.button))
+            }
+            .buttonStyle(.plain)
         }
     }
 
@@ -391,7 +423,8 @@ struct ShareView: View {
 
     private func handleShareFloorPlan() {
         guard let plan = appState.activePlan else { return }
-        PDFExportService.shareFloorPlanImage(plan: plan)
+        PDFExportService.shareFloorPlanImage(plan: plan,
+                                              showGuestNames: includeGuestNamesOnFloorPlan)
     }
 
     // MARK: - Export — PRINT & DESIGN
