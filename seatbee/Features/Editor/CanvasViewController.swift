@@ -1544,6 +1544,11 @@ class CanvasObjectView: UIView {
     func update(object: RoomObject, isSelected: Bool) {
         self.object = object
         self.isItemSelected = isSelected
+        // Reset transform before resizing — UIKit's frame.size setter
+        // doesn't behave the way you expect on a rotated view, and we
+        // want the underlying bounds to reflect the unrotated body
+        // before re-applying the rotation transform below.
+        transform = .identity
         frame.size = CGSize(width: object.width, height: object.height)
 
         let def = venueObjectTypes.first { $0.type == object.type }
@@ -1584,6 +1589,16 @@ class CanvasObjectView: UIView {
         let badgeSize: CGFloat = 16
         lockBadge.frame = CGRect(x: bounds.width - badgeSize - 4, y: 4, width: badgeSize, height: badgeSize)
         lockBadge.isHidden = (object.locked != true)
+
+        // Apply object.rotation as a CGAffineTransform — same way
+        // CanvasTableView handles table rotation. Without this, the
+        // VenueObjects sheet's rotation slider wrote to plan state
+        // but the canvas never updated visually until the user
+        // dragged the object or re-entered the editor.
+        let rad = CGFloat((object.rotation ?? 0) * .pi / 180)
+        if rad != 0 {
+            transform = CGAffineTransform(rotationAngle: rad)
+        }
     }
 
     func setSelected(_ selected: Bool) {
