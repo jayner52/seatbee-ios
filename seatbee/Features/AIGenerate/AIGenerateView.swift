@@ -197,14 +197,27 @@ struct AIGenerateView: View {
                     }
                 }
                 if fellBackToRoundRobin {
-                    Text("Solver returned 0 — used round-robin fallback. Check your rules for conflicts.")
-                        .font(SBFont.caption)
-                        .foregroundStyle(Color.sbError)
-                        .multilineTextAlignment(.center)
-                        .padding(12)
-                        .frame(maxWidth: .infinity)
-                        .background(Color.sbError.opacity(0.08))
-                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Solver returned 0 — used round-robin fallback. Check your rules for conflicts.")
+                            .font(SBFont.caption)
+                            .foregroundStyle(Color.sbError)
+                        // When solve() threw on the server, the actual
+                        // exception text is captured in
+                        // scorecard.suggestions[0]. Surface it so we
+                        // can debug (e.g. "Solver error: cannot read
+                        // property 'id' of undefined" → bad rule ref).
+                        if let detail = solverErrorDetail {
+                            Text(detail)
+                                .font(SBFont.caption)
+                                .foregroundStyle(Color.sbWarm)
+                                .padding(.top, 2)
+                        }
+                    }
+                    .multilineTextAlignment(.leading)
+                    .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.sbError.opacity(0.08))
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 }
                 actionStackComplete
                 Spacer(minLength: 100)
@@ -241,7 +254,7 @@ struct AIGenerateView: View {
                     if !s.overallLabel.isEmpty {
                         Text(s.overallLabel)
                             .font(SBFont.bodySemibold)
-                            .foregroundStyle(Color.sbSage)
+                            .foregroundStyle(labelColor(for: s.overallLabel))
                     }
                 }
                 Spacer()
@@ -254,12 +267,16 @@ struct AIGenerateView: View {
                         .foregroundStyle(Color.sbWarm)
                 }
             }
-            // Progress bar — fill width = overallPercent / 100.
+            // Progress bar — fill width = overallPercent / 100,
+            // colour keyed off the same percentage bands as the
+            // label and the web app's getProgressColor (App.jsx
+            // ~12968): sage at 80%+, gold at 70%+, blush/orange at
+            // 50%+, error red below 50.
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     Capsule().fill(Color.sbWarm2.opacity(0.25))
                     Capsule()
-                        .fill(Color.sbSage)
+                        .fill(progressBarColor(for: s.overallPercent))
                         .frame(width: geo.size.width * (CGFloat(max(0, min(100, s.overallPercent))) / 100))
                 }
             }
@@ -349,6 +366,28 @@ struct AIGenerateView: View {
         case "violated":  return Color.sbError.opacity(0.10)
         case "partial":   return Color.sbChampagne.opacity(0.50)
         default:          return Color.clear
+        }
+    }
+
+    /// Tier-coloured progress bar — same bands as the "getLabel"
+    /// thresholds in solve.js.
+    private func progressBarColor(for percent: Int) -> Color {
+        switch percent {
+        case 80...:    return Color.sbSage     // Perfect / Excellent / Great
+        case 70...:    return Color.sbGold     // Good
+        case 50...:    return Color.sbBlush    // Fair
+        default:       return Color.sbError    // Needs Work
+        }
+    }
+
+    /// Coloured label text matching the bar's tier so a 94%
+    /// "Excellent" reads as green typography, not red.
+    private func labelColor(for label: String) -> Color {
+        switch label {
+        case "Perfect", "Excellent", "Great": return Color.sbSage
+        case "Good":                          return Color.sbGoldDk
+        case "Fair":                          return Color.sbBlush
+        default:                              return Color.sbError
         }
     }
 
@@ -676,6 +715,15 @@ struct AIGenerateView: View {
 
     private var activeGuestCount: Int { activeGuests.count }
 
+    /// First entry of scorecard.suggestions when it begins with
+    /// "Solver error:" — the server stamps the JS exception message
+    /// there when solve() throws. Used by completeState below to
+    /// show the actual cause when the round-robin fallback kicks in.
+    private var solverErrorDetail: String? {
+        guard let s = lastResult?.scorecard else { return nil }
+        return s.suggestions.first { $0.hasPrefix("Solver error") }
+    }
+
     private var guestsSeated: Int {
         guard let plan = appState.activePlan else { return 0 }
         return plan.tables.reduce(0) { sum, t in
@@ -737,7 +785,12 @@ struct AIGenerateView: View {
             lastResult = result
             appState.lastGenResult = (planId: plan.id, result: result)
             fellBackToRoundRobin = result.fallback ?? false
-            resultMessage = "Seated \(plan.tables.reduce(0) { $0 + $1.assignments.count }) of \(activeGuestCount) guests."
+            // Use guestsSeated (which already filters rsvp == .no)
+            // for the numerator so the message stays consistent with
+            // the denominator. Without the filter, a stale declined
+            // guest sitting in plan.tables.assignments produced a
+            // "Seated 114 of 108" overshoot.
+            resultMessage = "Seated \(guestsSeated) of \(activeGuestCount) guests."
             HapticEngine.success()
             phase = .complete
         } catch let error as SeatService.SeatError {

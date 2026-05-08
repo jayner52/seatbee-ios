@@ -43,6 +43,12 @@ final class SeatService {
             let totalSatisfied: Int
             let hardConstraints: RuleBucket
             let softPreferences: RuleBucket
+            // Server's `scorecard.suggestions` array — when solve()
+            // throws, the first entry is "Solver error: <message>",
+            // which is the only place the actual exception text is
+            // exposed. Plumb it so the AI Generate screen can surface
+            // it instead of a generic "Error" label.
+            let suggestions: [String]
 
             init(from decoder: Decoder) throws {
                 let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -52,11 +58,12 @@ final class SeatService {
                 totalSatisfied  = (try? c.decode(Int.self, forKey: .totalSatisfied)) ?? 0
                 hardConstraints = (try? c.decode(RuleBucket.self, forKey: .hardConstraints)) ?? .empty
                 softPreferences = (try? c.decode(RuleBucket.self, forKey: .softPreferences)) ?? .empty
+                suggestions     = (try? c.decode([String].self, forKey: .suggestions)) ?? []
             }
 
             enum CodingKeys: String, CodingKey {
                 case overallPercent, overallLabel, totalRules, totalSatisfied
-                case hardConstraints, softPreferences
+                case hardConstraints, softPreferences, suggestions
             }
         }
 
@@ -158,16 +165,20 @@ final class SeatService {
             }
         }
 
-        // Respect includeMaybes (web parity, App.jsx:13092). solve.js
-        // already drops rsvp == "no" guests internally, but pending/
-        // unknown only get excluded when includeMaybes == false. Filter
-        // the guest payload here so the server sees the same set of
-        // attendees web would.
+        // Pre-filter attending guests (web parity, App.jsx:13092):
+        //   includeMaybes=true  → drop rsvp == "no"   (default)
+        //   includeMaybes=false → keep only rsvp == "yes"
+        // solve.js was historically called with attending-only and
+        // some unit/rule lookups assume that invariant — sending
+        // declined guests in the payload caused mixed-RSVP units
+        // to misbehave. iOS now mirrors web's pre-filter exactly.
         let includeMaybes = plan.includeMaybes ?? true
         let allGuests = (dtoDict["guests"] as? [[String: Any]]) ?? []
-        let filteredGuests: [[String: Any]] = includeMaybes
-            ? allGuests
-            : allGuests.filter { (($0["rsvp"] as? String) ?? "") == "yes" }
+        let filteredGuests: [[String: Any]] = allGuests.filter { dict in
+            let rsvp = (dict["rsvp"] as? String) ?? ""
+            if includeMaybes { return rsvp != "no" }
+            return rsvp == "yes"
+        }
 
         var body: [String: Any] = [
             "tables":              dtoDict["tables"] ?? [],
