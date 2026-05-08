@@ -62,6 +62,12 @@ struct GuestsView: View {
     private static let filterRSVPYes = "__rsvp_yes"
     private static let filterRSVPPending = "__rsvp_pending"
     private static let filterRSVPNo = "__rsvp_no"
+    // "Missing data" filters — surface the stragglers without
+    // scrolling. Helpful for catering prep ("who hasn't given me a
+    // meal?"), dietary follow-up, or category cleanup.
+    private static let filterNoMeal = "__no_meal"
+    private static let filterNoDietary = "__no_dietary"
+    private static let filterNoCategory = "__no_category"
 
     /// Canonical id → name list, sorted alphabetically by name. Same
     /// pattern as RulesView.canonicalCategories / CategoriesSheet so
@@ -103,6 +109,27 @@ struct GuestsView: View {
         let hasDietary = guests.contains { ($0.dietaryTags?.isEmpty == false) || ($0.dietary?.isEmpty == false) }
         if hasDietary {
             out.append((Self.filterDietary, "Dietary"))
+        }
+        // "Missing data" chips — only surface when at least one guest
+        // qualifies (so a fully-finished plan doesn't carry permanent
+        // empty filters). Counts on the chips would clutter; users
+        // can read the filtered list count instead.
+        let missingMealCount = guests.filter {
+            ($0.meal?.trimmingCharacters(in: .whitespaces).isEmpty ?? true)
+        }.count
+        if missingMealCount > 0 && missingMealCount < guests.count {
+            out.append((Self.filterNoMeal, "No meal"))
+        }
+        let missingDietaryCount = guests.filter {
+            ($0.dietaryTags?.isEmpty ?? true) &&
+            ($0.dietary?.isEmpty ?? true)
+        }.count
+        if missingDietaryCount > 0 && missingDietaryCount < guests.count {
+            out.append((Self.filterNoDietary, "No dietary"))
+        }
+        let missingCategoryCount = guests.filter { $0.categories.isEmpty }.count
+        if missingCategoryCount > 0 && missingCategoryCount < guests.count {
+            out.append((Self.filterNoCategory, "No category"))
         }
         return out
     }
@@ -768,6 +795,16 @@ struct GuestsView: View {
             result = result.filter { $0.rsvp == .pending || $0.rsvp == .unknown }
         case Self.filterRSVPNo:
             result = result.filter { $0.rsvp == .no }
+        case Self.filterNoMeal:
+            result = result.filter {
+                ($0.meal?.trimmingCharacters(in: .whitespaces).isEmpty ?? true)
+            }
+        case Self.filterNoDietary:
+            result = result.filter {
+                ($0.dietaryTags?.isEmpty ?? true) && ($0.dietary?.isEmpty ?? true)
+            }
+        case Self.filterNoCategory:
+            result = result.filter { $0.categories.isEmpty }
         default:
             // Category filter: match by canonical ID (selectedFilter holds
             // the rawCategories entry's id, not the displayed name). This
