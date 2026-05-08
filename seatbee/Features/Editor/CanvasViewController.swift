@@ -879,10 +879,13 @@ class CanvasTableView: UIView {
     private var seatInitialLayers: [CATextLayer] = [] // initials shown when zoom ≥ threshold
     private let lockBadge = UIImageView()
 
-    /// Zoom-aware seat-label gating. Web parity (App.jsx PR #12 + #13):
-    /// at zoom < 1.3× we render seats as small dots; at ≥ 1.3× we
-    /// enlarge them and show two-letter initials of the seated guest.
+    /// Zoom-aware seat-label gating. Three tiers, matching what web
+    /// shows when zoomed all the way in:
+    ///   < 1.3×  → small dots only
+    ///   1.3×–2× → larger dots + 2-letter initials
+    ///   ≥ 2×   → larger dots + full first name (web parity)
     private static let seatLabelZoomThreshold: CGFloat = 1.3
+    private static let seatLabelFullNameZoomThreshold: CGFloat = 2.0
     private var currentZoom: CGFloat = 1.0
     /// Cache of seatIndex → guest so the parent can change the zoom
     /// without re-passing the guest list each time.
@@ -1075,6 +1078,7 @@ class CanvasTableView: UIView {
         seatInitialLayers = []
 
         let showInitials = currentZoom >= Self.seatLabelZoomThreshold
+        let showFullName = currentZoom >= Self.seatLabelFullNameZoomThreshold
         let dotSize: CGFloat = showInitials ? 18 : 8
         let gold = CanvasTableView.atmGold
         let emptyStroke = UIColor(red: 201/255, green: 169/255, blue: 97/255, alpha: 0.45)
@@ -1096,24 +1100,55 @@ class CanvasTableView: UIView {
             layer.addSublayer(dot)
             seatLayers.append(dot)
 
-            // Initials — only when zoomed past the threshold AND the seat
-            // is filled. Empty seats stay as plain rings even when zoomed.
+            // Seat label — only when zoomed past at least the initials
+            // threshold AND the seat is filled. Two label modes:
+            //   - `showFullName` (zoom ≥ 2×): render the guest's first
+            //     name BELOW the seat dot (web parity), so the dot
+            //     itself stays uncluttered and the name doesn't
+            //     fight the seat for the same pixels
+            //   - `showInitials` (1.3× ≤ zoom < 2×): two-letter
+            //     initials INSIDE the dot, as before
             if showInitials, let guest = seatGuestByIndex[i] {
                 let text = CATextLayer()
                 text.contentsScale = UIScreen.main.scale
                 text.alignmentMode = .center
-                text.string = Self.initials(for: guest.displayName)
-                text.foregroundColor = CanvasTableView.atmPaper.cgColor
-                text.font = UIFont.systemFont(ofSize: 9, weight: .semibold)
-                text.fontSize = 9
-                let textHeight: CGFloat = 11
-                text.frame = CGRect(x: pos.x - dotSize/2,
-                                    y: pos.y - textHeight/2,
-                                    width: dotSize, height: textHeight)
+                if showFullName {
+                    text.string = Self.firstName(for: guest.displayName)
+                    text.foregroundColor = CanvasTableView.atmInk.cgColor
+                    text.font = UIFont.systemFont(ofSize: 10, weight: .semibold)
+                    text.fontSize = 10
+                    // Sit BELOW the dot so it doesn't overlap the seat
+                    // glyph. Width is generous so longer names don't
+                    // clip; CATextLayer truncates by default if it
+                    // really overflows.
+                    let labelWidth: CGFloat = 70
+                    let labelHeight: CGFloat = 12
+                    text.frame = CGRect(
+                        x: pos.x - labelWidth / 2,
+                        y: pos.y + dotSize / 2 + 2,
+                        width: labelWidth, height: labelHeight
+                    )
+                } else {
+                    text.string = Self.initials(for: guest.displayName)
+                    text.foregroundColor = CanvasTableView.atmPaper.cgColor
+                    text.font = UIFont.systemFont(ofSize: 9, weight: .semibold)
+                    text.fontSize = 9
+                    let textHeight: CGFloat = 11
+                    text.frame = CGRect(x: pos.x - dotSize/2,
+                                        y: pos.y - textHeight/2,
+                                        width: dotSize, height: textHeight)
+                }
                 layer.addSublayer(text)
                 seatInitialLayers.append(text)
             }
         }
+    }
+
+    /// First-name extractor for canvas labels at high zoom. Mirrors
+    /// web's `displayName` first-token convention.
+    private static func firstName(for name: String) -> String {
+        let parts = name.split(separator: " ")
+        return String(parts.first ?? Substring(name))
     }
 
     /// Two-letter initials matching SBAvatar's logic so canvas + drawer agree.
@@ -1126,19 +1161,26 @@ class CanvasTableView: UIView {
     }
 
     /// Called by the parent view controller when the canvas zoom changes.
-    /// Re-renders seats only when the threshold is crossed so we don't
-    /// thrash CATextLayers on every zoom delta.
+    /// Re-renders seats when EITHER threshold is crossed (initials at
+    /// 1.3× or full-name at 2×) so we pick up label-mode changes
+    /// without thrashing CATextLayers on every zoom delta.
     func setZoom(_ zoom: CGFloat) {
-        let wasShowing = currentZoom >= Self.seatLabelZoomThreshold
-        let nowShowing = zoom >= Self.seatLabelZoomThreshold
+        let oldTier = labelTier(for: currentZoom)
+        let newTier = labelTier(for: zoom)
         currentZoom = zoom
-        guard wasShowing != nowShowing, lastBody != .zero else { return }
+        guard oldTier != newTier, lastBody != .zero else { return }
         let total = max(table.seats, 1)
         let filled = max(0, min(table.filledCount, total))
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         renderSeats(table: table, body: lastBody, center: lastBodyCenter, filled: filled)
         CATransaction.commit()
+    }
+
+    private func labelTier(for zoom: CGFloat) -> Int {
+        if zoom >= Self.seatLabelFullNameZoomThreshold { return 2 }
+        if zoom >= Self.seatLabelZoomThreshold { return 1 }
+        return 0
     }
 
     // MARK: - Progress / count helpers

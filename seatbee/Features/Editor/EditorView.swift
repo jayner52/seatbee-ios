@@ -609,17 +609,27 @@ struct EditorView: View {
             ForEach(0..<table.seats, id: \.self) { index in
                 let guestId = table.assignments.first { $0.value == index }?.key
                 let guest = plan?.guests.first { $0.id == guestId }
-                if let guest {
-                    filledSeatRow(index: index, guest: guest, isLocked: isLocked)
-                } else {
-                    emptySeatRow(index: index, isLocked: isLocked)
+                Group {
+                    if let guest {
+                        filledSeatRow(index: index, guest: guest, isLocked: isLocked)
+                    } else {
+                        emptySeatRow(index: index, isLocked: isLocked)
+                    }
+                }
+                // Drop target on every row — locked tables refuse the
+                // drop. The dragged transferable is the guest id; the
+                // drop fires reorderSeat(...) which decides between
+                // a swap (target filled) and a move (target empty).
+                .dropDestination(for: String.self) { items, _ in
+                    guard !isLocked, let droppedId = items.first else { return false }
+                    return reorderSeat(tableId: table.id, draggedGuestId: droppedId, targetIndex: index)
                 }
             }
         }
     }
 
     private func filledSeatRow(index: Int, guest: Guest, isLocked: Bool = false) -> some View {
-        HStack(spacing: 10) {
+        let body = HStack(spacing: 10) {
             ZStack {
                 Circle().fill(Color.sbGold).frame(width: 22, height: 22)
                 Text("\(index + 1)").font(SBFont.inter(10, weight: .bold)).foregroundStyle(.white)
@@ -645,6 +655,37 @@ struct EditorView: View {
         .padding(8)
         .background(guest.side == .bride || guest.side == .groom ? Color.sbChampagne.opacity(0.4) : Color.clear)
         .clipShape(RoundedRectangle(cornerRadius: 8))
+
+        // Long-press → drag the guest to another seat to reorder.
+        // SwiftUI ships String as Transferable, so the guest id is
+        // enough payload — the receiver looks it up + swaps. Locked
+        // tables don't expose .draggable so the icon stays still.
+        return Group {
+            if isLocked {
+                body
+            } else {
+                body
+                    .draggable(guest.id) {
+                        // Lift preview — a gold-ringed mini avatar
+                        // makes it obvious which guest is in the
+                        // air during the drag.
+                        HStack(spacing: 8) {
+                            SBAvatar(name: guest.displayName, size: 28)
+                            Text(guest.displayName)
+                                .font(SBFont.inter(13, weight: .semibold))
+                                .foregroundStyle(Color.sbCharcoal)
+                                .lineLimit(1)
+                        }
+                        .padding(8)
+                        .background(Color.sbIvory)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .strokeBorder(Color.sbGold, lineWidth: 1.5)
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+            }
+        }
     }
 
     private func emptySeatRow(index: Int, isLocked: Bool = false) -> some View {
@@ -788,6 +829,35 @@ struct EditorView: View {
     private func savePositions() {
         guard let plan = appState.activePlan else { return }
         Task { try? await appState.database.savePlanData(plan: plan) }
+    }
+
+    /// Drag-drop seat reorder. Accepts a guest id (from .draggable
+    /// on filledSeatRow) and a target seat index on the SAME table.
+    /// Empty target → move; filled target → swap. Returns true to
+    /// accept the drop. Locked tables are filtered upstream so we
+    /// don't need a guard here.
+    private func reorderSeat(tableId: String, draggedGuestId: String, targetIndex: Int) -> Bool {
+        guard var p = appState.activePlan,
+              let ti = p.tables.firstIndex(where: { $0.id == tableId }) else { return false }
+        var t = p.tables[ti]
+        // Drag must originate from this same table — cross-table
+        // moves go through the existing assign flow, not this drop.
+        guard let currentIndex = t.assignments[draggedGuestId] else { return false }
+        if currentIndex == targetIndex { return false } // no-op
+
+        if let occupant = t.assignments.first(where: { $0.value == targetIndex })?.key {
+            // Swap: target occupant takes the dragged guest's old seat.
+            t.assignments[occupant] = currentIndex
+            t.assignments[draggedGuestId] = targetIndex
+        } else {
+            // Move into empty seat.
+            t.assignments[draggedGuestId] = targetIndex
+        }
+        p.tables[ti] = t
+        appState.activePlan = p
+        HapticEngine.success()
+        Task { try? await appState.database.savePlanData(plan: p) }
+        return true
     }
 
     private func unassignGuest(_ guest: Guest) {
