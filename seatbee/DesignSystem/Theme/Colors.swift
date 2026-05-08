@@ -16,6 +16,8 @@ extension Color {
     static let sbWarm2 = Color(hex: "B9B3A6")
     static let sbSage = Color(hex: "9CAF88")
     static let sbBlush = Color(hex: "D4A5A5")
+    static let sbPlum = Color(hex: "9B8EC4")          // Grand Pass accent (web --color-grand)
+    static let sbPlumLt = Color(hex: "F3F0FA")        // Grand Pass light tint
     static let sbError = Color(hex: "C17B7B")
 
     static let sbLine = Color(hex: "2D2D2D").opacity(0.10)

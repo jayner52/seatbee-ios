@@ -526,19 +526,19 @@ struct OnboardingView: View {
             }
         } label: {
             HStack(spacing: 12) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(passTileTint(tier))
-                        .frame(width: 36, height: 36)
-                    Text(passTileLetter(tier))
-                        .font(SBFont.bodySmallBold)
-                        .foregroundStyle(passTileForeground(tier))
-                }
+                // Key icon — same visual cue web uses (App.jsx ~20284):
+                // one icon for all tiers, tinted in the tier accent so
+                // the colour does the differentiating, not a letter.
+                Image(systemName: "key.fill")
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundStyle(passAccent(tier))
+                    .frame(width: 36, height: 36)
+                    .rotationEffect(.degrees(-45))   // diagonal, like web SVG
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(tier.displayName)
                         .font(SBFont.bodySmallBold)
-                        .foregroundStyle(Color.sbCharcoal)
+                        .foregroundStyle(passAccent(tier))
                     Text(passTileSubtitle(tier, count: count))
                         .font(SBFont.caption)
                         .foregroundStyle(Color.sbWarm)
@@ -550,14 +550,14 @@ struct OnboardingView: View {
                     if isSelected {
                         Image(systemName: "checkmark.circle.fill")
                             .font(.system(size: 18))
-                            .foregroundStyle(Color.sbGoldDk)
+                            .foregroundStyle(passAccent(tier))
                     } else {
                         Text("\(count) available")
                             .font(SBFont.capsLabel)
-                            .foregroundStyle(Color.sbGoldDk)
+                            .foregroundStyle(passAccent(tier))
                             .padding(.horizontal, 8)
                             .padding(.vertical, 3)
-                            .background(Color.sbChampagne)
+                            .background(passAccentTint(tier))
                             .clipShape(Capsule())
                     }
                 } else {
@@ -566,46 +566,43 @@ struct OnboardingView: View {
                         .foregroundStyle(.white)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
-                        .background(Color.sbGoldDk)
+                        .background(passAccent(tier))
                         .clipShape(Capsule())
                 }
             }
             .padding(12)
-            .background(isSelected ? Color.sbChampagne.opacity(0.5) : Color.sbIvory2)
+            .background(isSelected ? passAccentTint(tier) : Color.sbIvory2)
             .clipShape(RoundedRectangle(cornerRadius: SBRadius.button))
             .overlay(
                 RoundedRectangle(cornerRadius: SBRadius.button)
-                    .strokeBorder(isSelected ? Color.sbGoldDk : Color.sbLine,
+                    .strokeBorder(isSelected ? passAccent(tier) : Color.sbLine,
                                   lineWidth: isSelected ? 2 : 1)
             )
         }
         .buttonStyle(.plain)
     }
 
-    private func passTileLetter(_ tier: PlanTier) -> String {
+    /// Tier accent colour — matches web's text/border palette
+    /// (App.jsx ~20284 / index.css `--color-grand-rgb`). Charcoal for
+    /// Event (the entry tier), gold for Signature, plum for Grand.
+    private func passAccent(_ tier: PlanTier) -> Color {
         switch tier {
-        case .free:           return "F"
-        case .eventPass:      return "E"
-        case .signaturePass:  return "S"
-        case .proPass:        return "G"
-        }
-    }
-
-    private func passTileTint(_ tier: PlanTier) -> Color {
-        switch tier {
-        case .eventPass:      return Color.sbChampagne
-        case .signaturePass:  return Color.sbGold.opacity(0.30)
-        case .proPass:        return Color.sbCharcoal.opacity(0.15)
-        case .free:           return Color.sbIvory2
-        }
-    }
-
-    private func passTileForeground(_ tier: PlanTier) -> Color {
-        switch tier {
-        case .eventPass:      return Color.sbGoldDk
+        case .eventPass:      return Color.sbCharcoal
         case .signaturePass:  return Color.sbGoldDk
-        case .proPass:        return Color.sbCharcoal
+        case .proPass:        return Color.sbPlum
         case .free:           return Color.sbWarm
+        }
+    }
+
+    /// Light tint of the tier accent — used as the "available" pill
+    /// background and the selected-tile fill so each tier has its own
+    /// soft identity card without recoloring the whole row.
+    private func passAccentTint(_ tier: PlanTier) -> Color {
+        switch tier {
+        case .eventPass:      return Color.sbCharcoal.opacity(0.08)
+        case .signaturePass:  return Color.sbChampagne
+        case .proPass:        return Color.sbPlumLt
+        case .free:           return Color.sbIvory2
         }
     }
 

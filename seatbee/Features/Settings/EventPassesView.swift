@@ -583,23 +583,26 @@ struct EventPassesView: View {
 
     // MARK: - Helpers
 
-    private func tierBadge(_ tier: PlanTier) -> some View {
-        let (color, letter): (Color, String) = {
-            switch tier {
-            case .free:           return (Color.sbWarm, "F")
-            case .eventPass:      return (Color.sbGold, "E")
-            case .signaturePass:  return (Color.sbGoldDk, "S")
-            case .proPass:        return (Color.sbCharcoal, "G")
-            }
-        }()
-        return ZStack {
-            RoundedRectangle(cornerRadius: 8)
-                .fill(color.opacity(0.15))
-                .frame(width: 36, height: 36)
-            Text(letter)
-                .font(SBFont.bodySmallBold)
-                .foregroundStyle(color)
+    /// Tier accent — same palette as the onboarding pass tiles
+    /// (charcoal / gold / plum) so the two surfaces feel like one
+    /// system.
+    private func tierAccent(_ tier: PlanTier) -> Color {
+        switch tier {
+        case .free:           return Color.sbWarm
+        case .eventPass:      return Color.sbCharcoal
+        case .signaturePass:  return Color.sbGoldDk
+        case .proPass:        return Color.sbPlum
         }
+    }
+
+    private func tierBadge(_ tier: PlanTier) -> some View {
+        // Key icon matches web's pass picker (App.jsx ~20284) — colour
+        // does the differentiating, not a letter.
+        Image(systemName: "key.fill")
+            .font(.system(size: 22, weight: .semibold))
+            .foregroundStyle(tierAccent(tier))
+            .frame(width: 36, height: 36)
+            .rotationEffect(.degrees(-45))
     }
 
     /// Called by `PlanPickerSheet` after a successful redeem. Mirrors
