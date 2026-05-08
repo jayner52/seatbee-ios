@@ -409,6 +409,18 @@ struct EditorView: View {
                 .padding(.bottom, 8)
             }
 
+            // Stats ribbon — small, centred pill that hangs above
+            // the action row so it doesn't compete with the FAB or
+            // the AI button. "seated / total · to seat" gives a
+            // glance read on room utilisation. Only renders when
+            // the plan has at least one table or one attending
+            // guest so a fresh plan doesn't show "0/0 · 0".
+            if (plan?.tables.isEmpty == false) || (plan?.guests.isEmpty == false) {
+                statsPill
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 6)
+            }
+
             // Action bar
             HStack(spacing: 16) {
                 Menu {
@@ -746,9 +758,78 @@ struct EditorView: View {
         Task { try? await appState.database.savePlanData(plan: p) }
     }
 
+    /// Tiny floating pill above the action bar showing the room
+    /// state at a glance. Sits centred between the FAB and the AI
+    /// button so it never competes with either. Three numbers:
+    ///
+    ///   {seated} of {total seats} · {to seat}
+    ///
+    /// Numerator + "to seat" both filter rsvp=.no and (when
+    /// includeMaybes is off) rsvp != .yes, so the pill matches what
+    /// the AI seater would actually attempt. Denominator is total
+    /// chairs in the room (seat capacity), not attending guests, so
+    /// it answers "do I have enough seats?" at a glance.
+    private var statsPill: some View {
+        HStack(spacing: 6) {
+            Text("\(attendingSeatedCount)")
+                .font(SBFont.inter(11, weight: .semibold))
+                .foregroundStyle(Color.sbCharcoal)
+            Text("of")
+                .font(SBFont.caption)
+                .foregroundStyle(Color.sbWarm)
+            Text("\(totalSeatsCount) seats")
+                .font(SBFont.inter(11, weight: .semibold))
+                .foregroundStyle(Color.sbCharcoal)
+            if unseatedCount > 0 {
+                Text("·")
+                    .font(SBFont.caption)
+                    .foregroundStyle(Color.sbWarm2)
+                Text("\(unseatedCount) to seat")
+                    .font(SBFont.inter(11, weight: .semibold))
+                    .foregroundStyle(Color.sbGoldDk)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 5)
+        .background(.regularMaterial)
+        .clipShape(Capsule())
+        .shadow(color: Color.black.opacity(0.06), radius: 4, x: 0, y: 1)
+        .frame(maxWidth: .infinity)
+    }
+
+    /// Whether a guest counts as "to be seated" — same rule the AI
+    /// seat call uses (web App.jsx:13092, iOS SeatService): drop
+    /// declined; pending/unknown only count when includeMaybes is on.
+    private func isAttending(_ g: Guest) -> Bool {
+        if g.rsvp == .no { return false }
+        let includeMaybes = plan?.includeMaybes ?? true
+        if includeMaybes { return true }
+        return g.rsvp == .yes
+    }
+
+    /// Attending guests currently assigned to a seat — drives the
+    /// editor's "X seated" stat.
+    private var attendingSeatedCount: Int {
+        guard let plan else { return 0 }
+        let attendingIds = Set(plan.guests.filter { isAttending($0) }.map(\.id))
+        return plan.tables.reduce(0) { sum, t in
+            sum + t.assignments.keys.filter { attendingIds.contains($0) }.count
+        }
+    }
+
+    /// Total chairs across the whole room.
+    private var totalSeatsCount: Int {
+        plan?.tables.reduce(0) { $0 + $1.seats } ?? 0
+    }
+
+    /// Attending guests waiting on a seat. Used by the AI pill +
+    /// the new stat ribbon. Web parity: declined never count
+    /// regardless of includeMaybes; pending only counts when
+    /// includeMaybes is on.
     private var unseatedCount: Int {
         guard let plan else { return 0 }
-        return max(0, plan.guests.count - plan.tables.reduce(0) { $0 + $1.filledCount })
+        let seatedIds = Set(plan.tables.flatMap { $0.assignments.keys })
+        return plan.guests.filter { isAttending($0) && !seatedIds.contains($0.id) }.count
     }
 
     private func updateTablePosition(id: String, x: Double, y: Double) {
