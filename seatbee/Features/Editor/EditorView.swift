@@ -313,15 +313,21 @@ struct EditorView: View {
                 .padding(.horizontal, 12)
                 .padding(.bottom, 8)
             } else if let objId = selectedObjectId, let obj = objects.first(where: { $0.id == objId }) {
-                HStack(spacing: 10) {
+                HStack(spacing: 6) {
                     let def = venueObjectTypes.byType(obj.type)
                     Image(systemName: def?.icon ?? "square")
                         .font(.system(size: 18))
                         .foregroundStyle(Color.sbGoldDk)
+                    // lineLimit + truncation prevents long names like
+                    // "Photo Booth" from wrapping awkwardly mid-word
+                    // when the toolbar buttons claim most of the row.
                     Text(obj.name)
                         .font(SBFont.bodySmallBold)
                         .foregroundStyle(Color.sbCharcoal)
-                    Spacer()
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                        .minimumScaleFactor(0.85)
+                    Spacer(minLength: 4)
                     // Quick rotation — 45° steps either direction.
                     // Disabled when the object is locked so the user
                     // can't accidentally rotate something they pinned.
@@ -377,6 +383,19 @@ struct EditorView: View {
                         Image(systemName: "trash")
                             .font(.system(size: 14))
                             .foregroundStyle(Color.sbError)
+                            .frame(width: 34, height: 34)
+                            .background(.regularMaterial)
+                            .clipShape(Circle())
+                    }
+                    // Duplicate — handy for mirrored stages / dance
+                    // floors. Direct button (not in a menu) so the
+                    // toolbar reads as a flat icon row.
+                    Button {
+                        duplicateObject(id: objId)
+                    } label: {
+                        Image(systemName: "plus.square.on.square")
+                            .font(.system(size: 14))
+                            .foregroundStyle(Color.sbCharcoal)
                             .frame(width: 34, height: 34)
                             .background(.regularMaterial)
                             .clipShape(Circle())
@@ -718,6 +737,35 @@ struct EditorView: View {
         appState.activePlan = p
         Task { try? await appState.database.savePlanData(plan: p) }
     }
+
+    /// Clone the object with a fresh ID and a small offset so the
+    /// duplicate is visible (otherwise it'd land directly on top of
+    /// the original). New object becomes the selection so the user
+    /// can immediately drag/edit it.
+    private func duplicateObject(id: String) {
+        guard var p = appState.activePlan,
+              let idx = p.objects.firstIndex(where: { $0.id == id }) else { return }
+        let src = p.objects[idx]
+        // RoomObject.id is `let`, so construct a fresh RoomObject
+        // rather than mutating the clone.
+        let clone = RoomObject(
+            id: "obj_\(UUID().uuidString.prefix(8))",
+            type: src.type, name: src.name,
+            x: src.x + 24, y: src.y + 24,
+            width: src.width, height: src.height,
+            rotation: src.rotation,
+            color: src.color, category: src.category, icon: src.icon,
+            isObstacle: src.isObstacle, locked: false
+        )
+        // Insert immediately after the source so the duplicate sits
+        // one layer above the original.
+        p.objects.insert(clone, at: idx + 1)
+        appState.activePlan = p
+        selectedObjectId = clone.id
+        HapticEngine.success()
+        Task { try? await appState.database.savePlanData(plan: p) }
+    }
+
 
     private func deleteObjectById(_ id: String) {
         guard var p = appState.activePlan else { return }
