@@ -448,17 +448,21 @@ struct EditorView: View {
                 .buttonStyle(.plain)
             }
             .padding(.horizontal, 12)
-            .padding(.bottom, 90)
-            // Stats caption overlaid right above the action row.
-            // Using overlay (not a VStack child) so the caption
-            // doesn't take layout flow space — it sits visually
-            // glued to the top edge of the action bar instead of
-            // being pushed up by the FAB's 44pt height.
-            .overlay(alignment: .top) {
-                if (plan?.tables.isEmpty == false) || (plan?.guests.isEmpty == false) {
-                    statsCaption
-                        .offset(y: -2)
-                }
+            .padding(.bottom, 6)
+
+            // Stats caption — sits in the safe-area gap between the
+            // FAB / AI buttons and the iOS tab bar, so it reads as a
+            // status footer for the canvas without ever occluding
+            // the action row above it.
+            if (plan?.tables.isEmpty == false) || (plan?.guests.isEmpty == false) {
+                statsCaption
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 70)
+            } else {
+                // Keep the same vertical reservation when the
+                // caption is hidden so a fresh-empty plan doesn't
+                // pull the FAB row down toward the tab bar.
+                Color.clear.frame(height: 70)
             }
         }
     }
