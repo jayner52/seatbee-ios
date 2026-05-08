@@ -92,28 +92,14 @@ struct SettingsSheet: View {
                                 }
                             }
                         }
-                        // "Redeem a Gift Code" — top-level entry point so
-                        // users with a SEAT code from a friend can find
-                        // the redeem flow without first knowing it lives
-                        // inside Event Passes. Routes through the same
-                        // EventPassesView (the redeem form sits at the
-                        // top of that view now). Replaced the previous
-                        // "Upgrade Plan" tile, which was misleading next
-                        // to Event Passes — applying a pass IS how you
-                        // upgrade a plan on iOS, so that route was a
-                        // dead-end pointing back at web's pricing page.
-                        NavigationLink {
-                            EventPassesView()
-                                .environment(appState)
-                        } label: {
-                            HStack(spacing: 12) {
-                                Image(systemName: "gift")
-                                    .foregroundStyle(Color.sbGoldDk)
-                                    .frame(width: 24)
-                                Text("Redeem a Gift Code")
-                                    .foregroundStyle(Color.sbCharcoal)
-                            }
-                        }
+                        // The "Upgrade Plan" tile that used to live here
+                        // was removed — it pointed at web's pricing page
+                        // and read as a duplicate route next to Event
+                        // Passes (applying a pass IS how a plan
+                        // upgrades on iOS). The Redeem-a-Gift-Code flow
+                        // lives inside Event Passes itself, surfaced at
+                        // the top of that view; no need for a separate
+                        // top-level tile cluttering Settings.
                     } header: {
                         Text("Passes")
                     }
