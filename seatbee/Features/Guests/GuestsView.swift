@@ -643,6 +643,12 @@ struct GuestsView: View {
                 tableAssignment(for: guest)
             }
             .padding(.vertical, 10)
+            // Make the entire row a single tap target. Without this,
+            // .buttonStyle(.plain) only registers taps over visible
+            // content (text, avatar, dots) — the wide Spacer in the
+            // middle was dead, forcing users to aim for the small RSVP
+            // circle to open the editor.
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
