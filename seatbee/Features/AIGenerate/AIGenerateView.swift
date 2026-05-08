@@ -197,14 +197,27 @@ struct AIGenerateView: View {
                     }
                 }
                 if fellBackToRoundRobin {
-                    Text("Solver returned 0 — used round-robin fallback. Check your rules for conflicts.")
-                        .font(SBFont.caption)
-                        .foregroundStyle(Color.sbError)
-                        .multilineTextAlignment(.center)
-                        .padding(12)
-                        .frame(maxWidth: .infinity)
-                        .background(Color.sbError.opacity(0.08))
-                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Solver returned 0 — used round-robin fallback. Check your rules for conflicts.")
+                            .font(SBFont.caption)
+                            .foregroundStyle(Color.sbError)
+                        // When solve() threw on the server, the actual
+                        // exception text is captured in
+                        // scorecard.suggestions[0]. Surface it so we
+                        // can debug (e.g. "Solver error: cannot read
+                        // property 'id' of undefined" → bad rule ref).
+                        if let detail = solverErrorDetail {
+                            Text(detail)
+                                .font(SBFont.caption)
+                                .foregroundStyle(Color.sbWarm)
+                                .padding(.top, 2)
+                        }
+                    }
+                    .multilineTextAlignment(.leading)
+                    .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.sbError.opacity(0.08))
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 }
                 actionStackComplete
                 Spacer(minLength: 100)
@@ -675,6 +688,15 @@ struct AIGenerateView: View {
     }
 
     private var activeGuestCount: Int { activeGuests.count }
+
+    /// First entry of scorecard.suggestions when it begins with
+    /// "Solver error:" — the server stamps the JS exception message
+    /// there when solve() throws. Used by completeState below to
+    /// show the actual cause when the round-robin fallback kicks in.
+    private var solverErrorDetail: String? {
+        guard let s = lastResult?.scorecard else { return nil }
+        return s.suggestions.first { $0.hasPrefix("Solver error") }
+    }
 
     private var guestsSeated: Int {
         guard let plan = appState.activePlan else { return 0 }

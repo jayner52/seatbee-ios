@@ -43,6 +43,12 @@ final class SeatService {
             let totalSatisfied: Int
             let hardConstraints: RuleBucket
             let softPreferences: RuleBucket
+            // Server's `scorecard.suggestions` array — when solve()
+            // throws, the first entry is "Solver error: <message>",
+            // which is the only place the actual exception text is
+            // exposed. Plumb it so the AI Generate screen can surface
+            // it instead of a generic "Error" label.
+            let suggestions: [String]
 
             init(from decoder: Decoder) throws {
                 let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -52,11 +58,12 @@ final class SeatService {
                 totalSatisfied  = (try? c.decode(Int.self, forKey: .totalSatisfied)) ?? 0
                 hardConstraints = (try? c.decode(RuleBucket.self, forKey: .hardConstraints)) ?? .empty
                 softPreferences = (try? c.decode(RuleBucket.self, forKey: .softPreferences)) ?? .empty
+                suggestions     = (try? c.decode([String].self, forKey: .suggestions)) ?? []
             }
 
             enum CodingKeys: String, CodingKey {
                 case overallPercent, overallLabel, totalRules, totalSatisfied
-                case hardConstraints, softPreferences
+                case hardConstraints, softPreferences, suggestions
             }
         }
 
