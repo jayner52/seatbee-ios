@@ -313,15 +313,21 @@ struct EditorView: View {
                 .padding(.horizontal, 12)
                 .padding(.bottom, 8)
             } else if let objId = selectedObjectId, let obj = objects.first(where: { $0.id == objId }) {
-                HStack(spacing: 10) {
+                HStack(spacing: 6) {
                     let def = venueObjectTypes.byType(obj.type)
                     Image(systemName: def?.icon ?? "square")
                         .font(.system(size: 18))
                         .foregroundStyle(Color.sbGoldDk)
+                    // lineLimit + truncation prevents long names like
+                    // "Photo Booth" from wrapping awkwardly mid-word
+                    // when the toolbar buttons claim most of the row.
                     Text(obj.name)
                         .font(SBFont.bodySmallBold)
                         .foregroundStyle(Color.sbCharcoal)
-                    Spacer()
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                        .minimumScaleFactor(0.85)
+                    Spacer(minLength: 4)
                     // Quick rotation — 45° steps either direction.
                     // Disabled when the object is locked so the user
                     // can't accidentally rotate something they pinned.
@@ -381,30 +387,14 @@ struct EditorView: View {
                             .background(.regularMaterial)
                             .clipShape(Circle())
                     }
-                    // Less-frequent actions tucked into a menu so the
-                    // toolbar stays readable. Duplicate is handy for
-                    // mirrored stages / dance floors; forward/back
-                    // matter when overlapping objects need a layer
-                    // tweak (e.g. dance floor under a chandelier).
-                    Menu {
-                        Button {
-                            duplicateObject(id: objId)
-                        } label: {
-                            Label("Duplicate", systemImage: "plus.square.on.square")
-                        }
-                        Button {
-                            bringObjectForward(id: objId)
-                        } label: {
-                            Label("Bring Forward", systemImage: "square.3.layers.3d.top.filled")
-                        }
-                        Button {
-                            sendObjectBackward(id: objId)
-                        } label: {
-                            Label("Send Backward", systemImage: "square.3.layers.3d.bottom.filled")
-                        }
+                    // Duplicate — handy for mirrored stages / dance
+                    // floors. Direct button (not in a menu) so the
+                    // toolbar reads as a flat icon row.
+                    Button {
+                        duplicateObject(id: objId)
                     } label: {
-                        Image(systemName: "ellipsis")
-                            .font(.system(size: 14, weight: .semibold))
+                        Image(systemName: "plus.square.on.square")
+                            .font(.system(size: 14))
                             .foregroundStyle(Color.sbCharcoal)
                             .frame(width: 34, height: 34)
                             .background(.regularMaterial)
@@ -776,27 +766,6 @@ struct EditorView: View {
         Task { try? await appState.database.savePlanData(plan: p) }
     }
 
-    /// z-order is array order in the objects[] array — later index =
-    /// drawn on top. Swap with next/previous neighbour to nudge.
-    private func bringObjectForward(id: String) {
-        guard var p = appState.activePlan,
-              let idx = p.objects.firstIndex(where: { $0.id == id }),
-              idx < p.objects.count - 1 else { return }
-        p.objects.swapAt(idx, idx + 1)
-        appState.activePlan = p
-        HapticEngine.selection()
-        Task { try? await appState.database.savePlanData(plan: p) }
-    }
-
-    private func sendObjectBackward(id: String) {
-        guard var p = appState.activePlan,
-              let idx = p.objects.firstIndex(where: { $0.id == id }),
-              idx > 0 else { return }
-        p.objects.swapAt(idx, idx - 1)
-        appState.activePlan = p
-        HapticEngine.selection()
-        Task { try? await appState.database.savePlanData(plan: p) }
-    }
 
     private func deleteObjectById(_ id: String) {
         guard var p = appState.activePlan else { return }
