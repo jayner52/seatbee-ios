@@ -409,16 +409,15 @@ struct EditorView: View {
                 .padding(.bottom, 8)
             }
 
-            // Stats ribbon — small, centred pill that hangs above
-            // the action row so it doesn't compete with the FAB or
-            // the AI button. "seated / total · to seat" gives a
-            // glance read on room utilisation. Only renders when
-            // the plan has at least one table or one attending
-            // guest so a fresh plan doesn't show "0/0 · 0".
+            // Stats caption — intentionally tiny + centred so the
+            // canvas stays the focus. Four numbers: guests, to
+            // seat, seats, open. Renders only when the plan has
+            // at least one table or one attending guest, so a
+            // brand-new plan doesn't print "0 guests · 0 to seat".
             if (plan?.tables.isEmpty == false) || (plan?.guests.isEmpty == false) {
-                statsPill
+                statsCaption
                     .padding(.horizontal, 12)
-                    .padding(.bottom, 6)
+                    .padding(.bottom, 4)
             }
 
             // Action bar
@@ -758,43 +757,43 @@ struct EditorView: View {
         Task { try? await appState.database.savePlanData(plan: p) }
     }
 
-    /// Tiny floating pill above the action bar showing the room
-    /// state at a glance. Sits centred between the FAB and the AI
-    /// button so it never competes with either. Three numbers:
-    ///
-    ///   {seated} of {total seats} · {to seat}
-    ///
-    /// Numerator + "to seat" both filter rsvp=.no and (when
-    /// includeMaybes is off) rsvp != .yes, so the pill matches what
-    /// the AI seater would actually attempt. Denominator is total
-    /// chairs in the room (seat capacity), not attending guests, so
-    /// it answers "do I have enough seats?" at a glance.
-    private var statsPill: some View {
+    /// Tiny caption above the action bar — four numbers, separated
+    /// by middots, in muted gold. Single line of 10pt text, no
+    /// pill / no shadow, sits flush above the FAB / AI row so it
+    /// reads as a status footer rather than a UI element. Each
+    /// number labels itself ("108 guests" not "108") so a glance
+    /// is enough.
+    private var statsCaption: some View {
         HStack(spacing: 6) {
-            Text("\(attendingSeatedCount)")
-                .font(SBFont.inter(11, weight: .semibold))
-                .foregroundStyle(Color.sbCharcoal)
-            Text("of")
-                .font(SBFont.caption)
-                .foregroundStyle(Color.sbWarm)
-            Text("\(totalSeatsCount) seats")
-                .font(SBFont.inter(11, weight: .semibold))
-                .foregroundStyle(Color.sbCharcoal)
-            if unseatedCount > 0 {
-                Text("·")
-                    .font(SBFont.caption)
-                    .foregroundStyle(Color.sbWarm2)
-                Text("\(unseatedCount) to seat")
-                    .font(SBFont.inter(11, weight: .semibold))
-                    .foregroundStyle(Color.sbGoldDk)
-            }
+            captionSegment(value: attendingCount, label: "guest")
+            captionDivider
+            captionSegment(value: unseatedCount, label: "to seat")
+            captionDivider
+            captionSegment(value: totalSeatsCount, label: "seat")
+            captionDivider
+            captionSegment(value: openSeatsCount, label: "open")
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 5)
-        .background(.regularMaterial)
-        .clipShape(Capsule())
-        .shadow(color: Color.black.opacity(0.06), radius: 4, x: 0, y: 1)
+        .font(.system(size: 10, weight: .medium))
+        .foregroundStyle(Color.sbGoldDk.opacity(0.75))
         .frame(maxWidth: .infinity)
+        .multilineTextAlignment(.center)
+        .lineLimit(1)
+        .minimumScaleFactor(0.85)
+    }
+
+    /// "108 guests" / "0 to seat" — pluralisation handled per label.
+    /// "to seat" doesn't pluralise the way nouns do; everything else
+    /// gets a trailing s when count != 1.
+    private func captionSegment(value: Int, label: String) -> some View {
+        let suffix: String = {
+            if label == "to seat" { return label }
+            return value == 1 ? label : label + "s"
+        }()
+        return Text("\(value) \(suffix)")
+    }
+
+    private var captionDivider: some View {
+        Text("·").foregroundStyle(Color.sbGoldDk.opacity(0.45))
     }
 
     /// Whether a guest counts as "to be seated" — same rule the AI
@@ -817,9 +816,26 @@ struct EditorView: View {
         }
     }
 
+    /// Total attending guests on the plan (the "108 guests" segment).
+    /// Same attending rule as the seater so all four caption numbers
+    /// share a consistent basis.
+    private var attendingCount: Int {
+        plan?.guests.filter { isAttending($0) }.count ?? 0
+    }
+
     /// Total chairs across the whole room.
     private var totalSeatsCount: Int {
         plan?.tables.reduce(0) { $0 + $1.seats } ?? 0
+    }
+
+    /// Chairs with no occupant. Counts every assignment (including
+    /// stale declined / pending sitters) as "filled" because the
+    /// seat is still physically taken on the canvas — what the user
+    /// cares about is "do I have room to drop someone here?".
+    private var openSeatsCount: Int {
+        guard let plan else { return 0 }
+        let assignedCount = plan.tables.reduce(0) { $0 + $1.assignments.count }
+        return max(0, totalSeatsCount - assignedCount)
     }
 
     /// Attending guests waiting on a seat. Used by the AI pill +
