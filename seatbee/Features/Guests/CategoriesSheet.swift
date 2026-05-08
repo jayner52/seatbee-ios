@@ -56,53 +56,7 @@ struct CategoriesSheet: View {
                         }
                     }
 
-                    // Add new category
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("ADD CATEGORY")
-                            .font(SBFont.capsLabel)
-                            .foregroundStyle(Color.sbWarm)
-                            .letterSpacing(1.5)
-
-                        HStack(spacing: 12) {
-                            TextField("Category name", text: $newCategoryName)
-                                .font(SBFont.body)
-                                .padding(12)
-                                .background(Color.sbIvory2)
-                                .clipShape(RoundedRectangle(cornerRadius: SBRadius.small))
-                                .onSubmit { addCategory() }
-
-                            Button {
-                                addCategory()
-                            } label: {
-                                Image(systemName: "plus.circle.fill")
-                                    .font(.system(size: 28))
-                                    .foregroundStyle(Color.sbGold)
-                            }
-                            .buttonStyle(.plain)
-                            .disabled(newCategoryName.trimmingCharacters(in: .whitespaces).isEmpty)
-                        }
-
-                        // Color picker
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 8) {
-                                ForEach(colorPresets, id: \.self) { color in
-                                    Circle()
-                                        .fill(Color(hex: color))
-                                        .frame(width: 28, height: 28)
-                                        .overlay(
-                                            Circle()
-                                                .strokeBorder(Color.sbCharcoal, lineWidth: selectedColor == color ? 2 : 0)
-                                        )
-                                        .onTapGesture {
-                                            selectedColor = color
-                                            HapticEngine.selection()
-                                        }
-                                }
-                            }
-                        }
-                    }
-
-                    Spacer(minLength: 40)
+                    Spacer(minLength: 16)
                 }
                 .padding(.horizontal, SBSpacing.screenMargin)
                 .padding(.top, 16)
@@ -116,7 +70,72 @@ struct CategoriesSheet: View {
                         .foregroundStyle(Color.sbGoldDk)
                 }
             }
+            // Sticky Add Category form. Pinned at the bottom so users
+            // with long category lists never have to scroll the new-
+            // category input off screen to reach it. Same pattern as
+            // PartiesSheet's pinned Create CTA.
+            .safeAreaInset(edge: .bottom) {
+                addCategoryBar
+            }
         }
+    }
+
+    private var addCategoryBar: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("ADD CATEGORY")
+                .font(SBFont.capsLabel)
+                .foregroundStyle(Color.sbWarm)
+                .letterSpacing(1.5)
+
+            HStack(spacing: 12) {
+                TextField("Category name", text: $newCategoryName)
+                    .font(SBFont.body)
+                    .padding(12)
+                    .background(Color.sbIvory2)
+                    .clipShape(RoundedRectangle(cornerRadius: SBRadius.small))
+                    .onSubmit { addCategory() }
+
+                Button {
+                    addCategory()
+                } label: {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 28))
+                        .foregroundStyle(Color.sbGold)
+                }
+                .buttonStyle(.plain)
+                .disabled(newCategoryName.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+
+            // Color picker
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(colorPresets, id: \.self) { color in
+                        Circle()
+                            .fill(Color(hex: color))
+                            .frame(width: 28, height: 28)
+                            .overlay(
+                                Circle()
+                                    .strokeBorder(Color.sbCharcoal, lineWidth: selectedColor == color ? 2 : 0)
+                            )
+                            .onTapGesture {
+                                selectedColor = color
+                                HapticEngine.selection()
+                            }
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, SBSpacing.screenMargin)
+        .padding(.top, 12)
+        .padding(.bottom, 8)
+        .background(
+            // Soft top border + ivory bg so the pinned bar reads as a
+            // distinct surface from the scroll content above.
+            Color.sbIvory
+                .overlay(alignment: .top) {
+                    Rectangle().fill(Color.sbLine).frame(height: 1)
+                }
+        )
     }
 
     private func categoryRow(id: String, name: String, color: String?) -> some View {
