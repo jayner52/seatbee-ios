@@ -212,20 +212,29 @@ final class SeatService {
 // MARK: - Plan mutation
 
 extension SeatingPlan {
-    /// Apply a /api/seat result to this plan in place. Sets each table's
-    /// `assignments[guestId] = seatIndex` based on the seatOrders map
-    /// returned by the server. Tables not present in the result are left
-    /// untouched (locked tables preserve their existing assignments).
+    /// Apply a /api/seat result to this plan in place. Locked tables are
+    /// preserved (the server preserved them via existingAssignments);
+    /// every UNLOCKED table is wiped first and then rebuilt from the
+    /// returned seatOrders.
+    ///
+    /// Why the up-front wipe: the server only includes tables it
+    /// actually placed guests at in `seatOrders`. So if a regenerate
+    /// moves a guest from one table (e.g. Head Table) to another (e.g.
+    /// Sweetheart), the destination shows up in seatOrders but the
+    /// source doesn't — and without an explicit wipe the old guest
+    /// would linger at the source, producing the "guest seated at two
+    /// tables at once" bug. Web doesn't hit this because it stores
+    /// assignments as a flat guest→table map at state level and
+    /// replaces it wholesale; iOS stores them per-table so we have to
+    /// reset the per-table dictionaries explicitly.
     mutating func applyGeneratedSeating(_ result: SeatService.GenerateResult) {
+        for tIdx in tables.indices where tables[tIdx].locked != true {
+            tables[tIdx].assignments.removeAll()
+        }
         for tIdx in tables.indices {
+            if tables[tIdx].locked == true { continue }
             let tableId = tables[tIdx].id
             guard let seatMap = result.seatOrders[tableId] else { continue }
-            // Wipe and rebuild this table's assignments from the seatMap.
-            // Skip locked tables — server already preserved their existing
-            // assignments via existingAssignments, but we double-guard in
-            // case anything bypassed that.
-            if tables[tIdx].locked == true { continue }
-            tables[tIdx].assignments.removeAll()
             for (seatIndex, guestId) in seatMap.enumerated() {
                 if let gid = guestId, !gid.isEmpty {
                     tables[tIdx].assignments[gid] = seatIndex
