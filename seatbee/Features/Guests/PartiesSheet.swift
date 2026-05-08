@@ -62,6 +62,19 @@ struct PartiesSheet: View {
         return out
     }
 
+    /// Parties whose `guestIds` is empty OR whose IDs all reference
+    /// guests that no longer exist on the plan. These are leftovers
+    /// from older iOS writes / prior web normalisation passes that
+    /// dropped member references — they show "0 guests" and have no
+    /// way to "fill" themselves, so they're noise the user wants
+    /// cleared. We surface them explicitly + offer a one-tap purge.
+    private var orphanParties: [(id: String, name: String, guestIds: [String])] {
+        let livingIds = Set(allGuests.map(\.id))
+        return canonicalParties.filter { p in
+            p.guestIds.isEmpty || p.guestIds.allSatisfy { !livingIds.contains($0) }
+        }
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -88,6 +101,12 @@ struct PartiesSheet: View {
                         .buttonStyle(.plain)
                     }
 
+                    // One-tap cleanup banner for orphan parties (no
+                    // members or members that no longer exist).
+                    if !orphanParties.isEmpty {
+                        cleanupBanner
+                    }
+
                     if canonicalParties.isEmpty && !creatingParty {
                         emptyState
                     }
@@ -111,6 +130,70 @@ struct PartiesSheet: View {
                 }
             }
         }
+    }
+
+    /// Soft warning + one-tap purge for parties with no live members.
+    /// Lets the user clean up historical noise without manually
+    /// trash-tapping each card.
+    private var cleanupBanner: some View {
+        let count = orphanParties.count
+        return Button {
+            cleanUpOrphanParties()
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 14))
+                    .foregroundStyle(Color.sbGoldDk)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("\(count) empty part\(count == 1 ? "y" : "ies")")
+                        .font(SBFont.bodySmallBold)
+                        .foregroundStyle(Color.sbCharcoal)
+                    Text("Tap to remove parties with no members")
+                        .font(SBFont.caption)
+                        .foregroundStyle(Color.sbWarm)
+                }
+                Spacer()
+                Text("CLEAN UP")
+                    .font(SBFont.capsLabel)
+                    .foregroundStyle(Color.sbGoldDk)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.sbChampagne)
+                    .clipShape(Capsule())
+            }
+            .padding(12)
+            .background(Color.sbChampagne.opacity(0.4))
+            .clipShape(RoundedRectangle(cornerRadius: SBRadius.card))
+            .overlay(
+                RoundedRectangle(cornerRadius: SBRadius.card)
+                    .strokeBorder(Color.sbGoldDk.opacity(0.3), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func cleanUpOrphanParties() {
+        guard var p = plan else { return }
+        guard var raw = p.rawParties else { return }
+        let livingIds = Set(allGuests.map(\.id))
+        let orphanIds = Set(orphanParties.map(\.id))
+        raw.removeAll { entry in
+            guard let id = entry["id"]?.value as? String else { return true }
+            return orphanIds.contains(id)
+        }
+        p.rawParties = raw
+        // Also clear any stale guest.party strings that pointed at an
+        // orphan party (defensive — shouldn't be possible but harmless).
+        for i in p.guests.indices {
+            if let pname = p.guests[i].party,
+               !raw.contains(where: { ($0["name"]?.value as? String) == pname }) {
+                p.guests[i].party = nil
+            }
+        }
+        _ = livingIds // silence unused
+        appState.activePlan = p
+        HapticEngine.success()
+        Task { try? await appState.database.savePlanData(plan: p) }
     }
 
     // MARK: - Empty state
@@ -338,21 +421,36 @@ struct PartiesSheet: View {
                 .buttonStyle(.plain)
             }
 
-            ForEach(members, id: \.id) { guest in
-                HStack(spacing: 8) {
-                    SBAvatar(name: guest.displayName, size: 24)
-                    Text(guest.displayName)
-                        .font(SBFont.bodySmall)
-                        .foregroundStyle(Color.sbCharcoal)
-                    Spacer()
-                    Button {
-                        removeMember(partyId: id, guestId: guest.id)
-                    } label: {
-                        Image(systemName: "minus.circle")
-                            .font(.system(size: 14))
-                            .foregroundStyle(Color.sbWarm2)
+            if members.isEmpty {
+                // Explicit empty-state row — without this, an orphan
+                // party reads as just a name with no body and the
+                // user has no idea what's going on.
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.circle")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color.sbWarm2)
+                    Text("No members yet — add some below or tap the trash to remove this party")
+                        .font(SBFont.caption)
+                        .foregroundStyle(Color.sbWarm)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            } else {
+                ForEach(members, id: \.id) { guest in
+                    HStack(spacing: 8) {
+                        SBAvatar(name: guest.displayName, size: 24)
+                        Text(guest.displayName)
+                            .font(SBFont.bodySmall)
+                            .foregroundStyle(Color.sbCharcoal)
+                        Spacer()
+                        Button {
+                            removeMember(partyId: id, guestId: guest.id)
+                        } label: {
+                            Image(systemName: "minus.circle")
+                                .font(.system(size: 14))
+                                .foregroundStyle(Color.sbWarm2)
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
             }
 
