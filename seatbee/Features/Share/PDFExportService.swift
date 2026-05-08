@@ -917,9 +917,15 @@ final class PDFExportService {
 
     @MainActor
     static func generateSocialImage(plan: SeatingPlan) -> UIImage? {
-        let size: CGFloat = 1080
-        let renderer = UIGraphicsImageRenderer(size: CGSize(width: size, height: size))
+        // 1080×1350 — Instagram portrait. Gives the layout enough
+        // vertical room for branding + title + headline + category
+        // chart + 4 highlights + 4 badges + footer without trimming
+        // anything. Square (1080²) was tight; portrait reads natural
+        // in the IG feed and stories.
+        let size = CGSize(width: 1080, height: 1350)
+        let renderer = UIGraphicsImageRenderer(size: size)
         let metrics = computeSocialMetrics(plan: plan)
+        let badges = snapshotBadges(for: metrics, plan: plan)
         return renderer.image { context in
             let ctx = context.cgContext
             drawSocialBackground(ctx: ctx, size: size)
@@ -929,22 +935,27 @@ final class PDFExportService {
             y = drawSocialEventBlock(ctx: ctx, plan: plan, size: size, topY: y + 24)
             y = drawSocialHeadlineStats(ctx: ctx, metrics: metrics, size: size, topY: y + 28)
 
-            // Reserve room for the footer + a hair of breathing space
-            let footerTopY: CGFloat = size - 130
-            let availableHeight = footerTopY - y
+            // Reserve space at the bottom for footer + badges.
+            let footerTopY: CGFloat = size.height - 130
+            let badgesHeight: CGFloat = badges.isEmpty ? 0 : 158  // header + tiles + breathing
+            let badgesTopY = footerTopY - badgesHeight - 16
+            let highlightsBottomY = badgesTopY - 18
 
-            // Category chart only if we have ≥1 categorised guest. If
-            // it's missing, the highlights section gets the extra room.
+            let availableHeight = badgesTopY - y
+
+            // Category chart — only if categorised guests exist.
             if !metrics.topCategories.isEmpty {
                 let chartHeight = min(360, availableHeight * 0.55)
-                let nextY = drawSocialCategoryChart(ctx: ctx, metrics: metrics, size: size,
-                                                    topY: y + 18, maxHeight: chartHeight)
-                y = nextY
+                y = drawSocialCategoryChart(ctx: ctx, metrics: metrics, size: size,
+                                             topY: y + 18, maxHeight: chartHeight)
             }
 
-            // Highlights — fills the rest, capped at 4 lines
+            // Highlights — fills space between chart and badges.
             drawSocialHighlights(ctx: ctx, metrics: metrics, size: size,
-                                 topY: y + 24, bottomY: footerTopY - 6)
+                                 topY: y + 24, bottomY: highlightsBottomY)
+
+            // Badges row — pinned just above the footer.
+            _ = drawSocialBadges(ctx: ctx, badges: badges, size: size, topY: badgesTopY)
 
             drawSocialFooter(ctx: ctx, size: size)
         }
@@ -967,8 +978,11 @@ final class PDFExportService {
 
     @MainActor
     static func generateFloorPlanImage(plan: SeatingPlan, showGuestNames: Bool = false) -> UIImage? {
-        let size: CGFloat = 1080
-        let renderer = UIGraphicsImageRenderer(size: CGSize(width: size, height: size))
+        // Floor plan stays square 1080² — the floor plan is the
+        // visual hero and the square crop reads cleanly on IG / X
+        // / iMessage previews without letterboxing.
+        let size = CGSize(width: 1080, height: 1080)
+        let renderer = UIGraphicsImageRenderer(size: size)
         return renderer.image { context in
             let ctx = context.cgContext
 
@@ -985,10 +999,10 @@ final class PDFExportService {
             // hero. Reserved space for the mini-stats line + footer
             // below so the card has breathing room from the bottom.
             let cardTop = y + 28
-            let cardBottom = size - 200
+            let cardBottom = size.height - 200
             let cardSide: CGFloat = 70
             let cardRect = CGRect(x: cardSide, y: cardTop,
-                                   width: size - cardSide * 2,
+                                   width: size.width - cardSide * 2,
                                    height: cardBottom - cardTop)
 
             // Soft drop-shadow effect via a slightly offset darker
@@ -1031,7 +1045,7 @@ final class PDFExportService {
                 ]
                 let statsText = NSString(string: "\(totalGuests) GUESTS · \(totalTables) TABLES")
                 let sSize = statsText.size(withAttributes: statsAttrs)
-                statsText.draw(at: CGPoint(x: size / 2 - sSize.width / 2, y: statsY),
+                statsText.draw(at: CGPoint(x: size.width / 2 - sSize.width / 2, y: statsY),
                                withAttributes: statsAttrs)
             }
 
@@ -1079,12 +1093,22 @@ final class PDFExportService {
         let totalSeats: Int
         let topCategories: [(name: String, color: UIColor, count: Int)]
         let topMeal: (name: String, count: Int)?
+        let distinctMealCount: Int        // # of unique meal options ordered
+        let distinctDietaryTagCount: Int  // # of unique dietary tags represented
+        let categoriesWithMembers: Int    // # of categories with ≥1 guest
         let mustSitPeople: Int
-        let keepApartPeople: Int
+        let keepApartPeopleCount: Int
+        let keepApartRuleCount: Int       // separate from people-count for badge purposes
+        let mustSitRuleCount: Int
         let dietaryGuests: Int
         let vipGuests: Int
         let childGuests: Int
         let highChairGuests: Int
+        let hasGrandparentsCategoryWithMembers: Bool
+        let hasKidsCategoryWithMembers: Bool
+        // Table shape mix — used for the TABLES sub-line and (down the
+        // road) badges. Counts by SeatTable.TableType.
+        let tableTypeCounts: [SeatTable.TableType: Int]
     }
 
     private static func computeSocialMetrics(plan: SeatingPlan) -> SocialMetrics {
@@ -1159,18 +1183,86 @@ final class PDFExportService {
         let childGuests = confirmed.filter { $0.isChild == true }.count
         let highChairGuests = confirmed.filter { $0.highChair == true }.count
 
+        // Distinct meal options ordered (for the Culinary Spectacle
+        // badge). Case-insensitive de-dup so "Beef" and "beef" don't
+        // count separately.
+        let distinctMealCount = Set(
+            confirmed.compactMap {
+                $0.meal?
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                    .lowercased()
+            }
+            .filter { !$0.isEmpty }
+        ).count
+
+        // Distinct dietary tags represented (for The Foodie Wedding
+        // badge). Tags are already canonical strings ("vegetarian",
+        // "vegan", etc) so direct Set works.
+        let distinctDietaryTagCount = Set(
+            confirmed.flatMap { $0.dietaryTags ?? [] }
+        ).count
+
+        // Categories with at least one assigned guest (for The Mixer
+        // badge). Mirrors the topCategories count without slicing to 5.
+        let categoriesWithMembers = categoryCounts.values.filter { $0 > 0 }.count
+
+        // Multi-Generational badge — needs both Grandparents AND Kids
+        // categories with members. Use the canonical category names
+        // resolved from rawCategories. Web's default category seed
+        // uses these exact strings (App.jsx ~line 3042).
+        let nameById: [String: String] = catNameById
+        let counts: [String: Int] = categoryCounts
+        func hasCategoryNamed(_ keyword: String) -> Bool {
+            counts.contains { id, count in
+                guard count > 0 else { return false }
+                let name = (nameById[id] ?? id).lowercased()
+                return name.contains(keyword)
+            }
+        }
+        let hasGrandparents = hasCategoryNamed("grandparent")
+        let hasKids = hasCategoryNamed("kid") || hasCategoryNamed("child")
+
+        // Table-shape mix (for the headline sub-line + future badges).
+        var tableTypeCounts: [SeatTable.TableType: Int] = [:]
+        for table in plan.tables {
+            tableTypeCounts[table.type, default: 0] += 1
+        }
+
+        // Rule counts split from people counts so badges can target
+        // either dimension (e.g., The Diplomat fires on rule count,
+        // not people count).
+        let mustSitRuleCount = plan.rules.filter { rule in
+            guard rule.enabled else { return false }
+            switch rule.type {
+            case .mustTogether, .preferTogether, .categoryTogether,
+                 .sideTogether, .seatAdjacent: return true
+            default: return false
+            }
+        }.count
+        let keepApartRuleCount = plan.rules.filter {
+            $0.enabled && $0.type == .mustNot
+        }.count
+
         return SocialMetrics(
             totalGuests: totalGuests,
             totalTables: totalTables,
             totalSeats: totalSeats,
             topCategories: topCategories,
             topMeal: topMeal,
+            distinctMealCount: distinctMealCount,
+            distinctDietaryTagCount: distinctDietaryTagCount,
+            categoriesWithMembers: categoriesWithMembers,
             mustSitPeople: mustSit.count,
-            keepApartPeople: keepApart.count,
+            keepApartPeopleCount: keepApart.count,
+            keepApartRuleCount: keepApartRuleCount,
+            mustSitRuleCount: mustSitRuleCount,
             dietaryGuests: dietaryGuests,
             vipGuests: vipGuests,
             childGuests: childGuests,
-            highChairGuests: highChairGuests
+            highChairGuests: highChairGuests,
+            hasGrandparentsCategoryWithMembers: hasGrandparents,
+            hasKidsCategoryWithMembers: hasKids,
+            tableTypeCounts: tableTypeCounts
         )
     }
 
@@ -1184,26 +1276,288 @@ final class PDFExportService {
                        alpha: 1)
     }
 
+    // MARK: - Snapshot badges
+    //
+    // Up to 4 badges shown in a horizontal row on the Snapshot card.
+    // Each badge is an SF-Symbol icon + name + one-line subtitle,
+    // tinted with one of the brand palette colours so the row reads
+    // as varied. Badges are picked from a priority-ordered list —
+    // the most-specific / most-celebratory triggers fire first so a
+    // 350-guest multi-generational wedding doesn't always default to
+    // "The Banquet".
+    //
+    // Empty array when no triggers fire — we don't backfill with a
+    // generic "Crafted Seating" badge so the absence of badges
+    // genuinely communicates "this plan is still simple".
+
+    private struct SnapshotBadge {
+        let icon: String        // SF Symbol name
+        let title: String       // Bold headline
+        let subtitle: String    // One-line detail, dynamic when useful
+        let tint: UIColor       // Icon-tile background tint
+        let foreground: UIColor // Icon stroke colour
+    }
+
+    private static func snapshotBadges(for metrics: SocialMetrics, plan: SeatingPlan) -> [SnapshotBadge] {
+        var out: [SnapshotBadge] = []
+
+        // Brand palette aliases for badge tints.
+        let goldFill   = socialChampagne.withAlphaComponent(0.7)
+        let goldFG     = socialGoldDk
+        let sageFill   = UIColor(red: 213/255, green: 222/255, blue: 198/255, alpha: 1)
+        let sageFG     = UIColor(red: 91/255,  green: 127/255, blue: 78/255,  alpha: 1)
+        let blushFill  = UIColor(red: 240/255, green: 218/255, blue: 215/255, alpha: 1)
+        let blushFG    = UIColor(red: 168/255, green: 95/255,  blue: 88/255,  alpha: 1)
+        let charcoalFill = UIColor(red: 232/255, green: 226/255, blue: 218/255, alpha: 1)
+        let charcoalFG = socialCharcoal
+
+        // 1. Multi-Generational — both Grandparents and Kids categories
+        //    populated. Most specific combo, fires first.
+        if metrics.hasGrandparentsCategoryWithMembers && metrics.hasKidsCategoryWithMembers {
+            out.append(SnapshotBadge(
+                icon: "figure.2.and.child.holdinghands",
+                title: "Multi-Generational",
+                subtitle: "From grandkids to grandparents",
+                tint: sageFill, foreground: sageFG
+            ))
+        }
+        // 2. Culinary Spectacle — at least 4 distinct meal options.
+        if metrics.distinctMealCount >= 4 {
+            out.append(SnapshotBadge(
+                icon: "fork.knife",
+                title: "Culinary Spectacle",
+                subtitle: "\(metrics.distinctMealCount) meals on the menu",
+                tint: goldFill, foreground: goldFG
+            ))
+        }
+        // 3. The Foodie Wedding — at least 3 distinct dietary tags.
+        if metrics.distinctDietaryTagCount >= 3 {
+            out.append(SnapshotBadge(
+                icon: "leaf.fill",
+                title: "The Foodie Wedding",
+                subtitle: "\(metrics.distinctDietaryTagCount) dietary needs accommodated",
+                tint: sageFill, foreground: sageFG
+            ))
+        }
+        // 4. The Diplomat — keep-apart rules. Rare, surfaces high.
+        if metrics.keepApartRuleCount >= 3 {
+            out.append(SnapshotBadge(
+                icon: "scale.3d",
+                title: "The Diplomat",
+                subtitle: "Carefully spaced",
+                tint: charcoalFill, foreground: charcoalFG
+            ))
+        }
+        // 5. Inseparable Bunch — ≥30% of guests in must-sit-together.
+        if metrics.totalGuests > 0,
+           Double(metrics.mustSitPeople) / Double(metrics.totalGuests) >= 0.30 {
+            out.append(SnapshotBadge(
+                icon: "link",
+                title: "Inseparable Bunch",
+                subtitle: "\(metrics.mustSitPeople) people who must sit together",
+                tint: goldFill, foreground: goldFG
+            ))
+        }
+        // 6. Kid-Friendly — ≥10% kids OR ≥5 high chairs.
+        let kidPct = metrics.totalGuests > 0
+            ? Double(metrics.childGuests) / Double(metrics.totalGuests)
+            : 0
+        if kidPct >= 0.10 || metrics.highChairGuests >= 5 {
+            let count = max(metrics.childGuests, metrics.highChairGuests)
+            out.append(SnapshotBadge(
+                icon: "teddybear.fill",
+                title: "Kid-Friendly",
+                subtitle: "\(count) little one\(count == 1 ? "" : "s") on the list",
+                tint: blushFill, foreground: blushFG
+            ))
+        }
+        // 7. VIP Night — ≥10 VIPs OR ≥5% VIP.
+        let vipPct = metrics.totalGuests > 0
+            ? Double(metrics.vipGuests) / Double(metrics.totalGuests)
+            : 0
+        if metrics.vipGuests >= 10 || vipPct >= 0.05 {
+            out.append(SnapshotBadge(
+                icon: "crown.fill",
+                title: "VIP Night",
+                subtitle: "\(metrics.vipGuests) on the priority list",
+                tint: goldFill, foreground: goldFG
+            ))
+        }
+        // 8. The Banquet — large guest count.
+        if metrics.totalGuests >= 300 {
+            out.append(SnapshotBadge(
+                icon: "wineglass.fill",
+                title: "The Banquet",
+                subtitle: "A grand affair",
+                tint: charcoalFill, foreground: charcoalFG
+            ))
+        }
+        // 9. Tiny But Mighty — small guest count.
+        if metrics.totalGuests > 0 && metrics.totalGuests <= 30 {
+            out.append(SnapshotBadge(
+                icon: "sparkle",
+                title: "Tiny But Mighty",
+                subtitle: "Intimate gathering",
+                tint: blushFill, foreground: blushFG
+            ))
+        }
+        // 10. The Mixer — ≥7 categories with members (catch-all variety).
+        if metrics.categoriesWithMembers >= 7 {
+            out.append(SnapshotBadge(
+                icon: "person.3.fill",
+                title: "The Mixer",
+                subtitle: "\(metrics.categoriesWithMembers) different guest crews",
+                tint: goldFill, foreground: goldFG
+            ))
+        }
+
+        // Cap at 4 — top of the list wins. Order above is the priority
+        // (most-specific badges first so they always win the ranking).
+        return Array(out.prefix(4))
+    }
+
+    /// Horizontal row of up to 4 badge tiles. Auto-balances width so
+    /// 1 badge fills a centred third, 2 fill halves, 3 fill thirds,
+    /// 4 fill quarters. Each tile = icon-on-tinted-square + bold name
+    /// + one-line subtitle. Returns the bottom Y of the row (or
+    /// topY unchanged when no badges fired).
+    private static func drawSocialBadges(ctx: CGContext, badges: [SnapshotBadge],
+                                          size: CGSize, topY: CGFloat) -> CGFloat {
+        guard !badges.isEmpty else { return topY }
+
+        let outerInset: CGFloat = 60
+        let usableWidth = size.width - outerInset * 2
+        let tileGap: CGFloat = 10
+        let count = badges.count
+        let tileWidth = (usableWidth - tileGap * CGFloat(count - 1)) / CGFloat(count)
+        let tileHeight: CGFloat = 110
+
+        let titleAttrs: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 12, weight: .bold),
+            .foregroundColor: socialWarm,
+            .kern: 2.5,
+        ]
+        let header = NSString(string: "BADGES")
+        let hSize = header.size(withAttributes: titleAttrs)
+        header.draw(at: CGPoint(x: size.width / 2 - hSize.width / 2, y: topY),
+                    withAttributes: titleAttrs)
+
+        let rowY = topY + hSize.height + 14
+        for (i, badge) in badges.enumerated() {
+            let x = outerInset + CGFloat(i) * (tileWidth + tileGap)
+            drawSingleBadge(badge,
+                            rect: CGRect(x: x, y: rowY,
+                                          width: tileWidth, height: tileHeight),
+                            ctx: ctx)
+        }
+        return rowY + tileHeight
+    }
+
+    private static func drawSingleBadge(_ badge: SnapshotBadge, rect: CGRect, ctx: CGContext) {
+        // Tile background — soft white card with a thin gold border so
+        // each badge feels like a stamp without competing with the
+        // category-bar palette above.
+        let tilePath = UIBezierPath(roundedRect: rect, cornerRadius: 12)
+        ctx.setFillColor(UIColor.white.withAlphaComponent(0.6).cgColor)
+        ctx.setStrokeColor(socialGold.withAlphaComponent(0.30).cgColor)
+        ctx.setLineWidth(0.8)
+        ctx.addPath(tilePath.cgPath)
+        ctx.drawPath(using: .fillStroke)
+
+        // Icon tile — coloured square at the top-centre.
+        let iconSide: CGFloat = 38
+        let iconRect = CGRect(x: rect.midX - iconSide / 2,
+                               y: rect.minY + 10,
+                               width: iconSide, height: iconSide)
+        let iconBg = UIBezierPath(roundedRect: iconRect, cornerRadius: 9)
+        ctx.setFillColor(badge.tint.cgColor)
+        ctx.addPath(iconBg.cgPath)
+        ctx.fillPath()
+
+        // SF Symbol — render via UIImage configured with the badge's
+        // foreground colour. Falls back gracefully if the symbol name
+        // isn't available on the running iOS version.
+        if let symbol = sfSymbolImage(name: badge.icon, pointSize: 20, weight: .semibold,
+                                       tint: badge.foreground) {
+            let renderSide: CGFloat = 22
+            let symbolRect = CGRect(x: iconRect.midX - renderSide / 2,
+                                     y: iconRect.midY - renderSide / 2,
+                                     width: renderSide, height: renderSide)
+            symbol.draw(in: symbolRect)
+        }
+
+        // Title — bold, charcoal, single line.
+        let titleAttrs: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 12, weight: .bold),
+            .foregroundColor: socialCharcoal,
+        ]
+        let title = NSString(string: badge.title)
+        let titleSize = title.size(withAttributes: titleAttrs)
+        let titleY = iconRect.maxY + 8
+        title.draw(at: CGPoint(x: rect.midX - titleSize.width / 2, y: titleY),
+                   withAttributes: titleAttrs)
+
+        // Subtitle — muted, 1-2 lines, truncated to fit.
+        let subtitleAttrs: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 9, weight: .regular),
+            .foregroundColor: socialWarm,
+        ]
+        let truncated = truncate(badge.subtitle,
+                                  attrs: subtitleAttrs,
+                                  maxWidth: rect.width - 12)
+        let subtitle = NSString(string: truncated)
+        let subSize = subtitle.size(withAttributes: subtitleAttrs)
+        subtitle.draw(at: CGPoint(x: rect.midX - subSize.width / 2,
+                                   y: titleY + titleSize.height + 2),
+                      withAttributes: subtitleAttrs)
+    }
+
+    /// Render an SF Symbol as a UIImage at the given point size,
+    /// weight, and tint. Used by the badge tiles. Falls back to nil
+    /// if the symbol isn't available — the badge tile renders without
+    /// an icon but still shows title + subtitle, so we never crash on
+    /// a missing symbol.
+    private static func sfSymbolImage(name: String, pointSize: CGFloat,
+                                       weight: UIImage.SymbolWeight,
+                                       tint: UIColor) -> UIImage? {
+        let config = UIImage.SymbolConfiguration(pointSize: pointSize, weight: weight)
+        guard let raw = UIImage(systemName: name, withConfiguration: config) else {
+            return nil
+        }
+        // Convert template to a tinted bitmap so the colour bakes in
+        // (UIImage.draw doesn't honour tint colour for symbols on its
+        // own).
+        let renderer = UIGraphicsImageRenderer(size: raw.size)
+        return renderer.image { _ in
+            tint.set()
+            raw.withRenderingMode(.alwaysTemplate).draw(at: .zero)
+        }
+    }
+
     // MARK: - Social image — drawing helpers
 
     /// Top-to-bottom soft ivory→champagne gradient + thin gold inner
-    /// border so the card looks intentional on white feeds.
-    private static func drawSocialBackground(ctx: CGContext, size: CGFloat) {
+    /// border so the card looks intentional on white feeds. Takes
+    /// CGSize so the same chrome works for both the square (1080²)
+    /// Floor Plan image and the taller (1080×1350) Snapshot image.
+    private static func drawSocialBackground(ctx: CGContext, size: CGSize) {
         let colors = [socialIvory.cgColor, socialIvoryDeep.cgColor] as CFArray
         let space = CGColorSpaceCreateDeviceRGB()
         guard let gradient = CGGradient(colorsSpace: space, colors: colors,
                                          locations: [0, 1]) else {
             ctx.setFillColor(socialIvory.cgColor)
-            ctx.fill(CGRect(x: 0, y: 0, width: size, height: size))
+            ctx.fill(CGRect(origin: .zero, size: size))
             return
         }
         ctx.drawLinearGradient(gradient,
-                               start: CGPoint(x: 0, y: 0),
-                               end: CGPoint(x: 0, y: size),
+                               start: .zero,
+                               end: CGPoint(x: 0, y: size.height),
                                options: [])
 
         let inset: CGFloat = 36
-        let borderRect = CGRect(x: inset, y: inset, width: size - inset * 2, height: size - inset * 2)
+        let borderRect = CGRect(x: inset, y: inset,
+                                width: size.width - inset * 2,
+                                height: size.height - inset * 2)
         ctx.setStrokeColor(socialGold.withAlphaComponent(0.35).cgColor)
         ctx.setLineWidth(1.5)
         let borderPath = UIBezierPath(roundedRect: borderRect, cornerRadius: 24)
@@ -1215,9 +1569,9 @@ final class PDFExportService {
     /// to the right of it (single horizontal line, not stacked) so the
     /// header steals less vertical space than the v1 layout. Returns
     /// the bottom Y of the strip so the next section can stack.
-    private static func drawSocialBranding(ctx: CGContext, size: CGFloat, topY: CGFloat,
+    private static func drawSocialBranding(ctx: CGContext, size: CGSize, topY: CGFloat,
                                            tagline: String? = nil) -> CGFloat {
-        let cx = size / 2
+        let cx = size.width / 2
         let beeSide: CGFloat = 64
         let wordmarkW: CGFloat = 200
         let wordmarkH: CGFloat = wordmarkW / 6        // 720x120 native ratio
@@ -1266,9 +1620,9 @@ final class PDFExportService {
     /// Big event title + decorative gold bar + date · venue subtitle.
     /// Title auto-shrinks to fit the canvas width so long names don't
     /// bleed past the inner border. Returns the bottom Y of the block.
-    private static func drawSocialEventBlock(ctx: CGContext, plan: SeatingPlan, size: CGFloat, topY: CGFloat) -> CGFloat {
-        let cx = size / 2
-        let maxWidth = size - 160
+    private static func drawSocialEventBlock(ctx: CGContext, plan: SeatingPlan, size: CGSize, topY: CGFloat) -> CGFloat {
+        let cx = size.width / 2
+        let maxWidth = size.width - 160
         let title = plan.name.uppercased()
 
         var fontSize: CGFloat = 56
@@ -1318,10 +1672,12 @@ final class PDFExportService {
     }
 
     /// Single-line headline: "110 GUESTS · 19 TABLES" with the numbers
-    /// in big gold and the labels in muted caps. Pure typography, no
-    /// boxes — keeps the card from feeling card-heavy.
-    private static func drawSocialHeadlineStats(ctx: CGContext, metrics: SocialMetrics, size: CGFloat, topY: CGFloat) -> CGFloat {
-        let cx = size / 2
+    /// in big gold and the labels in muted caps. Adds a small muted
+    /// sub-line under TABLES when the plan has a mixed table-shape
+    /// layout ("8 round · 6 rect"). Pure typography, no boxes —
+    /// keeps the card from feeling card-heavy.
+    private static func drawSocialHeadlineStats(ctx: CGContext, metrics: SocialMetrics, size: CGSize, topY: CGFloat) -> CGFloat {
+        let cx = size.width / 2
 
         let numAttrs: [NSAttributedString.Key: Any] = [
             .font: UIFont.systemFont(ofSize: 64, weight: .bold),
@@ -1372,7 +1728,48 @@ final class PDFExportService {
         tablesLab.draw(at: CGPoint(x: tCenterX - tLabSize.width / 2, y: topY + tNumSize.height + 4),
                        withAttributes: labelAttrs)
 
-        return topY + gNumSize.height + 4 + gLabSize.height
+        // Table-shape mix sub-line — only when the plan actually has
+        // multiple table shapes. Stays muted so it doesn't compete
+        // with the headline numbers.
+        var bottom = topY + gNumSize.height + 4 + gLabSize.height
+        if let mix = formattedTableShapeMix(from: metrics.tableTypeCounts) {
+            let mixAttrs: [NSAttributedString.Key: Any] = [
+                .font: UIFont.systemFont(ofSize: 11, weight: .medium),
+                .foregroundColor: socialWarm,
+                .kern: 0.5,
+            ]
+            let mixStr = NSString(string: mix)
+            let mixSize = mixStr.size(withAttributes: mixAttrs)
+            mixStr.draw(at: CGPoint(x: tCenterX - mixSize.width / 2,
+                                     y: bottom + 4),
+                        withAttributes: mixAttrs)
+            bottom += 4 + mixSize.height
+        }
+        return bottom
+    }
+
+    /// Returns "8 round · 6 rect" style copy when the plan has more
+    /// than one shape; nil for uniform layouts so we don't clutter
+    /// the headline. Sweetheart + head are paired with rect because
+    /// they share the rectangular silhouette.
+    private static func formattedTableShapeMix(from counts: [SeatTable.TableType: Int]) -> String? {
+        guard !counts.isEmpty else { return nil }
+        // Group sweetheart + head under "rect" for the social card —
+        // visually they're all rectangular silhouettes; splitting
+        // hairs in a 1-line subtitle isn't worth the noise.
+        let round = counts[.round] ?? 0
+        let oval = counts[.oval] ?? 0
+        let rect = (counts[.rect] ?? 0) + (counts[.head] ?? 0) + (counts[.sweetheart] ?? 0)
+        let parts: [(String, Int)] = [
+            ("round", round),
+            ("oval", oval),
+            ("rect", rect),
+        ].filter { $0.1 > 0 }
+        // Single shape — uniform layout, no sub-line needed.
+        guard parts.count > 1 else { return nil }
+        return parts
+            .map { "\($0.1) \($0.0)" }
+            .joined(separator: " · ")
     }
 
     /// Top-5 categories as horizontal bars. Each row: dot + name on the
@@ -1380,10 +1777,10 @@ final class PDFExportService {
     /// proportional to the largest category. Bounded by `maxHeight`.
     /// Returns the bottom Y so the next section can stack.
     private static func drawSocialCategoryChart(ctx: CGContext, metrics: SocialMetrics,
-                                                size: CGFloat, topY: CGFloat, maxHeight: CGFloat) -> CGFloat {
+                                                size: CGSize, topY: CGFloat, maxHeight: CGFloat) -> CGFloat {
         let outerInset: CGFloat = 90
         let chartLeft = outerInset
-        let chartRight = size - outerInset
+        let chartRight = size.width - outerInset
         let chartWidth = chartRight - chartLeft
 
         // Section title
@@ -1394,7 +1791,7 @@ final class PDFExportService {
         ]
         let title = NSString(string: "BY CATEGORY")
         let titleSize = title.size(withAttributes: titleAttrs)
-        title.draw(at: CGPoint(x: size / 2 - titleSize.width / 2, y: topY),
+        title.draw(at: CGPoint(x: size.width / 2 - titleSize.width / 2, y: topY),
                    withAttributes: titleAttrs)
 
         // Cap rows so we never blow past maxHeight
@@ -1473,10 +1870,10 @@ final class PDFExportService {
     /// only renders if its source data exists. Picked in priority
     /// order so the most interesting stats rise to the top.
     private static func drawSocialHighlights(ctx: CGContext, metrics: SocialMetrics,
-                                             size: CGFloat, topY: CGFloat, bottomY: CGFloat) {
+                                             size: CGSize, topY: CGFloat, bottomY: CGFloat) {
         let outerInset: CGFloat = 90
         let leftX = outerInset
-        let rightX = size - outerInset
+        let rightX = size.width - outerInset
 
         // Build the full ranked list, pick top 4 that fit.
         var candidates: [(headline: String, detail: String)] = []
@@ -1493,8 +1890,8 @@ final class PDFExportService {
             candidates.append(("\(metrics.dietaryGuests) dietary need\(s)",
                                "Guests catered with care"))
         }
-        if metrics.keepApartPeople > 0 {
-            candidates.append(("\(metrics.keepApartPeople) carefully spaced",
+        if metrics.keepApartPeopleCount > 0 {
+            candidates.append(("\(metrics.keepApartPeopleCount) carefully spaced",
                                "Guests in keep-apart rules"))
         }
         if metrics.vipGuests > 0 {
@@ -1516,7 +1913,7 @@ final class PDFExportService {
                 .foregroundColor: socialWarm,
             ]
             let s = line.size(withAttributes: attrs)
-            line.draw(at: CGPoint(x: size / 2 - s.width / 2, y: topY),
+            line.draw(at: CGPoint(x: size.width / 2 - s.width / 2, y: topY),
                       withAttributes: attrs)
             return
         }
@@ -1529,7 +1926,7 @@ final class PDFExportService {
         ]
         let title = NSString(string: "HIGHLIGHTS")
         let titleSize = title.size(withAttributes: titleAttrs)
-        title.draw(at: CGPoint(x: size / 2 - titleSize.width / 2, y: topY),
+        title.draw(at: CGPoint(x: size.width / 2 - titleSize.width / 2, y: topY),
                    withAttributes: titleAttrs)
 
         let headlineAttrs: [NSAttributedString.Key: Any] = [
@@ -1566,9 +1963,9 @@ final class PDFExportService {
         }
     }
 
-    private static func drawSocialFooter(ctx: CGContext, size: CGFloat) {
-        let cx = size / 2
-        let y: CGFloat = size - 110
+    private static func drawSocialFooter(ctx: CGContext, size: CGSize) {
+        let cx = size.width / 2
+        let y: CGFloat = size.height - 110
         let madeAttrs: [NSAttributedString.Key: Any] = [
             .font: UIFont.systemFont(ofSize: 14, weight: .medium),
             .foregroundColor: socialWarm,
