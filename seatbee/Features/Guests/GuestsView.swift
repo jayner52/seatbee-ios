@@ -39,6 +39,7 @@ struct GuestsView: View {
     @State private var showCategories = false
     @State private var showRules = false
     @State private var showParties = false
+    @State private var showMeals = false
     @State private var editingGuest: Guest?
 
     private var plan: SeatingPlan? { appState.activePlan }
@@ -163,6 +164,10 @@ struct GuestsView: View {
                 PartiesSheet()
                     .environment(appState)
             }
+            .sheet(isPresented: $showMeals) {
+                MealsSheet()
+                    .environment(appState)
+            }
             .sheet(item: $editingGuest) { guest in
                 GuestDetailSheet(guest: guest)
                     .environment(appState)
@@ -254,6 +259,9 @@ struct GuestsView: View {
                     }
                     SBButton(title: "Parties", icon: "person.3", variant: .default, size: .small) {
                         showParties = true
+                    }
+                    SBButton(title: "Meals", icon: "fork.knife", variant: .default, size: .small) {
+                        showMeals = true
                     }
                 }
             }
