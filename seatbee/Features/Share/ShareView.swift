@@ -384,11 +384,17 @@ struct ShareView: View {
                 action: { handlePlannerViewPDF() }
             )
             canvaCard
+            // Web hand-off — see PARITY.md "Print pipeline" entry. The
+            // styled place card / poster seating chart editor on web is
+            // a deep, designer-driven flow (templates, fonts, colours,
+            // bleed, etc.). We deliberately don't reimplement it on
+            // iOS; tapping this card opens the web editor where the
+            // user can sign in and use the full print toolkit.
             toolCard(
-                icon: "rectangle.stack",
-                title: "Place Cards (PDF)",
-                subtitle: "Printable place cards, sorted alphabetically",
-                action: { handlePlaceCardsPDF() }
+                icon: "square.grid.2x2",
+                title: "Printable Cards & Charts",
+                subtitle: "Styled place cards · Poster seating charts (opens on web)",
+                action: { openPrintCardsOnWeb() }
             )
             toolCard(
                 icon: "photo",
@@ -614,9 +620,33 @@ struct ShareView: View {
         PDFExportService.sharePlannerViewPDF(plan: plan, opts: pdfOpts, isPaid: isPaidPlan)
     }
 
-    private func handlePlaceCardsPDF() {
-        guard let plan = appState.activePlan else { return }
-        PDFExportService.sharePlaceCards(plan: plan)
+    /// Opens the web Print & Design surface where the user can pick
+    /// styled place card / seating chart templates. Per PARITY.md the
+    /// web printable editor stays canonical; iOS doesn't try to mirror
+    /// it.
+    ///
+    /// Deep-link contract (handled by AppContent on web):
+    ///   `?planId=<id>&openExport=printCards`
+    /// On mount, web stashes both params in localStorage as
+    /// `seatbee_deep_link`. If the user is already signed in, it
+    /// loadPlan(id)s and pops the print modal immediately. If not, it
+    /// shows the sign-in prompt; the payload survives the OAuth
+    /// redirect and is consumed when `user` becomes truthy. Stale
+    /// entries auto-expire after 30 min.
+    private func openPrintCardsOnWeb() {
+        guard let plan = appState.activePlan else {
+            if let url = URL(string: "https://seatbee.app/app") {
+                UIApplication.shared.open(url)
+            }
+            return
+        }
+        // Percent-encode the plan ID defensively even though they're
+        // UUIDs — keeps us safe if the ID format ever changes.
+        let safeId = plan.id.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? plan.id
+        let urlString = "https://seatbee.app/app?planId=\(safeId)&openExport=printCards"
+        if let url = URL(string: urlString) {
+            UIApplication.shared.open(url)
+        }
     }
 
     private func handleSocialImage() {

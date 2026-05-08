@@ -900,116 +900,52 @@ final class PDFExportService {
     }
 
 
-    // MARK: - Place Cards PDF
-
-    static func generatePlaceCards(plan: SeatingPlan) -> Data? {
-        let cardWidth: CGFloat = 252  // 3.5 inches
-        let cardHeight: CGFloat = 180 // 2.5 inches
-        let pageWidth: CGFloat = 612
-        let pageHeight: CGFloat = 792
-        let cols = 2
-        let rows = 4
-        let marginX: CGFloat = (pageWidth - CGFloat(cols) * cardWidth) / CGFloat(cols + 1)
-        let marginY: CGFloat = (pageHeight - CGFloat(rows) * cardHeight) / CGFloat(rows + 1)
-
-        let goldColor = UIColor(red: 201/255, green: 169/255, blue: 97/255, alpha: 1)
-        let charcoalColor = UIColor(red: 45/255, green: 45/255, blue: 45/255, alpha: 1)
-        let warmColor = UIColor(red: 139/255, green: 134/255, blue: 128/255, alpha: 1)
-
-        // Collect all seated guests
-        var seatedGuests: [(guest: Guest, table: SeatTable, seat: Int)] = []
-        for table in plan.tables {
-            for (guestId, seatIdx) in table.assignments {
-                if let guest = plan.guests.first(where: { $0.id == guestId }) {
-                    seatedGuests.append((guest, table, seatIdx))
-                }
-            }
-        }
-        seatedGuests.sort { $0.guest.displayName < $1.guest.displayName }
-
-        let cardsPerPage = cols * rows
-        let renderer = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: pageWidth, height: pageHeight))
-
-        return renderer.pdfData { context in
-            let chunks = stride(from: 0, to: seatedGuests.count, by: cardsPerPage).map {
-                Array(seatedGuests[$0..<min($0 + cardsPerPage, seatedGuests.count)])
-            }
-
-            for chunk in chunks {
-                context.beginPage()
-                for (i, entry) in chunk.enumerated() {
-                    let col = i % cols
-                    let row = i / cols
-                    let x = marginX + CGFloat(col) * (cardWidth + marginX)
-                    let y = marginY + CGFloat(row) * (cardHeight + marginY)
-
-                    // Card border
-                    let cardRect = CGRect(x: x, y: y, width: cardWidth, height: cardHeight)
-                    context.cgContext.setStrokeColor(goldColor.cgColor)
-                    context.cgContext.setLineWidth(1)
-                    context.cgContext.addRect(cardRect)
-                    context.cgContext.strokePath()
-
-                    // Guest name
-                    let nameAttrs: [NSAttributedString.Key: Any] = [
-                        .font: UIFont.systemFont(ofSize: 18, weight: .medium),
-                        .foregroundColor: charcoalColor
-                    ]
-                    let name = NSString(string: entry.guest.displayName)
-                    let nameSize = name.size(withAttributes: nameAttrs)
-                    name.draw(at: CGPoint(x: x + (cardWidth - nameSize.width) / 2, y: y + 50), withAttributes: nameAttrs)
-
-                    // Table assignment
-                    let tableAttrs: [NSAttributedString.Key: Any] = [
-                        .font: UIFont.systemFont(ofSize: 12),
-                        .foregroundColor: goldColor
-                    ]
-                    let tableStr = NSString(string: "\(entry.table.name) · Seat \(entry.seat + 1)")
-                    let tableSize = tableStr.size(withAttributes: tableAttrs)
-                    tableStr.draw(at: CGPoint(x: x + (cardWidth - tableSize.width) / 2, y: y + 80), withAttributes: tableAttrs)
-
-                    // Dietary note
-                    if let dietary = entry.guest.dietary {
-                        let dietAttrs: [NSAttributedString.Key: Any] = [
-                            .font: UIFont.systemFont(ofSize: 10),
-                            .foregroundColor: warmColor
-                        ]
-                        let dietStr = NSString(string: dietary)
-                        let dietSize = dietStr.size(withAttributes: dietAttrs)
-                        dietStr.draw(at: CGPoint(x: x + (cardWidth - dietSize.width) / 2, y: y + 110), withAttributes: dietAttrs)
-                    }
-                }
-            }
-        }
-    }
-
-    static func sharePlaceCards(plan: SeatingPlan) {
-        guard let data = generatePlaceCards(plan: plan) else { return }
-        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("\(plan.name) Place Cards.pdf")
-        try? data.write(to: tempURL)
-        shareFile(tempURL)
-    }
-
-    // MARK: - Social Image
+    // MARK: - Social Image — "Seating Wrapped"
     //
-    // 1080×1080 share-card built from the Seatbee branding kit: bee logo
-    // and wordmark up top, big event name, four-up stat blocks (guests
-    // / tables / seated % / rules), and a "made with seatbee" footer.
-    // Designed to drop straight into Instagram, X, or iMessage without
-    // looking generic — uses the gold/ivory/champagne palette we use
-    // across the app, and the bee mark is rendered with a champagne
-    // halo backdrop so it pops on solid feeds.
+    // 1080×1080 share-card built like a Spotify Wrapped page: compact
+    // Seatbee branding strip, big event title, headline guest/table
+    // line, a horizontal-bar category breakdown (top 5 by guest count
+    // with each category's own colour from rawCategories), and a
+    // dynamic Highlights list — most popular meal, must-sit-together
+    // people, kept-apart people, dietary diversity, VIPs, kids — only
+    // showing the metrics the plan actually has data for.
+    //
+    // Sections are skipped (not just blanked) when empty, so an early-
+    // planning plan still produces a polished card without dead space.
+    // Tone: factual + delightful, never specific names or judgmental
+    // copy ("kept apart" stays as-is, no jokes about who hates whom).
 
     @MainActor
     static func generateSocialImage(plan: SeatingPlan) -> UIImage? {
         let size: CGFloat = 1080
         let renderer = UIGraphicsImageRenderer(size: CGSize(width: size, height: size))
+        let metrics = computeSocialMetrics(plan: plan)
         return renderer.image { context in
             let ctx = context.cgContext
             drawSocialBackground(ctx: ctx, size: size)
-            drawSocialBranding(ctx: ctx, size: size, topY: 80)
-            drawSocialEventBlock(ctx: ctx, plan: plan, size: size, centerY: 470)
-            drawSocialStatGrid(ctx: ctx, plan: plan, size: size, topY: 660)
+
+            var y: CGFloat = 70
+            y = drawSocialBranding(ctx: ctx, size: size, topY: y)
+            y = drawSocialEventBlock(ctx: ctx, plan: plan, size: size, topY: y + 24)
+            y = drawSocialHeadlineStats(ctx: ctx, metrics: metrics, size: size, topY: y + 28)
+
+            // Reserve room for the footer + a hair of breathing space
+            let footerTopY: CGFloat = size - 130
+            let availableHeight = footerTopY - y
+
+            // Category chart only if we have ≥1 categorised guest. If
+            // it's missing, the highlights section gets the extra room.
+            if !metrics.topCategories.isEmpty {
+                let chartHeight = min(360, availableHeight * 0.55)
+                let nextY = drawSocialCategoryChart(ctx: ctx, metrics: metrics, size: size,
+                                                    topY: y + 18, maxHeight: chartHeight)
+                y = nextY
+            }
+
+            // Highlights — fills the rest, capped at 4 lines
+            drawSocialHighlights(ctx: ctx, metrics: metrics, size: size,
+                                 topY: y + 24, bottomY: footerTopY - 6)
+
             drawSocialFooter(ctx: ctx, size: size)
         }
     }
@@ -1023,7 +959,7 @@ final class PDFExportService {
         shareFile(url)
     }
 
-    // MARK: - Social image — drawing helpers
+    // MARK: - Social image — palette + metrics
 
     private static let socialIvory = UIColor(red: 250/255, green: 246/255, blue: 236/255, alpha: 1)
     private static let socialIvoryDeep = UIColor(red: 244/255, green: 235/255, blue: 215/255, alpha: 1)
@@ -1033,8 +969,124 @@ final class PDFExportService {
     private static let socialCharcoal = UIColor(red: 45/255, green: 45/255, blue: 45/255, alpha: 1)
     private static let socialWarm = UIColor(red: 139/255, green: 134/255, blue: 128/255, alpha: 1)
 
-    /// Top-to-bottom soft ivory→champagne gradient. Subtle so it reads
-    /// as a single colour at thumbnail size but adds depth on mobile.
+    /// Pre-computed snapshot of everything the card might want to show.
+    /// Each draw section reads from this so we never re-walk plan.guests
+    /// per section. Empty arrays / nils mean "skip that section".
+    private struct SocialMetrics {
+        let totalGuests: Int
+        let totalTables: Int
+        let totalSeats: Int
+        let topCategories: [(name: String, color: UIColor, count: Int)]
+        let topMeal: (name: String, count: Int)?
+        let mustSitPeople: Int
+        let keepApartPeople: Int
+        let dietaryGuests: Int
+        let vipGuests: Int
+        let childGuests: Int
+        let highChairGuests: Int
+    }
+
+    private static func computeSocialMetrics(plan: SeatingPlan) -> SocialMetrics {
+        let confirmed = plan.guests.filter { $0.rsvp != .no }
+        let totalGuests = confirmed.count
+        let totalTables = plan.tables.count
+        let totalSeats = plan.tables.reduce(0) { $0 + $1.seats }
+
+        // Categories — resolve from rawCategories (id → {name, color}),
+        // count guests by ID match, take top 5 by count desc.
+        var catNameById: [String: String] = [:]
+        var catColorById: [String: UIColor] = [:]
+        if let raw = plan.rawCategories {
+            for entry in raw {
+                guard let id = entry["id"]?.value as? String else { continue }
+                catNameById[id] = (entry["name"]?.value as? String) ?? id
+                if let hex = entry["color"]?.value as? String,
+                   let c = parseSocialHex(hex) {
+                    catColorById[id] = c
+                }
+            }
+        }
+        var categoryCounts: [String: Int] = [:]
+        for g in confirmed {
+            for cid in g.categories {
+                categoryCounts[cid, default: 0] += 1
+            }
+        }
+        let topCategories: [(name: String, color: UIColor, count: Int)] = categoryCounts
+            .compactMap { id, count -> (String, UIColor, Int)? in
+                guard let name = catNameById[id] else { return nil }
+                let color = catColorById[id] ?? socialGold
+                return (name, color, count)
+            }
+            .sorted { $0.2 > $1.2 }
+            .prefix(5)
+            .map { $0 }
+
+        // Most popular meal — case-insensitive, trim, ignore blank.
+        var mealCounts: [String: Int] = [:]
+        for g in confirmed {
+            guard let raw = g.meal?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty else { continue }
+            let key = raw.capitalized
+            mealCounts[key, default: 0] += 1
+        }
+        let topMeal: (String, Int)? = mealCounts
+            .max(by: { $0.value < $1.value })
+            .map { ($0.key, $0.value) }
+
+        // Rule-derived people counts (Set so a guest in multiple rules
+        // counts once per category — otherwise it gets weird at 200%+).
+        var mustSit = Set<String>()
+        var keepApart = Set<String>()
+        for rule in plan.rules where rule.enabled {
+            switch rule.type {
+            case .mustTogether, .preferTogether, .categoryTogether,
+                 .sideTogether, .seatAdjacent:
+                mustSit.formUnion(rule.guests)
+            case .mustNot:
+                keepApart.formUnion(rule.guests)
+                if let a = rule.sideA { keepApart.formUnion(a) }
+                if let b = rule.sideB { keepApart.formUnion(b) }
+            default:
+                break
+            }
+        }
+
+        let dietaryGuests = confirmed.filter {
+            ($0.dietaryTags?.isEmpty == false) || ($0.dietary?.isEmpty == false)
+        }.count
+        let vipGuests = confirmed.filter { $0.vip }.count
+        let childGuests = confirmed.filter { $0.isChild == true }.count
+        let highChairGuests = confirmed.filter { $0.highChair == true }.count
+
+        return SocialMetrics(
+            totalGuests: totalGuests,
+            totalTables: totalTables,
+            totalSeats: totalSeats,
+            topCategories: topCategories,
+            topMeal: topMeal,
+            mustSitPeople: mustSit.count,
+            keepApartPeople: keepApart.count,
+            dietaryGuests: dietaryGuests,
+            vipGuests: vipGuests,
+            childGuests: childGuests,
+            highChairGuests: highChairGuests
+        )
+    }
+
+    private static func parseSocialHex(_ hex: String) -> UIColor? {
+        var s = hex.trimmingCharacters(in: .whitespaces)
+        if s.hasPrefix("#") { s.removeFirst() }
+        guard s.count == 6, let val = UInt32(s, radix: 16) else { return nil }
+        return UIColor(red: CGFloat((val >> 16) & 0xFF) / 255,
+                       green: CGFloat((val >> 8) & 0xFF) / 255,
+                       blue: CGFloat(val & 0xFF) / 255,
+                       alpha: 1)
+    }
+
+    // MARK: - Social image — drawing helpers
+
+    /// Top-to-bottom soft ivory→champagne gradient + thin gold inner
+    /// border so the card looks intentional on white feeds.
     private static func drawSocialBackground(ctx: CGContext, size: CGFloat) {
         let colors = [socialIvory.cgColor, socialIvoryDeep.cgColor] as CFArray
         let space = CGColorSpaceCreateDeviceRGB()
@@ -1049,8 +1101,6 @@ final class PDFExportService {
                                end: CGPoint(x: 0, y: size),
                                options: [])
 
-        // Inner border — thin gold stroke just inside the edge as a
-        // subtle frame so the card looks intentional on white feeds.
         let inset: CGFloat = 36
         let borderRect = CGRect(x: inset, y: inset, width: size - inset * 2, height: size - inset * 2)
         ctx.setStrokeColor(socialGold.withAlphaComponent(0.35).cgColor)
@@ -1060,59 +1110,61 @@ final class PDFExportService {
         ctx.strokePath()
     }
 
-    /// Bee logo on a champagne disc + the Seatbee wordmark below.
-    /// Both assets are drawn at their natural aspect ratio to avoid the
-    /// distortion bug from the bee-logo-rendering memory.
-    private static func drawSocialBranding(ctx: CGContext, size: CGFloat, topY: CGFloat) {
-        // Champagne halo behind the bee
-        let haloR: CGFloat = 90
+    /// Compact branding strip: bee logo on champagne halo + wordmark
+    /// to the right of it (single horizontal line, not stacked) so the
+    /// header steals less vertical space than the v1 layout. Returns
+    /// the bottom Y of the strip so the next section can stack.
+    private static func drawSocialBranding(ctx: CGContext, size: CGFloat, topY: CGFloat) -> CGFloat {
         let cx = size / 2
-        let haloRect = CGRect(x: cx - haloR, y: topY, width: haloR * 2, height: haloR * 2)
+        let beeSide: CGFloat = 64
+        let wordmarkW: CGFloat = 200
+        let wordmarkH: CGFloat = wordmarkW / 6        // 720x120 native ratio
+        let gap: CGFloat = 16
+        let totalW = beeSide + gap + wordmarkW
+        let startX = cx - totalW / 2
+
+        // Halo behind bee
+        let haloR: CGFloat = beeSide / 2 + 8
+        let haloRect = CGRect(x: startX + beeSide / 2 - haloR,
+                              y: topY + beeSide / 2 - haloR,
+                              width: haloR * 2, height: haloR * 2)
         ctx.setFillColor(socialChampagne.withAlphaComponent(0.55).cgColor)
         ctx.fillEllipse(in: haloRect)
 
-        // Bee logo — square asset, draw inside the halo
+        // Bee logo
         if let bee = UIImage(named: "SeatbeeLogo") {
-            let beeSide: CGFloat = 132
-            let beeRect = CGRect(x: cx - beeSide / 2,
-                                  y: topY + haloR - beeSide / 2,
-                                  width: beeSide, height: beeSide)
-            bee.draw(in: beeRect)
+            bee.draw(in: CGRect(x: startX, y: topY, width: beeSide, height: beeSide))
         }
-
-        // Wordmark below — preserve native 6:1 aspect ratio so the
-        // letterforms aren't squished.
+        // Wordmark — centred vertically against the bee
         if let mark = UIImage(named: "SeatbeeWordmark") {
-            let markW: CGFloat = 360
-            let markH = markW / 6  // 720x120 native
-            let markRect = CGRect(x: cx - markW / 2,
-                                   y: topY + haloR * 2 + 18,
-                                   width: markW, height: markH)
-            mark.draw(in: markRect)
+            mark.draw(in: CGRect(x: startX + beeSide + gap,
+                                 y: topY + (beeSide - wordmarkH) / 2,
+                                 width: wordmarkW, height: wordmarkH))
         }
 
-        // Tag line under wordmark
+        // "Seating Wrapped" tagline
         let tagAttrs: [NSAttributedString.Key: Any] = [
-            .font: UIFont.systemFont(ofSize: 18, weight: .semibold),
+            .font: UIFont.systemFont(ofSize: 13, weight: .bold),
             .foregroundColor: socialGoldDk,
             .kern: 4,
         ]
-        let tag = NSString(string: "SEATING PLANNED")
+        let tag = NSString(string: "SEATING WRAPPED")
         let tSize = tag.size(withAttributes: tagAttrs)
-        tag.draw(at: CGPoint(x: cx - tSize.width / 2, y: topY + haloR * 2 + 95),
+        tag.draw(at: CGPoint(x: cx - tSize.width / 2, y: topY + beeSide + 14),
                  withAttributes: tagAttrs)
+
+        return topY + beeSide + 14 + tSize.height
     }
 
-    /// Big event title + subtitle (date · venue). Title auto-shrinks
-    /// to fit the canvas width so long event names don't bleed past
-    /// the inner border.
-    private static func drawSocialEventBlock(ctx: CGContext, plan: SeatingPlan, size: CGFloat, centerY: CGFloat) {
+    /// Big event title + decorative gold bar + date · venue subtitle.
+    /// Title auto-shrinks to fit the canvas width so long names don't
+    /// bleed past the inner border. Returns the bottom Y of the block.
+    private static func drawSocialEventBlock(ctx: CGContext, plan: SeatingPlan, size: CGFloat, topY: CGFloat) -> CGFloat {
         let cx = size / 2
         let maxWidth = size - 160
         let title = plan.name.uppercased()
 
-        // Auto-fit font: start big, shrink until it fits within maxWidth.
-        var fontSize: CGFloat = 64
+        var fontSize: CGFloat = 56
         var titleAttrs: [NSAttributedString.Key: Any] = [
             .font: UIFont.systemFont(ofSize: fontSize, weight: .semibold),
             .foregroundColor: socialCharcoal,
@@ -1125,19 +1177,17 @@ final class PDFExportService {
             measured = NSString(string: title).size(withAttributes: titleAttrs)
         }
         NSString(string: title).draw(
-            at: CGPoint(x: cx - measured.width / 2, y: centerY - measured.height / 2),
+            at: CGPoint(x: cx - measured.width / 2, y: topY),
             withAttributes: titleAttrs)
 
-        // Decorative gold bar under title
-        let barWidth: CGFloat = 80
-        let barY = centerY + measured.height / 2 + 18
+        let barWidth: CGFloat = 70
+        let barY = topY + measured.height + 16
         ctx.setStrokeColor(socialGold.cgColor)
         ctx.setLineWidth(2)
         ctx.move(to: CGPoint(x: cx - barWidth / 2, y: barY))
         ctx.addLine(to: CGPoint(x: cx + barWidth / 2, y: barY))
         ctx.strokePath()
 
-        // Subtitle: date · venue
         var subParts: [String] = []
         if let date = plan.eventDate {
             let f = DateFormatter()
@@ -1145,102 +1195,267 @@ final class PDFExportService {
             subParts.append(f.string(from: date))
         }
         if let venue = plan.venue, !venue.isEmpty { subParts.append(venue) }
+        var bottom = barY + 4
         if !subParts.isEmpty {
             let subAttrs: [NSAttributedString.Key: Any] = [
-                .font: UIFont.systemFont(ofSize: 22, weight: .regular),
+                .font: UIFont.systemFont(ofSize: 19, weight: .regular),
                 .foregroundColor: socialWarm,
             ]
             let sub = NSString(string: subParts.joined(separator: " · "))
             let sSize = sub.size(withAttributes: subAttrs)
-            sub.draw(at: CGPoint(x: cx - sSize.width / 2, y: barY + 18),
+            sub.draw(at: CGPoint(x: cx - sSize.width / 2, y: barY + 14),
                      withAttributes: subAttrs)
+            bottom = barY + 14 + sSize.height
         }
+        return bottom
     }
 
-    /// Adaptive stat grid: always shows GUESTS + TABLES, then adds
-    /// "MUST SIT" / "KEPT APART" people-count cards when those rules
-    /// exist. Counts PEOPLE (not rules) so the numbers read like
-    /// drama, not housekeeping — "12 must sit together" is juicier
-    /// than "3 keep-together rules". Falls back to GUESTS + TABLES +
-    /// SEATS when no rules exist.
-    private static func drawSocialStatGrid(ctx: CGContext, plan: SeatingPlan, size: CGFloat, topY: CGFloat) {
-        let totalGuests = plan.guests.filter { $0.rsvp != .no }.count
-        let totalTables = plan.tables.count
-        let totalSeats = plan.tables.reduce(0) { $0 + $1.seats }
+    /// Single-line headline: "110 GUESTS · 19 TABLES" with the numbers
+    /// in big gold and the labels in muted caps. Pure typography, no
+    /// boxes — keeps the card from feeling card-heavy.
+    private static func drawSocialHeadlineStats(ctx: CGContext, metrics: SocialMetrics, size: CGFloat, topY: CGFloat) -> CGFloat {
+        let cx = size / 2
 
-        // Tally people involved in must-together / keep-apart rules.
-        // Use sets so a guest in multiple rules is only counted once
-        // per category (otherwise the number gets weird at 200%+).
-        var mustTogetherPeople = Set<String>()
-        var keepApartPeople = Set<String>()
-        for rule in plan.rules where rule.enabled {
-            switch rule.type {
-            case .mustTogether, .preferTogether, .categoryTogether,
-                 .sideTogether, .seatAdjacent:
-                mustTogetherPeople.formUnion(rule.guests)
-            case .mustNot:
-                keepApartPeople.formUnion(rule.guests)
-                if let a = rule.sideA { keepApartPeople.formUnion(a) }
-                if let b = rule.sideB { keepApartPeople.formUnion(b) }
-            default:
-                break
-            }
-        }
-
-        var stats: [(value: String, label: String)] = [
-            ("\(totalGuests)", "GUESTS"),
-            ("\(totalTables)", "TABLES"),
-        ]
-        if !mustTogetherPeople.isEmpty {
-            stats.append(("\(mustTogetherPeople.count)", "MUST SIT"))
-        }
-        if !keepApartPeople.isEmpty {
-            stats.append(("\(keepApartPeople.count)", "KEPT APART"))
-        }
-        // No rules at all → fall back to a third stat that's always
-        // meaningful: total seats (capacity).
-        if stats.count == 2 {
-            stats.append(("\(totalSeats)", "SEATS"))
-        }
-        // Cap at 4 so cards don't get too narrow.
-        if stats.count > 4 { stats = Array(stats.prefix(4)) }
-
-        let count = stats.count
-        let outerInset: CGFloat = 70
-        let usableW = size - outerInset * 2
-        let cardSpacing: CGFloat = 16
-        let cardW = (usableW - cardSpacing * CGFloat(count - 1)) / CGFloat(count)
-        let cardH: CGFloat = 170
-
-        let valueAttrs: [NSAttributedString.Key: Any] = [
-            .font: UIFont.systemFont(ofSize: 56, weight: .semibold),
+        let numAttrs: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 64, weight: .bold),
             .foregroundColor: socialGoldDk,
         ]
         let labelAttrs: [NSAttributedString.Key: Any] = [
-            .font: UIFont.systemFont(ofSize: 12, weight: .bold),
+            .font: UIFont.systemFont(ofSize: 13, weight: .semibold),
             .foregroundColor: socialWarm,
-            .kern: 1.8,
+            .kern: 2,
         ]
 
-        for (i, stat) in stats.enumerated() {
-            let x = outerInset + CGFloat(i) * (cardW + cardSpacing)
-            let cardRect = CGRect(x: x, y: topY, width: cardW, height: cardH)
+        let guestsNum = NSString(string: "\(metrics.totalGuests)")
+        let guestsLab = NSString(string: "GUESTS")
+        let tablesNum = NSString(string: "\(metrics.totalTables)")
+        let tablesLab = NSString(string: "TABLES")
+        let dot = NSString(string: "·")
+        let dotAttrs: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 56, weight: .light),
+            .foregroundColor: socialGold.withAlphaComponent(0.5),
+        ]
 
-            ctx.setFillColor(UIColor.white.withAlphaComponent(0.55).cgColor)
-            ctx.setStrokeColor(socialGold.withAlphaComponent(0.35).cgColor)
-            ctx.setLineWidth(1)
-            let cardPath = UIBezierPath(roundedRect: cardRect, cornerRadius: 16)
-            ctx.addPath(cardPath.cgPath)
-            ctx.drawPath(using: .fillStroke)
+        let gNumSize = guestsNum.size(withAttributes: numAttrs)
+        let gLabSize = guestsLab.size(withAttributes: labelAttrs)
+        let tNumSize = tablesNum.size(withAttributes: numAttrs)
+        let tLabSize = tablesLab.size(withAttributes: labelAttrs)
+        let dotSize = dot.size(withAttributes: dotAttrs)
 
-            let value = NSString(string: stat.value)
-            let vSize = value.size(withAttributes: valueAttrs)
-            value.draw(at: CGPoint(x: cardRect.midX - vSize.width / 2, y: topY + 36),
-                       withAttributes: valueAttrs)
-            let label = NSString(string: stat.label)
-            let lSize = label.size(withAttributes: labelAttrs)
-            label.draw(at: CGPoint(x: cardRect.midX - lSize.width / 2, y: topY + 116),
+        // Each "stat unit" = number stacked above label. Centre each
+        // unit, separator dot between.
+        let gUnitW = max(gNumSize.width, gLabSize.width)
+        let tUnitW = max(tNumSize.width, tLabSize.width)
+        let unitGap: CGFloat = 32
+        let totalW = gUnitW + unitGap + dotSize.width + unitGap + tUnitW
+        let startX = cx - totalW / 2
+
+        let gCenterX = startX + gUnitW / 2
+        let dotX = startX + gUnitW + unitGap + dotSize.width / 2
+        let tCenterX = startX + gUnitW + unitGap + dotSize.width + unitGap + tUnitW / 2
+
+        guestsNum.draw(at: CGPoint(x: gCenterX - gNumSize.width / 2, y: topY),
+                       withAttributes: numAttrs)
+        guestsLab.draw(at: CGPoint(x: gCenterX - gLabSize.width / 2, y: topY + gNumSize.height + 4),
                        withAttributes: labelAttrs)
+        dot.draw(at: CGPoint(x: dotX - dotSize.width / 2, y: topY + 6),
+                 withAttributes: dotAttrs)
+        tablesNum.draw(at: CGPoint(x: tCenterX - tNumSize.width / 2, y: topY),
+                       withAttributes: numAttrs)
+        tablesLab.draw(at: CGPoint(x: tCenterX - tLabSize.width / 2, y: topY + tNumSize.height + 4),
+                       withAttributes: labelAttrs)
+
+        return topY + gNumSize.height + 4 + gLabSize.height
+    }
+
+    /// Top-5 categories as horizontal bars. Each row: dot + name on the
+    /// left, fill bar in category colour, count on the right. Bars are
+    /// proportional to the largest category. Bounded by `maxHeight`.
+    /// Returns the bottom Y so the next section can stack.
+    private static func drawSocialCategoryChart(ctx: CGContext, metrics: SocialMetrics,
+                                                size: CGFloat, topY: CGFloat, maxHeight: CGFloat) -> CGFloat {
+        let outerInset: CGFloat = 90
+        let chartLeft = outerInset
+        let chartRight = size - outerInset
+        let chartWidth = chartRight - chartLeft
+
+        // Section title
+        let titleAttrs: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 12, weight: .bold),
+            .foregroundColor: socialWarm,
+            .kern: 2.5,
+        ]
+        let title = NSString(string: "BY CATEGORY")
+        let titleSize = title.size(withAttributes: titleAttrs)
+        title.draw(at: CGPoint(x: size / 2 - titleSize.width / 2, y: topY),
+                   withAttributes: titleAttrs)
+
+        // Cap rows so we never blow past maxHeight
+        let rowH: CGFloat = 36
+        let rowGap: CGFloat = 8
+        let availableForRows = maxHeight - titleSize.height - 18
+        let maxRows = max(1, Int((availableForRows + rowGap) / (rowH + rowGap)))
+        let rows = Array(metrics.topCategories.prefix(maxRows))
+
+        let maxCount = max(1, rows.first?.count ?? 1)
+        var y = topY + titleSize.height + 18
+
+        // Layout: 30% name column | bar | count
+        let nameColW = chartWidth * 0.30
+        let countColW: CGFloat = 60
+        let barLeft = chartLeft + nameColW + 8
+        let barRight = chartRight - countColW - 8
+        let barFullW = barRight - barLeft
+
+        let nameAttrs: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 16, weight: .semibold),
+            .foregroundColor: socialCharcoal,
+        ]
+        let countAttrs: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 17, weight: .bold),
+            .foregroundColor: socialGoldDk,
+        ]
+
+        for cat in rows {
+            // Category dot
+            let dotR: CGFloat = 5
+            let dotRect = CGRect(x: chartLeft, y: y + rowH / 2 - dotR,
+                                  width: dotR * 2, height: dotR * 2)
+            ctx.setFillColor(cat.color.cgColor)
+            ctx.fillEllipse(in: dotRect)
+
+            // Name (truncated to nameColW)
+            let nameStr = NSString(string: truncate(cat.name, attrs: nameAttrs, maxWidth: nameColW - 16))
+            let nameSize = nameStr.size(withAttributes: nameAttrs)
+            nameStr.draw(at: CGPoint(x: chartLeft + 16,
+                                      y: y + rowH / 2 - nameSize.height / 2),
+                         withAttributes: nameAttrs)
+
+            // Bar background
+            let barH: CGFloat = 12
+            let barY = y + rowH / 2 - barH / 2
+            let bgRect = CGRect(x: barLeft, y: barY, width: barFullW, height: barH)
+            ctx.setFillColor(socialChampagne.withAlphaComponent(0.5).cgColor)
+            let bgPath = UIBezierPath(roundedRect: bgRect, cornerRadius: barH / 2)
+            ctx.addPath(bgPath.cgPath)
+            ctx.fillPath()
+
+            // Bar fill
+            let fillW = max(barH, barFullW * CGFloat(cat.count) / CGFloat(maxCount))
+            let fillRect = CGRect(x: barLeft, y: barY, width: fillW, height: barH)
+            ctx.setFillColor(cat.color.withAlphaComponent(0.85).cgColor)
+            let fillPath = UIBezierPath(roundedRect: fillRect, cornerRadius: barH / 2)
+            ctx.addPath(fillPath.cgPath)
+            ctx.fillPath()
+
+            // Count (right-aligned)
+            let countStr = NSString(string: "\(cat.count)")
+            let cSize = countStr.size(withAttributes: countAttrs)
+            countStr.draw(at: CGPoint(x: chartRight - cSize.width,
+                                       y: y + rowH / 2 - cSize.height / 2),
+                          withAttributes: countAttrs)
+
+            y += rowH + rowGap
+        }
+
+        return y
+    }
+
+    /// Up-to-4 fun facts shaped like a Wrapped card: small gold bullet,
+    /// a bold value + short label, optional secondary text. Each line
+    /// only renders if its source data exists. Picked in priority
+    /// order so the most interesting stats rise to the top.
+    private static func drawSocialHighlights(ctx: CGContext, metrics: SocialMetrics,
+                                             size: CGFloat, topY: CGFloat, bottomY: CGFloat) {
+        let outerInset: CGFloat = 90
+        let leftX = outerInset
+        let rightX = size - outerInset
+
+        // Build the full ranked list, pick top 4 that fit.
+        var candidates: [(headline: String, detail: String)] = []
+        if let meal = metrics.topMeal {
+            candidates.append(("\(meal.count) ordered \(meal.name.lowercased())",
+                               "Most popular meal"))
+        }
+        if metrics.mustSitPeople > 0 {
+            candidates.append(("\(metrics.mustSitPeople) inseparable",
+                               "Guests in must-sit-together rules"))
+        }
+        if metrics.dietaryGuests > 0 {
+            let s = metrics.dietaryGuests == 1 ? "" : "s"
+            candidates.append(("\(metrics.dietaryGuests) dietary need\(s)",
+                               "Guests catered with care"))
+        }
+        if metrics.keepApartPeople > 0 {
+            candidates.append(("\(metrics.keepApartPeople) carefully spaced",
+                               "Guests in keep-apart rules"))
+        }
+        if metrics.vipGuests > 0 {
+            let s = metrics.vipGuests == 1 ? "" : "s"
+            candidates.append(("\(metrics.vipGuests) VIP\(s)",
+                               "On the priority list"))
+        }
+        if metrics.childGuests > 0 {
+            let s = metrics.childGuests == 1 ? "" : "s"
+            candidates.append(("\(metrics.childGuests) little one\(s)",
+                               "Kids in the room"))
+        }
+        if metrics.topCategories.isEmpty && candidates.isEmpty {
+            // Nothing to highlight (very early-planning) — show a soft
+            // closing note instead of empty space.
+            let line = NSString(string: "Planning in progress")
+            let attrs: [NSAttributedString.Key: Any] = [
+                .font: UIFont.italicSystemFont(ofSize: 17),
+                .foregroundColor: socialWarm,
+            ]
+            let s = line.size(withAttributes: attrs)
+            line.draw(at: CGPoint(x: size / 2 - s.width / 2, y: topY),
+                      withAttributes: attrs)
+            return
+        }
+
+        // Section title
+        let titleAttrs: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 12, weight: .bold),
+            .foregroundColor: socialWarm,
+            .kern: 2.5,
+        ]
+        let title = NSString(string: "HIGHLIGHTS")
+        let titleSize = title.size(withAttributes: titleAttrs)
+        title.draw(at: CGPoint(x: size / 2 - titleSize.width / 2, y: topY),
+                   withAttributes: titleAttrs)
+
+        let headlineAttrs: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 22, weight: .semibold),
+            .foregroundColor: socialCharcoal,
+        ]
+        let detailAttrs: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 14, weight: .regular),
+            .foregroundColor: socialWarm,
+        ]
+
+        let rowH: CGFloat = 56
+        let availableHeight = bottomY - (topY + titleSize.height + 16)
+        let maxRows = max(1, Int(availableHeight / rowH))
+        let chosen = Array(candidates.prefix(min(4, maxRows)))
+
+        var y = topY + titleSize.height + 16
+        for item in chosen {
+            // Bullet — small filled gold circle
+            let bulletR: CGFloat = 4
+            let bulletRect = CGRect(x: leftX, y: y + 9,
+                                     width: bulletR * 2, height: bulletR * 2)
+            ctx.setFillColor(socialGold.cgColor)
+            ctx.fillEllipse(in: bulletRect)
+
+            let textX = leftX + bulletR * 2 + 14
+            let truncatedHead = truncate(item.headline, attrs: headlineAttrs, maxWidth: rightX - textX)
+            NSString(string: truncatedHead).draw(at: CGPoint(x: textX, y: y),
+                                                  withAttributes: headlineAttrs)
+            let truncatedDet = truncate(item.detail, attrs: detailAttrs, maxWidth: rightX - textX)
+            NSString(string: truncatedDet).draw(at: CGPoint(x: textX, y: y + 26),
+                                                 withAttributes: detailAttrs)
+            y += rowH
         }
     }
 
@@ -1248,7 +1463,7 @@ final class PDFExportService {
         let cx = size / 2
         let y: CGFloat = size - 110
         let madeAttrs: [NSAttributedString.Key: Any] = [
-            .font: UIFont.systemFont(ofSize: 16, weight: .medium),
+            .font: UIFont.systemFont(ofSize: 14, weight: .medium),
             .foregroundColor: socialWarm,
         ]
         let made = NSString(string: "Made with Seatbee")
@@ -1256,13 +1471,13 @@ final class PDFExportService {
         made.draw(at: CGPoint(x: cx - mSize.width / 2, y: y), withAttributes: madeAttrs)
 
         let urlAttrs: [NSAttributedString.Key: Any] = [
-            .font: UIFont.systemFont(ofSize: 22, weight: .semibold),
+            .font: UIFont.systemFont(ofSize: 20, weight: .bold),
             .foregroundColor: socialGoldDk,
             .kern: 1.5,
         ]
         let url = NSString(string: "seatbee.app")
         let uSize = url.size(withAttributes: urlAttrs)
-        url.draw(at: CGPoint(x: cx - uSize.width / 2, y: y + 24),
+        url.draw(at: CGPoint(x: cx - uSize.width / 2, y: y + 22),
                  withAttributes: urlAttrs)
     }
 
