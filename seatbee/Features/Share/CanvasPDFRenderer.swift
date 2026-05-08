@@ -37,7 +37,13 @@ enum CanvasPDFRenderer {
 
         // When labels are on, the world bounds need extra perimeter room
         // so names don't get clipped at the edges of the target rect.
-        let labelPad: CGFloat = showGuestNames ? 36 : 0
+        // 60pt buys margin for the worst-case label: a 9-char name in
+        // a 7.5pt semibold font with the ivory pill backdrop's 3pt
+        // horizontal padding (~50pt total label width) sitting on the
+        // outermost seat at body_radius + seat_offset (10) + label
+        // offset (16). 36pt was clipping "Sterling" / "Alexander" on
+        // tables at the far left/right of the floor plan.
+        let labelPad: CGFloat = showGuestNames ? 60 : 0
         let inflatedBounds = bounds.insetBy(dx: -labelPad, dy: -labelPad)
 
         // Fit-to-rect with a small inner padding so seats/labels don't
