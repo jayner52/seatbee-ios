@@ -396,13 +396,22 @@ struct DashboardView: View {
             HStack(spacing: 12) {
                 SBTableGraphic(totalSeats: 8, filledSeats: min(plan.guests.count, 8), size: 44)
 
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text(plan.name)
                         .font(SBFont.bodySmallBold)
                         .foregroundStyle(Color.sbCharcoal)
-                    Text("\(plan.guests.count) guests · \(plan.tables.count) tables")
-                        .font(SBFont.caption)
-                        .foregroundStyle(Color.sbWarm)
+                    HStack(spacing: 6) {
+                        Text("\(plan.guests.count) guests · \(plan.tables.count) tables")
+                            .font(SBFont.caption)
+                            .foregroundStyle(Color.sbWarm)
+                        // Tier pill — at-a-glance read on which plan
+                        // is on which tier without opening Event
+                        // Passes. Resolves through the same chain as
+                        // AppState.activePlanTier so plans with stale
+                        // tier columns but valid event_pass_expires_at
+                        // render correctly.
+                        planTierPill(for: plan)
+                    }
                 }
 
                 Spacer()
@@ -416,6 +425,29 @@ struct DashboardView: View {
             .clipShape(RoundedRectangle(cornerRadius: SBRadius.card))
         }
         .buttonStyle(.plain)
+    }
+
+    /// Compact uppercase pill carrying the plan's effective tier.
+    /// Free renders muted so paid plans visually pop on the list.
+    @ViewBuilder
+    private func planTierPill(for plan: SeatingPlan) -> some View {
+        let tier = plan.resolvedTier(against: appState.userPasses)
+        let (label, fg, bg): (String, Color, Color) = {
+            switch tier {
+            case .free:           return ("FREE",      Color.sbWarm,    Color.sbWarm.opacity(0.10))
+            case .eventPass:      return ("EVENT",     Color.sbGoldDk,  Color.sbChampagne)
+            case .signaturePass:  return ("SIGNATURE", Color.white,     Color.sbGoldDk)
+            case .proPass:        return ("GRAND",     Color.white,     Color.sbCharcoal)
+            }
+        }()
+        Text(label)
+            .font(.system(size: 9, weight: .bold))
+            .kerning(1)
+            .foregroundStyle(fg)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(bg)
+            .clipShape(Capsule())
     }
 
     private func selectPlan(_ plan: SeatingPlan) {
