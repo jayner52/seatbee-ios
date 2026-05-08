@@ -90,6 +90,7 @@ struct MealsSheet: View {
                         title: g.displayName,
                         initialMeal: g.meal,
                         initialDietaryTags: Set(g.dietaryTags ?? []),
+                        initialDietaryNote: g.dietary ?? "",
                         popularMeals: popularMeals,
                         mode: .single
                     ) { result in
@@ -104,6 +105,7 @@ struct MealsSheet: View {
                     title: "\(selectedGuestIds.count) selected",
                     initialMeal: nil,
                     initialDietaryTags: [],
+                    initialDietaryNote: "",
                     popularMeals: popularMeals,
                     mode: .bulk
                 ) { result in
@@ -289,6 +291,19 @@ struct MealsSheet: View {
                                 Text(emoji).font(.system(size: 12))
                             }
                         }
+                        // Custom dietary note (Guest.dietary, free-text).
+                        // Italic so users can tell it apart from a meal
+                        // chip at a glance.
+                        if let note = g.dietary, !note.isEmpty {
+                            Text(note)
+                                .font(SBFont.caption.italic())
+                                .foregroundStyle(Color.sbCharcoal2)
+                                .lineLimit(1)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.sbSage.opacity(0.15))
+                                .clipShape(Capsule())
+                        }
                     }
                 }
                 Spacer()
@@ -394,6 +409,9 @@ struct MealsSheet: View {
         if let tags = result.dietaryTags {
             p.guests[idx].dietaryTags = tags.isEmpty ? nil : Array(tags)
         }
+        if let note = result.dietaryNote {
+            p.guests[idx].dietary = note.isEmpty ? nil : note
+        }
         appState.activePlan = p
         let snap = p
         Task { try? await appState.database.savePlanData(plan: snap) }
@@ -409,6 +427,12 @@ struct MealsSheet: View {
             }
             if let tags = result.dietaryTags {
                 p.guests[idx].dietaryTags = tags.isEmpty ? nil : Array(tags)
+            }
+            // In bulk, the note is only emitted when non-empty (commit
+            // logic), so existing per-guest notes are preserved when
+            // the user only updates tags.
+            if let note = result.dietaryNote {
+                p.guests[idx].dietary = note.isEmpty ? nil : note
             }
         }
         appState.activePlan = p
@@ -429,12 +453,25 @@ struct PopularMeal: Equatable {
     let count: Int
 }
 
+/// Quick-pick suggestions — shown when the user hasn't typed many
+/// meals yet, so they can pick a sensible default with one tap
+/// instead of typing. Order is opinionated to surface the most
+/// common wedding/event meal categories first. Anything more
+/// specific ("Beef tenderloin with red wine jus") still gets typed
+/// in the custom field. De-duplicated case-insensitively against
+/// the plan's existing meals so we don't show "Chicken" twice when
+/// it's already in popular.
+private let quickPickMeals: [String] = [
+    "Beef", "Chicken", "Fish", "Pasta", "Vegetarian", "Kids meal"
+]
+
 /// Result of a picker session. `nil` means "leave this field alone"
 /// (only relevant in bulk mode where the user might choose to update
-/// only meals OR only dietary tags). Empty values mean "clear".
+/// only meals OR only dietary tags). Empty strings mean "clear".
 struct MealPickerResult {
     var meal: String?
     var dietaryTags: Set<String>?
+    var dietaryNote: String?      // writes to Guest.dietary (legacy free-text)
 }
 
 private struct MealPickerSheet: View {
@@ -443,6 +480,7 @@ private struct MealPickerSheet: View {
     let title: String
     let initialMeal: String?
     let initialDietaryTags: Set<String>
+    let initialDietaryNote: String          // single mode preloads, bulk starts empty
     let popularMeals: [PopularMeal]
     let mode: Mode
     let onApply: (MealPickerResult) -> Void
@@ -451,24 +489,31 @@ private struct MealPickerSheet: View {
     @State private var selectedMeal: String   // "" = none / clear
     @State private var customMealText: String
     @State private var selectedTags: Set<String>
+    @State private var customDietaryText: String
     @State private var mealEdited: Bool       // bulk: did user touch meal section?
     @State private var dietaryEdited: Bool    // bulk: did user touch dietary section?
 
     init(title: String,
          initialMeal: String?,
          initialDietaryTags: Set<String>,
+         initialDietaryNote: String,
          popularMeals: [PopularMeal],
          mode: Mode,
          onApply: @escaping (MealPickerResult) -> Void) {
         self.title = title
         self.initialMeal = initialMeal
         self.initialDietaryTags = initialDietaryTags
+        self.initialDietaryNote = initialDietaryNote
         self.popularMeals = popularMeals
         self.mode = mode
         self.onApply = onApply
         _selectedMeal = State(initialValue: initialMeal ?? "")
         _customMealText = State(initialValue: "")
         _selectedTags = State(initialValue: initialDietaryTags)
+        // Preload existing note in single mode so users see what's
+        // there. In bulk we start empty — empty == "leave alone" so
+        // bulk-applying tags doesn't accidentally wipe per-guest notes.
+        _customDietaryText = State(initialValue: mode == .single ? initialDietaryNote : "")
         _mealEdited = State(initialValue: false)
         _dietaryEdited = State(initialValue: false)
     }
@@ -516,7 +561,7 @@ private struct MealPickerSheet: View {
             }
 
             if mode == .single || mealEdited {
-                if !popularMeals.isEmpty {
+                if !popularMeals.isEmpty || mode == .single {
                     FlowLayout(spacing: 8) {
                         // "None" — explicit clear option. Skipped in
                         // bulk because the toggle handles "leave alone";
@@ -533,6 +578,28 @@ private struct MealPickerSheet: View {
                                      selected: selectedMeal.caseInsensitiveCompare(p.label) == .orderedSame)
                         }
                     }
+                }
+
+                // Quick picks — sensible default options shown when the
+                // plan hasn't built up many meals yet, deduped against
+                // the plan's existing meal strings (case-insensitive).
+                // Once a quick-pick is used, it'll surface in the
+                // "popular" row above on the next picker open.
+                if !suggestedQuickPicks.isEmpty {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("QUICK PICKS")
+                            .font(SBFont.capsLabel)
+                            .foregroundStyle(Color.sbWarm)
+                            .letterSpacing(1.5)
+                        FlowLayout(spacing: 8) {
+                            ForEach(suggestedQuickPicks, id: \.self) { label in
+                                mealChip(label: label, value: label,
+                                         count: nil,
+                                         selected: selectedMeal.caseInsensitiveCompare(label) == .orderedSame)
+                            }
+                        }
+                    }
+                    .padding(.top, 4)
                 }
 
                 VStack(alignment: .leading, spacing: 6) {
@@ -605,6 +672,13 @@ private struct MealPickerSheet: View {
         .buttonStyle(.plain)
     }
 
+    /// Quick-picks minus anything already in popularMeals (case-folded).
+    /// Avoids showing "Chicken" twice when the plan already has it.
+    private var suggestedQuickPicks: [String] {
+        let popularKeys = Set(popularMeals.map { $0.label.lowercased() })
+        return quickPickMeals.filter { !popularKeys.contains($0.lowercased()) }
+    }
+
     // MARK: - Dietary section
 
     private var dietarySection: some View {
@@ -647,10 +721,49 @@ private struct MealPickerSheet: View {
                         .buttonStyle(.plain)
                     }
                 }
-                if mode == .bulk {
-                    Text("Selected tags REPLACE the current dietary tags on each guest.")
+                // Custom dietary note — writes to Guest.dietary, the
+                // legacy free-text "other restriction or allergy" field
+                // (web parity: same field that surfaces as the "Other
+                // restriction or allergy note…" input on web Edit Guest).
+                // Use this for things outside the canonical tag list:
+                // "no pork", "low sodium", "tree nut allergy + dairy".
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "plus.circle")
+                            .foregroundStyle(Color.sbGoldDk)
+                            .font(.system(size: 14))
+                        TextField(mode == .bulk
+                                  ? "Other restriction (replaces existing notes)"
+                                  : "Other restriction — e.g. no pork, low sodium",
+                                  text: $customDietaryText, axis: .horizontal)
+                            .textFieldStyle(.plain)
+                            .font(SBFont.body)
+                            .onChange(of: customDietaryText) { _, _ in
+                                if mode == .bulk { dietaryEdited = true }
+                            }
+                        if !customDietaryText.isEmpty {
+                            Button {
+                                customDietaryText = ""
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundStyle(Color.sbWarm2)
+                            }
+                        }
+                    }
+                    .padding(10)
+                    .background(Color.white)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: SBRadius.small)
+                            .strokeBorder(Color.sbLine, lineWidth: 1)
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: SBRadius.small))
+
+                    Text(mode == .bulk
+                         ? "Leave empty to keep each guest's existing note. Selected tags REPLACE existing tags."
+                         : "Use for restrictions outside the tags above (e.g. \"no pork\", \"low sodium\").")
                         .font(SBFont.caption)
                         .foregroundStyle(Color.sbWarm)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
         }
@@ -674,17 +787,22 @@ private struct MealPickerSheet: View {
 
     private func commit() {
         var result = MealPickerResult()
+        let dietaryNoteTrimmed = customDietaryText.trimmingCharacters(in: .whitespaces)
         switch mode {
         case .single:
             // Custom takes precedence over chip. Empty custom + empty
             // chip = "None" / clear.
-            let trimmed = customMealText.trimmingCharacters(in: .whitespaces)
-            if !trimmed.isEmpty {
-                result.meal = trimmed
+            let trimmedMeal = customMealText.trimmingCharacters(in: .whitespaces)
+            if !trimmedMeal.isEmpty {
+                result.meal = trimmedMeal
             } else {
                 result.meal = selectedMeal
             }
             result.dietaryTags = selectedTags
+            // Single mode preloaded the field, so always emit — empty
+            // string explicitly clears the existing note. Lets users
+            // both add and remove notes through the same path.
+            result.dietaryNote = dietaryNoteTrimmed
         case .bulk:
             if mealEdited {
                 let trimmed = customMealText.trimmingCharacters(in: .whitespaces)
@@ -692,6 +810,12 @@ private struct MealPickerSheet: View {
             }
             if dietaryEdited {
                 result.dietaryTags = selectedTags
+                // Bulk: only emit a note when the user actually typed
+                // one. Empty == "leave each guest's note alone" so
+                // bulk-applying tags doesn't nuke per-guest notes.
+                if !dietaryNoteTrimmed.isEmpty {
+                    result.dietaryNote = dietaryNoteTrimmed
+                }
             }
         }
         onApply(result)
