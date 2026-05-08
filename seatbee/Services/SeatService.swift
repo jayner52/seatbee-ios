@@ -165,16 +165,20 @@ final class SeatService {
             }
         }
 
-        // Respect includeMaybes (web parity, App.jsx:13092). solve.js
-        // already drops rsvp == "no" guests internally, but pending/
-        // unknown only get excluded when includeMaybes == false. Filter
-        // the guest payload here so the server sees the same set of
-        // attendees web would.
+        // Pre-filter attending guests (web parity, App.jsx:13092):
+        //   includeMaybes=true  → drop rsvp == "no"   (default)
+        //   includeMaybes=false → keep only rsvp == "yes"
+        // solve.js was historically called with attending-only and
+        // some unit/rule lookups assume that invariant — sending
+        // declined guests in the payload caused mixed-RSVP units
+        // to misbehave. iOS now mirrors web's pre-filter exactly.
         let includeMaybes = plan.includeMaybes ?? true
         let allGuests = (dtoDict["guests"] as? [[String: Any]]) ?? []
-        let filteredGuests: [[String: Any]] = includeMaybes
-            ? allGuests
-            : allGuests.filter { (($0["rsvp"] as? String) ?? "") == "yes" }
+        let filteredGuests: [[String: Any]] = allGuests.filter { dict in
+            let rsvp = (dict["rsvp"] as? String) ?? ""
+            if includeMaybes { return rsvp != "no" }
+            return rsvp == "yes"
+        }
 
         var body: [String: Any] = [
             "tables":              dtoDict["tables"] ?? [],
