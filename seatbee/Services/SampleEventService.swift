@@ -327,27 +327,25 @@ private struct SampleParty: Decodable {
 // MARK: - Pre-baked AI playback
 
 private struct SamplePreBakedAI: Decodable {
-    let assignments: [String: String]
-    let seatOrders: [String: AnyJSONValue]?
-    let score: Double?
-    let scorecard: SampleScorecard?
+    // Whole blob captured as raw JSON values. Earlier versions tried to
+    // decode each field into typed properties and rebuilt the scorecard
+    // dict by hand — that lossily dropped the per-rule satisfaction
+    // arrays (hardConstraints.rules / softPreferences.rules), so the
+    // demo run page never showed the rule-by-rule breakdown the real
+    // AI flow surfaces. Now we just round-trip the whole blob and let
+    // SeatService.GenerateResult's existing custom decoder pick it
+    // apart — every field including suggestions and rule entries
+    // survives unchanged.
+    let raw: AnyJSONValue
+
+    init(from decoder: Decoder) throws {
+        raw = try AnyJSONValue(from: decoder)
+    }
 
     func toGenerateResult() -> SeatService.GenerateResult {
-        // Round-trip through JSON so we can reuse SeatService.GenerateResult's
-        // existing custom decoder (handles the score-int-or-double + nested
-        // suggestions ambiguity already documented in SeatService).
-        let unwrappedSeatOrders: Any = seatOrders.map { dict in
-            dict.mapValues { $0.unwrapped }
-        } ?? [:]
-        let payload: [String: Any] = [
-            "assignments": assignments,
-            "seatOrders": unwrappedSeatOrders,
-            "score": score ?? 100,
-            "scorecard": scorecard?.encodedDictionary() ?? [:],
-            "fallback": false,
-        ]
+        let unwrapped = raw.unwrapped
         do {
-            let data = try JSONSerialization.data(withJSONObject: payload, options: [])
+            let data = try JSONSerialization.data(withJSONObject: unwrapped, options: [])
             return try JSONDecoder().decode(SeatService.GenerateResult.self, from: data)
         } catch {
             // Fail loud rather than silently hand back an empty result —
@@ -356,26 +354,6 @@ private struct SamplePreBakedAI: Decodable {
             assertionFailure("SampleEvent preBakedAI decode failed: \(error)")
             return SeatService.GenerateResult.empty
         }
-    }
-}
-
-private struct SampleScorecard: Decodable {
-    let overallPercent: Double?
-    let overallLabel: String?
-    let totalRules: Int?
-    let totalSatisfied: Int?
-
-    func encodedDictionary() -> [String: Any] {
-        var dict: [String: Any] = [:]
-        if let v = overallPercent { dict["overallPercent"] = v }
-        if let v = overallLabel { dict["overallLabel"] = v }
-        if let v = totalRules { dict["totalRules"] = v }
-        if let v = totalSatisfied { dict["totalSatisfied"] = v }
-        // Empty rule buckets so SeatService's RuleBucket decoder doesn't choke
-        dict["hardConstraints"] = ["total": 0, "satisfied": 0, "partial": 0, "violated": 0, "rules": []]
-        dict["softPreferences"] = ["total": 0, "satisfied": 0, "partial": 0, "violated": 0, "rules": []]
-        dict["suggestions"] = []
-        return dict
     }
 }
 

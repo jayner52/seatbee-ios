@@ -1096,13 +1096,16 @@ struct AIGenerateView: View {
     /// the "Seating generated" UX.
     @MainActor
     private func fetchAIInsight(for plan: SeatingPlan) async {
-        // Demo plan: no /api/ai call. Show a static "perfect" insight so
-        // the UI matches the real flow without spending OpenAI credits.
+        // Demo plan: no /api/ai call. Build the insight string off the
+        // pre-baked scorecard so the percentage matches the score panel
+        // above (was previously hardcoded at 100% while the solver tops
+        // out at 97%, leaving the two cards visibly disagreeing).
         if plan.isDemo {
+            let pct = (try? SampleEventService.shared.preBakedResult().scorecard?.overallPercent) ?? 97
             aiInsight = .ready(AIService.ConflictResult(
                 conflicts: [],
-                score: 100,
-                summary: "Sample wedding seated at 100%. Every must-sit family is together, every can't-sit pair is apart, and the head table holds the wedding party."
+                score: pct,
+                summary: "Sample wedding seated at \(pct)%. Every must-sit family is together, every can't-sit pair is apart, and the head table holds the wedding party."
             ))
             return
         }
