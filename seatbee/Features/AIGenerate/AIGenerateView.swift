@@ -551,13 +551,8 @@ struct AIGenerateView: View {
         case .idle:
             EmptyView()
         case .loading:
-            insightCard(
-                accent: Color.sbGoldDk,
-                icon: "sparkles",
-                heading: "AI Insight",
-                body: "Analyzing seating arrangement…",
-                bodyStyle: .italic
-            )
+            insightLoadingCard
+                .transition(.opacity)
         case .unparseable:
             insightCard(
                 accent: Color.sbGoldDk,
@@ -583,6 +578,45 @@ struct AIGenerateView: View {
                 bodyStyle: .italic
             )
         }
+    }
+
+    /// Loading-state card with subtle motion so the user knows the
+    /// AI call is alive (5–10s round trips otherwise read as "did
+    /// nothing happen?"). Three things move:
+    ///   - sparkles icon pulses via SF Symbol's native .pulse effect
+    ///   - "Analyzing…" cycles through 1 / 2 / 3 dots via a
+    ///     TimelineView ticking every 0.4s — no extra @State
+    ///   - sage progress dot drifts L→R on a 1.4s loop, mirroring
+    ///     the sparkle accent so it reads as a single moving system
+    private var insightLoadingCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Color.sbGoldDk)
+                    .symbolEffect(.pulse, options: .repeating)
+                Text("AI Insight")
+                    .font(SBFont.bodySmallBold)
+                    .foregroundStyle(Color.sbCharcoal)
+            }
+            TimelineView(.animation(minimumInterval: 0.4, paused: false)) { context in
+                let dotCount = (Int(context.date.timeIntervalSinceReferenceDate * 2.5) % 3) + 1
+                let dots = String(repeating: ".", count: dotCount)
+                Text("Analyzing seating arrangement\(dots)")
+                    .font(SBFont.body.italic())
+                    .foregroundStyle(Color.sbWarm)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            // Indeterminate shimmer bar — gives a horizontal sense of
+            // motion that reads as "still working" even if the user
+            // looks away mid-call. 2pt high so it stays subtle.
+            LoadingShimmerBar()
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.sbCharcoal.opacity(0.05))
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
     private enum InsightBodyStyle { case italic, plain }
@@ -1095,6 +1129,44 @@ struct AIGenerateView: View {
         }
         HapticEngine.medium()
         clearConfirm = nil
+    }
+}
+
+/// Subtle horizontal shimmer for the AI Insight loading card.
+/// 2pt-high champagne strip with a brighter gold pill drifting
+/// L→R on a 1.4s loop. Reads as "still working" without competing
+/// with the heading or the dot-cycling text.
+private struct LoadingShimmerBar: View {
+    @State private var offset: CGFloat = -1
+
+    var body: some View {
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(Color.sbChampagne.opacity(0.7))
+                Capsule()
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color.sbGoldDk.opacity(0),
+                                Color.sbGoldDk.opacity(0.65),
+                                Color.sbGoldDk.opacity(0),
+                            ],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .frame(width: geo.size.width * 0.4)
+                    .offset(x: offset * geo.size.width)
+            }
+            .clipShape(Capsule())
+            .onAppear {
+                withAnimation(.linear(duration: 1.4).repeatForever(autoreverses: false)) {
+                    offset = 1
+                }
+            }
+        }
+        .frame(height: 2)
     }
 }
 
