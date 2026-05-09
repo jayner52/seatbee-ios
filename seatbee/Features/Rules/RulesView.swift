@@ -637,8 +637,22 @@ struct AddRuleSheet: View {
         // pick one. RSVP-change cleanup in RSVPSheet strips already-
         // referenced declined guests from existing rules.
         let attending = guests.filter { $0.rsvp != .no }
-        if searchText.isEmpty { return attending }
-        return attending.filter { $0.displayName.localizedCaseInsensitiveContains(searchText) }
+        let matched: [Guest]
+        if searchText.isEmpty {
+            matched = attending
+        } else {
+            matched = attending.filter { $0.displayName.localizedCaseInsensitiveContains(searchText) }
+        }
+        // Sort already-selected guests to the top so users can see who's
+        // in the rule without scrolling — critical in edit mode where the
+        // picker pre-fills from the existing rule. Within each group keep
+        // the original order so the list isn't reshuffled mid-typing.
+        return matched.sorted { lhs, rhs in
+            let lSel = selectedGuestIds.contains(lhs.id)
+            let rSel = selectedGuestIds.contains(rhs.id)
+            if lSel == rSel { return false }
+            return lSel && !rSel
+        }
     }
 
     private var canonicalCategories: [(id: String, name: String, color: String?)] {
@@ -866,8 +880,20 @@ struct AddRuleSheet: View {
         search: Binding<String>
     ) -> some View {
         let sideGuests: [Guest] = {
-            if search.wrappedValue.isEmpty { return guests }
-            return guests.filter { $0.displayName.localizedCaseInsensitiveContains(search.wrappedValue) }
+            let base: [Guest] = {
+                if search.wrappedValue.isEmpty { return guests }
+                return guests.filter { $0.displayName.localizedCaseInsensitiveContains(search.wrappedValue) }
+            }()
+            // Selected guests bubble to the top of THIS column so users can
+            // see who's already assigned to Side A / Side B at a glance —
+            // matters most in edit mode where pre-filled selections were
+            // previously buried in the middle of a 100+ guest list.
+            let sel = selection.wrappedValue
+            return base.sorted { lhs, rhs in
+                let l = sel.contains(lhs.id), r = sel.contains(rhs.id)
+                if l == r { return false }
+                return l && !r
+            }
         }()
 
         VStack(alignment: .leading, spacing: 8) {

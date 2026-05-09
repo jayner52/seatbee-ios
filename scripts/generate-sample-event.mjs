@@ -548,9 +548,11 @@ const objects = [
     x: 940, y: 200, width: 70, height: 70,
     color: '#D4A5A5', category: 'food', isObstacle: false },
 
-  // DJ Booth — bottom-right corner near the dance floor.
+  // DJ Booth — embedded at the back-centre of the dance floor, where a
+  // real DJ would be set up. User feedback 2026-05-09: 'Maybe just move
+  // the DJ booth to be near the dance floor.'
   { id: 'obj_dj', type: 'dj', name: 'DJ Booth',
-    x: ROOM_W - 140, y: ROOM_H - 70, width: 100, height: 60,
+    x: ROOM_W / 2 - 40, y: 380, width: 80, height: 50,
     color: '#2D2D2D', category: 'entertainment', isObstacle: false },
 
   // Bar — opposite corner from the DJ.
@@ -642,33 +644,29 @@ addRule({
 })
 
 // 8-11: must_not — cross-party drama (specific named guests)
+//
+// Web parity: must_not persists BOTH the flat `guests` list AND the
+// sideA/sideB split. The iOS Edit Rule form's two-column picker reads
+// from the split (not the flat list); without sideA/sideB the form
+// opens with both columns empty even when the rule is otherwise
+// correctly applied at solve time.
 const guestByName = (first, last) => guests.find(g => g.firstName === first && g.lastName === last)
+const addMustNot = (a, b, desc, weight = 30) => addRule({
+  type: 'must_not',
+  guests: [a, b],
+  sideA: [a],
+  sideB: [b],
+  desc,
+  weight,
+  hard: true,
+})
+
 const grandmaW = guestByName('Margaret', 'Williams')
 const grandpaW = guestByName('James', 'Williams')
-addRule({
-  type: 'must_not',
-  guests: [grandmaW.id, grandpaW.id],
-  desc: 'Divorced grandparents kept apart',
-  weight: 50, hard: true,
-})
-addRule({
-  type: 'must_not',
-  guests: [brideWork[0].id, groomWork[0].id],
-  desc: 'Ex-colleagues from rival firms apart',
-  weight: 30, hard: true,
-})
-addRule({
-  type: 'must_not',
-  guests: [brideCollege[0].id, groomCollege[0].id],
-  desc: 'Old roommates with bad history apart',
-  weight: 30, hard: true,
-})
-addRule({
-  type: 'must_not',
-  guests: [brideCollege[1].id, brideWork[2].id],
-  desc: 'Past workplace incident apart',
-  weight: 30, hard: true,
-})
+addMustNot(grandmaW.id, grandpaW.id, 'Divorced grandparents kept apart', 50)
+addMustNot(brideWork[0].id, groomWork[0].id, 'Ex-colleagues from rival firms apart')
+addMustNot(brideCollege[0].id, groomCollege[0].id, 'Old roommates with bad history apart')
+addMustNot(brideCollege[1].id, brideWork[2].id, 'Past workplace incident apart')
 
 console.log(`Rules: ${rules.length}`)
 
