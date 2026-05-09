@@ -101,7 +101,9 @@ final class StoreKitService {
                     print("[StoreKit] Purchase successful: \(product.id)")
                     return true
                 } else {
-                    purchaseError = "Server verification failed. Contact support."
+                    // Don't finish the transaction — Apple will re-deliver it
+                    // via Transaction.updates so we can retry on next launch.
+                    purchaseError = "Purchase recorded but activation failed. Tap Restore Purchases to retry."
                     return false
                 }
 

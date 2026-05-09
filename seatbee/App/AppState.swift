@@ -44,6 +44,18 @@ final class AppState {
     // when the user switches plans. Survives tab navigation within a session.
     var lastGenResult: (planId: String, result: SeatService.GenerateResult)?
 
+    /// Re-fetch the active plan from Supabase so tier/expiry
+    /// columns reflect server-side changes (e.g. after an IAP).
+    func refreshActivePlan() async {
+        guard let plan = activePlan else { return }
+        do {
+            activePlan = try await database.fetchPlan(id: plan.id)
+            print("[AppState] refreshActivePlan OK — tier: \(activePlan?.tier ?? "nil")")
+        } catch {
+            print("[AppState] refreshActivePlan error: \(error.localizedDescription)")
+        }
+    }
+
     /// Refresh the user's pass inventory from /api/passes.
     /// Safe to call on app foreground and after sign-in.
     func refreshPasses() async {

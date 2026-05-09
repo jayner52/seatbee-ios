@@ -98,7 +98,10 @@ struct UpgradeView: View {
         }
         .onChange(of: storeKit.purchaseSuccess) { _, success in
             if success {
-                Task { await appState.refreshPasses() }
+                Task {
+                    await appState.refreshActivePlan()
+                    await appState.refreshPasses()
+                }
                 withAnimation(.seatbeeSpring) { showSuccess = true }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { dismiss() }
             }
