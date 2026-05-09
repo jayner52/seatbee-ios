@@ -440,13 +440,26 @@ struct PartiesSheet: View {
 
                 Spacer()
 
-                Text("\(members.count)")
-                    .font(SBFont.capsLabel)
-                    .foregroundStyle(Color.sbGoldDk)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(Color.sbChampagne)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                // Member count — show attending only as the headline
+                // number, then "(of N)" when some members declined.
+                // Tells the user at a glance "this party will seat 3
+                // even though it has 4 names on it".
+                let attendingCount = members.filter { $0.rsvp != .no }.count
+                let totalCount = members.count
+                HStack(spacing: 4) {
+                    Text("\(attendingCount)")
+                        .font(SBFont.capsLabel)
+                        .foregroundStyle(Color.sbGoldDk)
+                    if attendingCount != totalCount {
+                        Text("of \(totalCount)")
+                            .font(SBFont.capsLabel)
+                            .foregroundStyle(Color.sbWarm)
+                    }
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background(Color.sbChampagne)
+                .clipShape(RoundedRectangle(cornerRadius: 6))
 
                 Button {
                     deleteParty(id: id)
@@ -472,12 +485,35 @@ struct PartiesSheet: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             } else {
-                ForEach(members, id: \.id) { guest in
+                // Option A treatment for declined members: keep them
+                // visible in the party (preserves intent — Sarah was
+                // grouped with Bob even if Bob declined) but render
+                // them dimmed with an "RSVP: No" pill, sorted to the
+                // bottom so attending members lead. The count chip
+                // above already reflects attending-only.
+                let sortedMembers = members.sorted { lhs, rhs in
+                    let lhsDeclined = lhs.rsvp == .no
+                    let rhsDeclined = rhs.rsvp == .no
+                    if lhsDeclined != rhsDeclined { return !lhsDeclined }
+                    return lhs.displayName.localizedCaseInsensitiveCompare(rhs.displayName) == .orderedAscending
+                }
+                ForEach(sortedMembers, id: \.id) { guest in
+                    let isDeclined = guest.rsvp == .no
                     HStack(spacing: 8) {
                         SBAvatar(name: guest.displayName, size: 24)
                         Text(guest.displayName)
                             .font(SBFont.bodySmall)
                             .foregroundStyle(Color.sbCharcoal)
+                            .strikethrough(isDeclined, color: Color.sbWarm)
+                        if isDeclined {
+                            Text("RSVP: No")
+                                .font(SBFont.capsLabel)
+                                .foregroundStyle(Color.sbError)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.sbError.opacity(0.10))
+                                .clipShape(Capsule())
+                        }
                         Spacer()
                         Button {
                             removeMember(partyId: id, guestId: guest.id)
@@ -488,6 +524,7 @@ struct PartiesSheet: View {
                         }
                         .buttonStyle(.plain)
                     }
+                    .opacity(isDeclined ? 0.55 : 1)
                 }
             }
 
