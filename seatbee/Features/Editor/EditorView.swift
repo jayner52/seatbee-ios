@@ -575,6 +575,22 @@ struct EditorView: View {
                         .lineLimit(1)
                 }
                 Spacer(minLength: 4)
+                // Direct shortcut to the deep editor (shape, rotation,
+                // notes, tags) — saves a hop versus going through
+                // Guest List → Edit Table.
+                Button {
+                    showDrawer = true
+                    HapticEngine.selection()
+                } label: {
+                    Image(systemName: "pencil")
+                        .font(.system(size: 14))
+                        .foregroundStyle(Color.sbGoldDk)
+                        .frame(width: 34, height: 34)
+                        .background(.regularMaterial)
+                        .clipShape(Circle())
+                }
+                .accessibilityLabel("Edit table")
+                .accessibilityHint("Open the full table editor with shape, rotation, notes, and tags")
                 // Lock toggle — same visual language as venue object lock.
                 Button {
                     toggleTableLock(id: table.id)
