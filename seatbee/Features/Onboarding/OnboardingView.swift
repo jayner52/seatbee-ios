@@ -257,6 +257,30 @@ struct OnboardingView: View {
         return (max(roomWidthFt, 1) * pxPerUnit, max(roomHeightFt, 1) * pxPerUnit)
     }
 
+    /// Pre-fill the dimension fields from a freshly-traced polygon's
+    /// bounding box, but ONLY when the user is still on the default
+    /// preset values (80×60). Manual edits to W or H stay sticky —
+    /// we never silently overwrite typed input.
+    private func autoFillDimensionsFromTrace(_ points: [RoomPoint]) {
+        let xs = points.map(\.x)
+        let ys = points.map(\.y)
+        guard let minX = xs.min(), let maxX = xs.max(),
+              let minY = ys.min(), let maxY = ys.max() else { return }
+        let widthPx  = max(1.0, maxX - minX)
+        let heightPx = max(1.0, maxY - minY)
+        let pxPerUnit: Double = useMetric ? (15.0 * 3.28084) : 15.0
+        let widthUnit = (widthPx / pxPerUnit).rounded()
+        let heightUnit = (heightPx / pxPerUnit).rounded()
+        // 80 / 60 are the seed defaults set in the View. If the user
+        // already changed them, treat that as intent and bail.
+        if abs(roomWidthFt - 80) < 0.01 {
+            roomWidthFt = max(1, widthUnit)
+        }
+        if abs(roomHeightFt - 60) < 0.01 {
+            roomHeightFt = max(1, heightUnit)
+        }
+    }
+
     private var roomSummaryLabel: String {
         let unit = useMetric ? "m" : "ft"
         let w = Int(roomWidthFt.rounded())
@@ -1023,6 +1047,14 @@ struct OnboardingView: View {
                 roomFlipH = newFlipH
                 roomFlipV = newFlipV
                 roomShape = .custom
+                // Auto-fill dimensions from the traced polygon's
+                // bounding box, but only if the user hasn't already
+                // typed values — never overwrite manual input. Web
+                // does the same after upload + trace.
+                if newPoints.count >= 3 {
+                    autoFillDimensionsFromTrace(newPoints)
+                }
+                HapticEngine.success()
             }
         }
         .photosPicker(isPresented: $showFloorPlanPhotoPicker, selection: $floorPlanPickerItem, matching: .images)
