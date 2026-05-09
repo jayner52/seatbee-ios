@@ -10,6 +10,7 @@ protocol CanvasDelegate: AnyObject {
     func canvasDidMoveTable(_ tableId: String, x: Double, y: Double)
     func canvasDidMoveObject(_ objectId: String, x: Double, y: Double)
     func canvasDidRequestDeleteObject(_ objectId: String)
+    func canvasDidDoubleTapTable(_ tableId: String)
 }
 
 // MARK: - Canvas View Controller
@@ -902,6 +903,10 @@ class CanvasViewController: UIViewController, UIScrollViewDelegate {
                 tv.onTap = { [weak self] in
                     self?.selectTable(table.id)
                 }
+                tv.onDoubleTap = { [weak self] in
+                    self?.selectTable(table.id)
+                    self?.delegate?.canvasDidDoubleTapTable(table.id)
+                }
                 tv.onDragMove = { [weak self] proposed, body in
                     guard let self else { return proposed }
                     let result = self.computeAlignmentSnap(
@@ -1061,6 +1066,10 @@ class DotPatternLayer: CALayer {
 
 class CanvasTableView: UIView {
     var onTap: (() -> Void)?
+    /// Double-tap opens the deeper guest-list editor directly,
+    /// bypassing the compact selection toolbar (web parity — web
+    /// uses onDoubleClick for the same shortcut).
+    var onDoubleTap: (() -> Void)?
     /// Called on each pan tick with the proposed centre + body size.
     /// Receiver can return a snapped centre (alignment guides) which
     /// the view will adopt instead of the raw finger position.
@@ -1726,6 +1735,13 @@ class CanvasTableView: UIView {
 
         let tap = UITapGestureRecognizer(target: self, action: #selector(handleTap))
         addGestureRecognizer(tap)
+        // Double-tap → open the deeper guest-list editor. Single-tap
+        // requires the double-tap to fail so a real double-tap doesn't
+        // also fire the single-tap selection.
+        let doubleTap = UITapGestureRecognizer(target: self, action: #selector(handleDoubleTap))
+        doubleTap.numberOfTapsRequired = 2
+        addGestureRecognizer(doubleTap)
+        tap.require(toFail: doubleTap)
 
         isUserInteractionEnabled = true
         // Initial enabled state — update(table:) keeps it in sync after
@@ -1736,6 +1752,11 @@ class CanvasTableView: UIView {
     @objc private func handleTap() {
         onTap?()
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
+    }
+
+    @objc private func handleDoubleTap() {
+        onDoubleTap?()
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
     }
 
     @objc private func handlePan(_ gesture: UIPanGestureRecognizer) {
@@ -1979,6 +2000,9 @@ struct CanvasViewRepresentable: UIViewControllerRepresentable {
     var onDeselectAll: () -> Void
     var onMoveTable: (String, Double, Double) -> Void
     var onMoveObject: (String, Double, Double) -> Void
+    /// Double-tap on a table → open the deeper guest-list editor
+    /// (web parity for onDoubleClick).
+    var onDoubleTapTable: (String) -> Void = { _ in }
 
     func makeUIViewController(context: Context) -> CanvasViewController {
         let vc = CanvasViewController()
@@ -2041,5 +2065,9 @@ struct CanvasViewRepresentable: UIViewControllerRepresentable {
         }
 
         func canvasDidRequestDeleteObject(_ objectId: String) {}
+
+        func canvasDidDoubleTapTable(_ tableId: String) {
+            parent.onDoubleTapTable(tableId)
+        }
     }
 }

@@ -65,14 +65,13 @@ struct EditorView: View {
                     fitToken: fitToken,
                     planId: plan?.id,
                     onSelectTable: { id in
-                        // Close any open object sheet before opening the
-                        // table sheet — iOS suppresses a second sheet
-                        // presented while another is still onscreen,
-                        // which manifests as an empty white pane.
+                        // Tap = select only. The compact toolbar appears
+                        // in the bottom bar; the full guest-list sheet
+                        // opens via the toolbar's "Guest List" button or
+                        // by double-tapping the table on the canvas.
                         selectedObjectId = nil
                         showEditObject = false
                         selectedTableId = id
-                        showDetailSheet = true
                         HapticEngine.selection()
                     },
                     onSelectObject: { id in
@@ -99,6 +98,16 @@ struct EditorView: View {
                     onMoveObject: { id, x, y in
                         updateObjectPosition(id: id, x: x, y: y)
                         savePositions()
+                    },
+                    onDoubleTapTable: { id in
+                        // Power-user shortcut to the deeper editor —
+                        // skip the toolbar and go straight to the guest
+                        // list. Matches web's onDoubleClick behavior.
+                        selectedObjectId = nil
+                        showEditObject = false
+                        selectedTableId = id
+                        showDetailSheet = true
+                        HapticEngine.medium()
                     }
                 )
                 .ignoresSafeArea(.all, edges: .bottom)
@@ -163,9 +172,16 @@ struct EditorView: View {
                     .presentationDragIndicator(.visible)
             }
         }
-        .alert("Delete object?", isPresented: $showDeleteConfirm) {
+        .alert(selectedTableId != nil ? "Delete table?" : "Delete object?", isPresented: $showDeleteConfirm) {
             Button("Delete", role: .destructive) {
-                if let id = selectedObjectId { deleteObjectById(id) }
+                // Route to whichever selection is active — toolbar's
+                // delete button is shared across tables and objects via
+                // the same showDeleteConfirm flag.
+                if let id = selectedTableId {
+                    deleteTableById(id)
+                } else if let id = selectedObjectId {
+                    deleteObjectById(id)
+                }
             }
             Button("Cancel", role: .cancel) {}
         }
@@ -351,35 +367,15 @@ struct EditorView: View {
 
     private var bottomBar: some View {
         VStack(spacing: 0) {
-            // Selected item pill
+            // Selected item toolbar — compact in-canvas controls.
             if let table = selectedTable {
-                Button { showDetailSheet = true } label: {
-                    HStack(spacing: 10) {
-                        SBTableGraphic(totalSeats: table.seats, filledSeats: table.filledCount, size: 36)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(table.name)
-                                .font(SBFont.bodySmallBold)
-                                .foregroundStyle(Color.sbCharcoal)
-                            Text("\(table.filledCount)/\(table.seats) seated")
-                                .font(SBFont.caption)
-                                .foregroundStyle(Color.sbWarm)
-                        }
-                        Spacer()
-                        Image(systemName: "chevron.up")
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundStyle(Color.sbGoldDk)
-                    }
+                tableSelectionToolbar(table)
                     .padding(14)
                     .background(.regularMaterial)
                     .clipShape(RoundedRectangle(cornerRadius: SBRadius.card))
                     .shadow(color: Color.black.opacity(0.08), radius: 12, x: 0, y: -4)
-                }
-                .buttonStyle(.plain)
-                .padding(.horizontal, 12)
-                .padding(.bottom, 8)
-                .accessibilityElement(children: .combine)
-                .accessibilityLabel("Open \(table.name) details")
-                .accessibilityValue("\(table.filledCount) of \(table.seats) seated")
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 8)
             } else if let objId = selectedObjectId, let obj = objects.first(where: { $0.id == objId }) {
                 HStack(spacing: 6) {
                     let def = venueObjectTypes.byType(obj.type)
@@ -548,6 +544,161 @@ struct EditorView: View {
                 // caption is hidden so a fresh-empty plan doesn't
                 // pull the FAB row down toward the tab bar.
                 Color.clear.frame(height: 70)
+            }
+        }
+    }
+
+    // MARK: - Table Selection Toolbar
+    //
+    // Compact in-canvas controls that show when a table is selected.
+    // Mirrors the venue-object toolbar pattern. Quick actions (seat
+    // stepper, size, lock, delete) are inline; the heavier "open guest
+    // list / deeper edit" action is a labeled Edit button so it's
+    // unambiguous after the auto-open-on-tap behavior was removed.
+    @ViewBuilder
+    private func tableSelectionToolbar(_ table: SeatTable) -> some View {
+        let isLocked = table.locked == true
+        let sizePresets = TableDefaults.sizePresets(for: table.type)
+        VStack(spacing: 10) {
+            // Top row — name + stat
+            HStack(spacing: 10) {
+                SBTableGraphic(totalSeats: table.seats, filledSeats: table.filledCount, size: 32)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(table.name)
+                        .font(SBFont.bodySmallBold)
+                        .foregroundStyle(Color.sbCharcoal)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                    Text("\(table.filledCount)/\(table.seats) seated · \(table.type.rawValue)")
+                        .font(SBFont.caption)
+                        .foregroundStyle(Color.sbWarm)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 4)
+                // Direct shortcut to the deep editor (shape, rotation,
+                // notes, tags) — saves a hop versus going through
+                // Guest List → Edit Table.
+                Button {
+                    showDrawer = true
+                    HapticEngine.selection()
+                } label: {
+                    Image(systemName: "pencil")
+                        .font(.system(size: 14))
+                        .foregroundStyle(Color.sbGoldDk)
+                        .frame(width: 34, height: 34)
+                        .background(.regularMaterial)
+                        .clipShape(Circle())
+                }
+                .accessibilityLabel("Edit table")
+                .accessibilityHint("Open the full table editor with shape, rotation, notes, and tags")
+                // Lock toggle — same visual language as venue object lock.
+                Button {
+                    toggleTableLock(id: table.id)
+                    HapticEngine.selection()
+                } label: {
+                    Image(systemName: isLocked ? "lock.fill" : "lock")
+                        .font(.system(size: 14))
+                        .foregroundStyle(isLocked ? Color.sbGold : Color.sbWarm)
+                        .frame(width: 34, height: 34)
+                        .background(.regularMaterial)
+                        .clipShape(Circle())
+                }
+                .accessibilityLabel(isLocked ? "Unlock table" : "Lock table")
+                // Delete — confirms via existing showDeleteConfirm alert
+                // path (we route via tableId vs objectId based on which
+                // selection state is set when the alert fires).
+                Button {
+                    showDeleteConfirm = true
+                } label: {
+                    Image(systemName: "trash")
+                        .font(.system(size: 14))
+                        .foregroundStyle(Color.sbError)
+                        .frame(width: 34, height: 34)
+                        .background(.regularMaterial)
+                        .clipShape(Circle())
+                }
+                .accessibilityLabel("Delete table")
+            }
+            // Bottom row — quick adjustments + prominent Edit
+            HStack(spacing: 8) {
+                // Seat stepper (− 8 +). Disabled when locked.
+                HStack(spacing: 0) {
+                    Button {
+                        adjustTableSeats(id: table.id, by: -1)
+                    } label: {
+                        Image(systemName: "minus")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(isLocked || table.seats <= 1 ? Color.sbWarm2 : Color.sbCharcoal)
+                            .frame(width: 32, height: 32)
+                    }
+                    .disabled(isLocked || table.seats <= 1)
+                    Text("\(table.seats)")
+                        .font(SBFont.bodySmallBold)
+                        .foregroundStyle(Color.sbCharcoal)
+                        .frame(minWidth: 22)
+                    Button {
+                        adjustTableSeats(id: table.id, by: 1)
+                    } label: {
+                        Image(systemName: "plus")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(isLocked || table.seats >= 20 ? Color.sbWarm2 : Color.sbCharcoal)
+                            .frame(width: 32, height: 32)
+                    }
+                    .disabled(isLocked || table.seats >= 20)
+                }
+                .background(.regularMaterial)
+                .clipShape(Capsule())
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Seat count")
+                .accessibilityValue("\(table.seats) seats")
+
+                // Size menu — only for table types that have presets
+                // (round/oval/rect). Head/sweetheart use semantic dims
+                // and are sized in the deeper editor.
+                if let presets = sizePresets {
+                    Menu {
+                        ForEach(presets, id: \.self) { ft in
+                            Button("\(ft) ft") { setTableSize(id: table.id, sizeFt: ft) }
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "ruler")
+                                .font(.system(size: 12, weight: .medium))
+                            Text("Size")
+                                .font(SBFont.inter(12, weight: .semibold))
+                        }
+                        .foregroundStyle(isLocked ? Color.sbWarm2 : Color.sbCharcoal)
+                        .padding(.horizontal, 12)
+                        .frame(height: 32)
+                        .background(.regularMaterial)
+                        .clipShape(Capsule())
+                    }
+                    .disabled(isLocked)
+                    .accessibilityLabel("Change table size")
+                }
+
+                Spacer(minLength: 4)
+
+                // Prominent Edit / Guest List entry — the heavy action
+                // moved here from auto-open. Labeled "Open Guest List"
+                // so users always know where their seating UI lives.
+                Button {
+                    showDetailSheet = true
+                    HapticEngine.selection()
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "person.2.fill")
+                            .font(.system(size: 12, weight: .semibold))
+                        Text("Guest List")
+                            .font(SBFont.inter(13, weight: .semibold))
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 14)
+                    .frame(height: 34)
+                    .background(Color.sbGoldDk)
+                    .clipShape(Capsule())
+                }
+                .accessibilityLabel("Open guest list and deeper editing for \(table.name)")
             }
         }
     }
@@ -966,6 +1117,55 @@ struct EditorView: View {
               let idx = p.objects.firstIndex(where: { $0.id == id }) else { return }
         p.objects[idx].locked = !(p.objects[idx].locked ?? false)
         appState.activePlan = p
+        Task { try? await appState.database.savePlanData(plan: p) }
+    }
+
+    private func toggleTableLock(id: String) {
+        guard var p = appState.activePlan,
+              let idx = p.tables.firstIndex(where: { $0.id == id }) else { return }
+        p.tables[idx].locked = !(p.tables[idx].locked ?? false)
+        appState.activePlan = p
+        Task { try? await appState.database.savePlanData(plan: p) }
+    }
+
+    /// Adjust seat count by ±delta, clamped to 1...20 (web parity range).
+    /// Drops assignments that fall off the end so the data stays consistent.
+    private func adjustTableSeats(id: String, by delta: Int) {
+        guard var p = appState.activePlan,
+              let idx = p.tables.firstIndex(where: { $0.id == id }) else { return }
+        let new = max(1, min(20, p.tables[idx].seats + delta))
+        if new == p.tables[idx].seats { return }
+        p.tables[idx].seats = new
+        // Drop assignments to seat indices that no longer exist after a
+        // shrink — leaves the guest unseated rather than silently
+        // pinned to a phantom seat.
+        p.tables[idx].assignments = p.tables[idx].assignments.filter { $0.value < new }
+        appState.activePlan = p
+        HapticEngine.selection()
+        Task { try? await appState.database.savePlanData(plan: p) }
+    }
+
+    /// Apply a TableDefaults size preset (in feet) to the table's
+    /// dimensions. Type-aware — round writes diameter, others write
+    /// width/height per the preset's aspect ratio.
+    private func setTableSize(id: String, sizeFt: Int) {
+        guard var p = appState.activePlan,
+              let idx = p.tables.firstIndex(where: { $0.id == id }) else { return }
+        let dims = TableDefaults.dimensions(for: p.tables[idx].type, sizeFt: sizeFt)
+        if let d = dims.diameter { p.tables[idx].diameter = d }
+        if let w = dims.width { p.tables[idx].width = w }
+        if let h = dims.height { p.tables[idx].height = h }
+        appState.activePlan = p
+        HapticEngine.selection()
+        Task { try? await appState.database.savePlanData(plan: p) }
+    }
+
+    private func deleteTableById(_ id: String) {
+        guard var p = appState.activePlan else { return }
+        p.tables.removeAll { $0.id == id }
+        appState.activePlan = p
+        selectedTableId = nil
+        HapticEngine.medium()
         Task { try? await appState.database.savePlanData(plan: p) }
     }
 
