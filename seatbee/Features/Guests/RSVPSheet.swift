@@ -315,6 +315,9 @@ struct RSVPSheet: View {
         guard var p = plan else { return }
         guard let idx = p.guests.firstIndex(where: { $0.id == id }) else { return }
         p.guests[idx].rsvp = status
+        if status == .no {
+            cleanupRulesForDeclined(in: &p, declinedIds: [id])
+        }
         appState.activePlan = p
         let snap = p
         Task { try? await appState.database.savePlanData(plan: snap) }
@@ -323,9 +326,14 @@ struct RSVPSheet: View {
 
     private func applyBulk(_ status: Guest.RSVPStatus) {
         guard var p = plan else { return }
+        var declinedNow: [String] = []
         for id in selectedGuestIds {
             guard let idx = p.guests.firstIndex(where: { $0.id == id }) else { continue }
             p.guests[idx].rsvp = status
+            if status == .no { declinedNow.append(id) }
+        }
+        if !declinedNow.isEmpty {
+            cleanupRulesForDeclined(in: &p, declinedIds: declinedNow)
         }
         appState.activePlan = p
         let snap = p
@@ -335,6 +343,38 @@ struct RSVPSheet: View {
             selectionMode = false
             selectedGuestIds.removeAll()
         }
+    }
+
+    /// Strip declined guest IDs out of every rule's guests / sideA /
+    /// sideB. If a rule's required member count drops below the rule
+    /// type's minimum (must_together / must_not / seat_adjacent need
+    /// 2; must_table / near_* need 1), the rule is removed entirely
+    /// — a "must sit together" with one person isn't a rule. Mirrors
+    /// the user's directive: "there's no way that the rules would
+    /// even have declined guests in them".
+    private func cleanupRulesForDeclined(in plan: inout SeatingPlan, declinedIds: [String]) {
+        let declinedSet = Set(declinedIds)
+        var keptRules: [SeatingRule] = []
+        for var rule in plan.rules {
+            rule.guests.removeAll { declinedSet.contains($0) }
+            if var a = rule.sideA { a.removeAll { declinedSet.contains($0) }; rule.sideA = a }
+            if var b = rule.sideB { b.removeAll { declinedSet.contains($0) }; rule.sideB = b }
+            let minMembers: Int = {
+                switch rule.type {
+                case .mustTogether, .preferTogether, .mustNot, .seatAdjacent: return 2
+                case .mustTable, .nearTable, .nearObject: return 1
+                default: return 0
+                }
+            }()
+            // Side-based rules use sideA + sideB instead of `guests`.
+            // Drop them only when both sides are empty.
+            let hasSides = (rule.sideA?.isEmpty == false) || (rule.sideB?.isEmpty == false)
+            let hasGuests = rule.guests.count >= max(minMembers, 1)
+            if hasGuests || hasSides || minMembers == 0 {
+                keptRules.append(rule)
+            }
+        }
+        plan.rules = keptRules
     }
 
     private func togglIncludeMaybes() {

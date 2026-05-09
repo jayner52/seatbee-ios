@@ -43,7 +43,11 @@ struct MealsSheet: View {
     @State private var bulkPickerOpen = false
 
     private var plan: SeatingPlan? { appState.activePlan }
-    private var guests: [Guest] { plan?.guests ?? [] }
+    /// Declined guests are excluded everywhere they could be picked
+    /// for an action (meals, dietary, bulk select). They still exist
+    /// on the plan, just not visible here. Matches the same rule on
+    /// RulesView and the party-add picker.
+    private var guests: [Guest] { (plan?.guests ?? []).filter { $0.rsvp != .no } }
 
     var body: some View {
         NavigationStack {

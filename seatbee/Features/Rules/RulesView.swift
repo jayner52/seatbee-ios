@@ -518,8 +518,14 @@ struct AddRuleSheet: View {
     private var objects: [RoomObject] { appState.activePlan?.objects ?? [] }
 
     private var filteredGuests: [Guest] {
-        if searchText.isEmpty { return guests }
-        return guests.filter { $0.displayName.localizedCaseInsensitiveContains(searchText) }
+        // Declined guests are never selectable for a rule — rules
+        // describe seating intent and a declined guest won't be
+        // seated. Filter them out at the source so the user can't
+        // pick one. RSVP-change cleanup in RSVPSheet strips already-
+        // referenced declined guests from existing rules.
+        let attending = guests.filter { $0.rsvp != .no }
+        if searchText.isEmpty { return attending }
+        return attending.filter { $0.displayName.localizedCaseInsensitiveContains(searchText) }
     }
 
     private var canonicalCategories: [(id: String, name: String, color: String?)] {
@@ -1245,8 +1251,11 @@ struct AddPartySheet: View {
     private var guests: [Guest] { appState.activePlan?.guests ?? [] }
 
     private var filteredGuests: [Guest] {
-        if searchText.isEmpty { return guests }
-        return guests.filter { $0.displayName.localizedCaseInsensitiveContains(searchText) }
+        // Hide declined guests from rule editing — see top filteredGuests
+        // helper for the rationale.
+        let attending = guests.filter { $0.rsvp != .no }
+        if searchText.isEmpty { return attending }
+        return attending.filter { $0.displayName.localizedCaseInsensitiveContains(searchText) }
     }
 
     var body: some View {

@@ -592,7 +592,12 @@ struct PartiesSheet: View {
 
     private func unassignedToAnyParty() -> [Guest] {
         let assigned = assignedToPartyIds
-        return allGuests.filter { !assigned.contains($0.id) }
+        // Hide declined guests from the add-to-party picker — they
+        // wouldn't be seated, so adding them would be misleading.
+        // Existing party members who later decline stay in the party
+        // (Option A — see displayMembers / declined-dim treatment in
+        // partyRow), they just can't be newly added.
+        return allGuests.filter { !assigned.contains($0.id) && $0.rsvp != .no }
     }
 
     private func applySearch(to guests: [Guest], query: String) -> [Guest] {
