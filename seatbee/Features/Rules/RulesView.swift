@@ -836,6 +836,23 @@ struct AddRuleSheet: View {
                 )
             }
 
+            // Optional name — when blank, falls back to the auto-generated
+            // "<Side A> vs <Side B>" description on save. Parity with Seat
+            // Together, which already supports custom names.
+            VStack(alignment: .leading, spacing: 6) {
+                Text("RULE NAME (OPTIONAL)")
+                    .font(SBFont.label)
+                    .foregroundStyle(Color.sbWarm)
+                TextField("e.g. Divorced grandparents", text: $nameText)
+                    .padding(10)
+                    .background(Color.sbIvory2)
+                    .clipShape(RoundedRectangle(cornerRadius: SBRadius.small))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: SBRadius.small)
+                            .strokeBorder(Color.sbLine, lineWidth: 1)
+                    )
+            }
+
             weightSliderSection(label: weight >= 90 ? "Required (high priority)" : "Preferred")
         }
     }
@@ -1245,6 +1262,11 @@ struct AddRuleSheet: View {
             }
             let aNames = sideA.map(nameOf).joined(separator: ", ")
             let bNames = sideB.map(nameOf).joined(separator: ", ")
+            // User-supplied name overrides the auto "A ✕ B" description.
+            // Trims whitespace and falls back to the auto string when blank
+            // — same behaviour as Seat Together rules.
+            let trimmedName = nameText.trimmingCharacters(in: .whitespaces)
+            let ruleDesc = trimmedName.isEmpty ? "\(aNames) ✕ \(bNames)" : trimmedName
             let rule = SeatingRule(
                 id: ruleId,
                 type: .mustNot,
@@ -1255,7 +1277,7 @@ struct AddRuleSheet: View {
                 enabled: true,
                 categoryId: nil, objectId: nil, sideValue: nil,
                 sideA: sideA, sideB: sideB,
-                desc: "\(aNames) ✕ \(bNames)",
+                desc: ruleDesc,
                 auto: nil, source: "manual",
                 partyId: nil, groupId: nil
             )

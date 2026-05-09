@@ -260,21 +260,33 @@ private struct SampleRule: Decodable {
     let enabled: Bool
     let desc: String?
     let partyId: String?
+    // Type-specific anchors. Without these, edit-mode opens with no
+    // category/object/table selected (the field reads nil from the
+    // hydrated rule even though the JSON contains the value), and the
+    // Save button stays disabled because canSubmit fails its required-
+    // anchor check. Decoded as optionals so older/simpler rules still
+    // round-trip cleanly.
+    let categoryId: String?
+    let objectId: String?
+    let tableId: String?
+    let sideValue: String?
+    let sideA: [String]?
+    let sideB: [String]?
 
     func toDomain() -> SeatingRule {
         SeatingRule(
             id: id,
             type: SeatingRule.RuleType.parse(type),
             guests: guests,
-            tableId: nil,
+            tableId: tableId,
             weight: weight,
             hard: hard,
             enabled: enabled,
-            categoryId: nil,
-            objectId: nil,
-            sideValue: nil,
-            sideA: nil,
-            sideB: nil,
+            categoryId: categoryId,
+            objectId: objectId,
+            sideValue: sideValue,
+            sideA: sideA,
+            sideB: sideB,
             desc: desc,
             auto: nil,
             source: nil,

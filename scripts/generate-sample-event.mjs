@@ -489,7 +489,7 @@ console.log(`Generated ${guests.length} guests; declined: ${guests.filter(g => g
 // ── Tables (T-shape venue) ─────────────────────────────────────────────────
 
 const ROOM_W = 1200
-const ROOM_H = 900
+const ROOM_H = 1000  // taller than v2 to fit a real-sized dance floor + 4 rows of rounds + bar/DJ along the bottom wall
 const tables = []
 
 // Sweetheart at top center
@@ -508,10 +508,11 @@ const head = {
 }
 tables.push(head)
 
-// 16 round tables in 4×4 grid below
-// Left half (x cols 0-1) → bride side preference; right half → groom side
+// 16 round tables in 4×4 grid below. Pushed down from the prior layout
+// so there's a real ~10ft gap between the head table and the first row
+// of guest tables — that's where the dance floor actually lives.
 const roundCols = [180, 460, 740, 1020]
-const roundRows = [400, 540, 680, 820]
+const roundRows = [500, 620, 740, 860]
 let roundIdx = 0
 for (const y of roundRows) {
   for (const x of roundCols) {
@@ -528,16 +529,44 @@ for (const y of roundRows) {
 
 // ── Room objects ──────────────────────────────────────────────────────────
 
+// CRITICAL: `type` strings must exactly match seatbee/Features/Editor/
+// VenueObjectsSheet.swift::venueObjectTypes (catalogue source of truth).
+// The catalogue maps each type to an icon + colour at render time, so
+// typos like "dance_floor" or "dj_booth" silently fall through to wrong
+// styling (which made the dance floor render as a bar in the prior pass).
+// Defaults below mirror the catalogue's preferred dimensions.
 const objects = [
-  { id: 'obj_dance',   type: 'dance_floor', name: 'Dance Floor',
-    x: ROOM_W / 2 - 80, y: 305, width: 160, height: 80,
-    color: '#C9A961', category: 'entertainment', isObstacle: false },
-  { id: 'obj_bar',     type: 'bar', name: 'Bar',
-    x: 40, y: ROOM_H - 80, width: 120, height: 50,
-    color: '#8B6F47', category: 'food', isObstacle: false },
-  { id: 'obj_dj',      type: 'dj_booth', name: 'DJ Booth',
-    x: ROOM_W - 140, y: ROOM_H - 80, width: 100, height: 50,
-    color: '#5B7B9A', category: 'entertainment', isObstacle: false },
+  // Centerpiece dance floor — fills the gap between head table and the
+  // first row of round guest tables. 240×130 reads as a real area.
+  { id: 'obj_dance', type: 'dance', name: 'Dance Floor',
+    x: ROOM_W / 2 - 120, y: 300, width: 240, height: 130,
+    color: '#EDE0C4', category: 'entertainment', isObstacle: false },
+
+  // Cake table — flanks the head table on the right so cake-cutting
+  // plays out near the wedding party.
+  { id: 'obj_cake', type: 'cake', name: 'Cake Table',
+    x: 940, y: 200, width: 70, height: 70,
+    color: '#D4A5A5', category: 'food', isObstacle: false },
+
+  // DJ Booth — bottom-right corner near the dance floor.
+  { id: 'obj_dj', type: 'dj', name: 'DJ Booth',
+    x: ROOM_W - 140, y: ROOM_H - 70, width: 100, height: 60,
+    color: '#2D2D2D', category: 'entertainment', isObstacle: false },
+
+  // Bar — opposite corner from the DJ.
+  { id: 'obj_bar', type: 'bar', name: 'Bar',
+    x: 40, y: ROOM_H - 70, width: 160, height: 60,
+    color: '#8B8680', category: 'food', isObstacle: false },
+
+  // Main Entrance — top-left wall.
+  { id: 'obj_entrance', type: 'entrance', name: 'Main Entrance',
+    x: 30, y: 60, width: 40, height: 60,
+    color: '#2D2D2D', category: 'structure', isObstacle: false },
+
+  // Emergency Exit — right wall mid-height.
+  { id: 'obj_exit', type: 'exit', name: 'Emergency Exit',
+    x: ROOM_W - 50, y: 470, width: 40, height: 50,
+    color: '#9CAF88', category: 'structure', isObstacle: false },
 ]
 
 // ── Pre-pin head table + sweetheart ───────────────────────────────────────
