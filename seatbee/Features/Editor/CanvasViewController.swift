@@ -57,6 +57,16 @@ class CanvasViewController: UIViewController, UIScrollViewDelegate {
     private let alignmentEdgeGuides   = CAShapeLayer()
     private static let alignSnapThreshold: CGFloat = 8
 
+    // Ruler overlay — gold tick marks + unit labels along the top and
+    // left edges of the room rect. Toggled via setRulerVisible(_:unit:).
+    // Strokes live in `rulerLayer`; labels are individual CATextLayers
+    // rebuilt on every relevant update so we don't have to reposition
+    // 50+ tick labels frame-by-frame.
+    private let rulerLayer = CAShapeLayer()
+    private var rulerLabels: [CATextLayer] = []
+    private var rulerVisible = false
+    private var rulerUnit: String?
+
     // Snapshots of the most recent table / object data so the guide
     // calculator can iterate without poking through the visual views.
     private var currentTables: [SeatTable] = []
@@ -138,6 +148,16 @@ class CanvasViewController: UIViewController, UIScrollViewDelegate {
         }
         alignmentCenterGuides.strokeColor = UIColor(red: 232/255, green: 124/255, blue: 124/255, alpha: 1).cgColor // #E87C7C
         alignmentEdgeGuides.strokeColor   = UIColor(red: 124/255, green: 184/255, blue: 232/255, alpha: 1).cgColor // #7CB8E8
+
+        // Ruler overlay layer — added above the alignment guides so
+        // ticks remain visible during a drag. Stroke colour is gold
+        // at low alpha to match the canvas chrome without competing
+        // with table content.
+        rulerLayer.fillColor = UIColor.clear.cgColor
+        rulerLayer.strokeColor = UIColor(red: 168/255, green: 136/255, blue: 67/255, alpha: 0.7).cgColor // sbGoldDk
+        rulerLayer.lineWidth = 1
+        rulerLayer.isHidden = true
+        contentView.layer.insertSublayer(rulerLayer, above: alignmentEdgeGuides)
 
         // Tap to deselect
         let tap = UITapGestureRecognizer(target: self, action: #selector(handleBackgroundTap(_:)))
@@ -254,6 +274,119 @@ class CanvasViewController: UIViewController, UIScrollViewDelegate {
             floorPlanImageView.image = nil
             floorPlanImageView.isHidden = true
         }
+
+        // Room dimensions just changed — refresh the ruler if visible
+        // so tick extents follow the new room rect.
+        rebuildRulerIfNeeded()
+    }
+
+    // MARK: - Ruler overlay
+
+    /// Toggle the ruler on/off and remember the unit. Cheap when the
+    /// state hasn't changed; rebuilds when it has.
+    func setRulerVisible(_ visible: Bool, unit: String?) {
+        let visibilityChanged = (visible != rulerVisible)
+        let unitChanged = (unit != rulerUnit)
+        rulerVisible = visible
+        rulerUnit = unit
+        if visibilityChanged || unitChanged {
+            rebuildRulerIfNeeded()
+        }
+    }
+
+    private func rebuildRulerIfNeeded() {
+        // When hidden, just blank the layer — no need to recompute
+        // ticks until the user toggles it back on.
+        if !rulerVisible {
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            rulerLayer.path = nil
+            rulerLayer.isHidden = true
+            CATransaction.commit()
+            for label in rulerLabels { label.removeFromSuperlayer() }
+            rulerLabels.removeAll()
+            return
+        }
+        // Room not sized yet — wait for updateRoom to provide
+        // dimensions; nothing to draw against.
+        guard currentRoomWidth > 0, currentRoomHeight > 0 else { return }
+
+        let factor = CGFloat(RoomScale.factor(for: rulerUnit))
+        let unitLabel = RoomScale.unitLabel(for: rulerUnit)
+        let isMetric = (rulerUnit == "metric")
+        // Tick spacing (in real-world units): major labels every
+        // 5 ft / 1 m; minor ticks every 1 ft / 0.25 m.
+        let majorStep: CGFloat = isMetric ? 1 : 5
+        let minorStep: CGFloat = isMetric ? 0.25 : 1
+
+        let path = UIBezierPath()
+        for label in rulerLabels { label.removeFromSuperlayer() }
+        rulerLabels.removeAll()
+
+        // Top ruler: ticks hang DOWN from the top edge of the room
+        // into the canvas; labels sit just below the tick.
+        let topY = canvasOrigin.y
+        var u: CGFloat = 0
+        let widthInUnits = currentRoomWidth / factor
+        while u <= widthInUnits + 0.001 {
+            let x = canvasOrigin.x + u * factor
+            let isMajor = abs((u / majorStep).rounded() - (u / majorStep)) < 0.001
+            let tickLen: CGFloat = isMajor ? 6 : 3
+            path.move(to: CGPoint(x: x, y: topY))
+            path.addLine(to: CGPoint(x: x, y: topY + tickLen))
+            if isMajor && u > 0 {
+                addRulerLabel(at: CGPoint(x: x + 2, y: topY + tickLen + 1),
+                              text: rulerLabelText(value: u, unit: unitLabel))
+            }
+            u += minorStep
+        }
+
+        // Left ruler: ticks point RIGHT from the left edge; labels
+        // sit just to the right of the tick.
+        let leftX = canvasOrigin.x
+        u = 0
+        let heightInUnits = currentRoomHeight / factor
+        while u <= heightInUnits + 0.001 {
+            let y = canvasOrigin.y + u * factor
+            let isMajor = abs((u / majorStep).rounded() - (u / majorStep)) < 0.001
+            let tickLen: CGFloat = isMajor ? 6 : 3
+            path.move(to: CGPoint(x: leftX, y: y))
+            path.addLine(to: CGPoint(x: leftX + tickLen, y: y))
+            if isMajor && u > 0 {
+                addRulerLabel(at: CGPoint(x: leftX + tickLen + 1, y: y - 5),
+                              text: rulerLabelText(value: u, unit: unitLabel))
+            }
+            u += minorStep
+        }
+
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        rulerLayer.path = path.cgPath
+        rulerLayer.isHidden = false
+        CATransaction.commit()
+    }
+
+    private func rulerLabelText(value: CGFloat, unit: String) -> String {
+        // Drop trailing .0 ("5 ft" not "5.0 ft", "1 m" not "1.0 m").
+        let rounded = value.rounded()
+        if abs(value - rounded) < 0.01 {
+            return "\(Int(rounded)) \(unit)"
+        }
+        return String(format: "%.1f %@", Double(value), unit)
+    }
+
+    private func addRulerLabel(at origin: CGPoint, text: String) {
+        let label = CATextLayer()
+        label.contentsScale = UIScreen.main.scale
+        label.string = text
+        label.font = UIFont.systemFont(ofSize: 9, weight: .regular)
+        label.fontSize = 9
+        // sbCharcoal at 70% alpha — readable against the ivory
+        // canvas without competing with table glyphs.
+        label.foregroundColor = UIColor(red: 45/255, green: 45/255, blue: 45/255, alpha: 0.7).cgColor
+        label.frame = CGRect(x: origin.x, y: origin.y, width: 36, height: 11)
+        contentView.layer.addSublayer(label)
+        rulerLabels.append(label)
     }
 
     // Direct port of web's roomPath() — builds a UIBezierPath equivalent
@@ -1769,6 +1902,11 @@ struct CanvasViewRepresentable: UIViewControllerRepresentable {
     var roomZones: [RoomZone]?
     var floorPlanBase64: String?
     var floorPlanOpacity: Double?
+    // Ruler overlay (top + left edges of the room rect). Off by
+    // default; toggled via the editor toolbar. Unit drives label
+    // suffix + tick spacing — see RoomScale in Models/SeatingPlan.swift.
+    var rulerVisible: Bool = false
+    var measurementUnit: String?
 
     // Increment to trigger a fit-to-content zoom on next updateUIViewController.
     var fitToken: Int = 0
@@ -1803,6 +1941,7 @@ struct CanvasViewRepresentable: UIViewControllerRepresentable {
             floorPlanBase64: floorPlanBase64,
             floorPlanOpacity: floorPlanOpacity
         )
+        vc.setRulerVisible(rulerVisible, unit: measurementUnit)
         if context.coordinator.lastFitToken != fitToken {
             context.coordinator.lastFitToken = fitToken
             DispatchQueue.main.async { vc.fitToContent(animated: true) }
