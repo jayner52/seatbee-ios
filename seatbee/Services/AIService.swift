@@ -153,13 +153,27 @@ final class AIService {
     ///     reason about which rules are violated
     ///   - prompts come straight from web for behavioural identity
     func detectConflicts(plan: SeatingPlan) async throws -> ConflictResult {
+        // Voice rules + JSON shape mirror web's detectConflicts in
+        // src/lib/ai.js — both apps hit the same /api/ai endpoint
+        // with the same systemPrompt for behavioural identity.
         let systemPrompt = """
-        You are analyzing a seating arrangement for potential conflicts.
-        Look for: people who shouldn't sit together, dietary issues, accessibility needs, family dynamics.
+        You are writing a short, friendly seating summary for the event host. Tone is warm and celebratory — like a thoughtful friend looking at their plan.
+
+        Lead with what's working. Always start with at least one specific positive (\"Sweetheart table is beautifully placed for the couple\", \"Most family groups are seated together\", \"All keep-apart preferences are honoured\"). Then, only if there are real concerns, mention the most important one in a gentle, helpful tone — never alarmist.
+
+        Voice rules (strict):
+        - Write for a real person, not a developer.
+        - NEVER quote, paraphrase, or include any backend identifier with underscores or camelCase. Examples to NEVER write: \"must_together\", \"must_not\", \"prefer_together\", \"near_object\", \"categoryTogether\". Just describe what the rule means in plain words.
+        - Refer to rules conversationally: \"must-sit-together rules\", \"keep-apart preferences\", \"couples seated together\", \"assigned tables\", etc. Avoid quoting rule terminology even informally.
+        - Refer to guests by first name, not id.
+        - 2-3 sentences total. Compliment first, soften critique, end with a constructive note when possible.
+
+        If you have nothing meaningful to flag, write a fully positive summary — that's a valid result.
+
         Return a JSON object with:
-        - conflicts: array of conflicts, each with type ("critical" | "warning" | "suggestion"), guests (array of guest names involved), message (explanation), suggestion (how to fix)
+        - conflicts: array of conflicts, each with type (\"critical\" | \"warning\" | \"suggestion\"), guests (array of guest names — never ids), message (plain English, no backend identifiers), suggestion (how to fix)
         - score: 1-100 rating of overall arrangement quality
-        - summary: brief text summary of the arrangement
+        - summary: 2-3 sentence host-friendly summary following the voice rules above
         """
 
         // Build guestId → tableName map (web App.jsx:13055)
@@ -173,10 +187,14 @@ final class AIService {
             }
         }
 
-        // Encode context. Use AnyCodable wrappers wouldn't help here —
-        // a plain dictionary serialised via JSONSerialization is enough
-        // and matches web's JSON.stringify shape.
-        let guestPayload: [[String: Any]] = plan.guests.map { g in
+        // Declined guests should be invisible to the AI — drop them
+        // from the guests payload AND scrub their IDs out of every
+        // rule.guests / sideA / sideB. Mirrors src/lib/ai.js
+        // humaniseRules + cleansedGuests behaviour.
+        let declinedIds = Set(plan.guests.filter { $0.rsvp == .no }.map(\.id))
+        let attendingGuests = plan.guests.filter { $0.rsvp != .no }
+
+        let guestPayload: [[String: Any]] = attendingGuests.map { g in
             [
                 "id": g.id,
                 "name": g.name,
@@ -189,18 +207,51 @@ final class AIService {
                 "isChild": g.isChild ?? false,
             ]
         }
+
+        // Plain-English rule kinds — model never sees raw `type`,
+        // matching web's RULE_TYPE_PLAIN_LANGUAGE table.
+        let kindByType: [String: String] = [
+            "must_together":     "must sit together rule",
+            "must_not":          "keep-apart rule",
+            "prefer_together":   "should sit together rule",
+            "must_table":        "assigned-table rule",
+            "near_object":       "near venue element rule",
+            "near_table":        "near another table rule",
+            "seat_adjacent":     "sit-next-to rule",
+            "category_together": "category-stays-together rule",
+            "side_together":     "side-stays-together rule",
+        ]
+
         let rulesPayload: [[String: Any]] = plan.rules
             .filter { $0.enabled }
-            .map { r in
-                [
+            .compactMap { r -> [String: Any]? in
+                let scrubbedGuests = r.guests.filter { !declinedIds.contains($0) }
+                let scrubbedSideA  = (r.sideA ?? []).filter { !declinedIds.contains($0) }
+                let scrubbedSideB  = (r.sideB ?? []).filter { !declinedIds.contains($0) }
+                // Drop rules whose surviving membership fell to zero
+                // — they'd register as phantom constraints. Side rules
+                // survive while at least one side has anyone; category
+                // rules survive regardless (they reference category id
+                // not guest list).
+                let hasGuests = !scrubbedGuests.isEmpty
+                let hasSides = !scrubbedSideA.isEmpty || !scrubbedSideB.isEmpty
+                if !hasGuests && !hasSides && r.type.rawValue != "category_together" {
+                    return nil
+                }
+                let kind = kindByType[r.type.rawValue]
+                    ?? r.type.rawValue.replacingOccurrences(of: "_", with: " ") + " rule"
+                var entry: [String: Any] = [
                     "id": r.id,
-                    "type": r.type.rawValue,
-                    "guests": r.guests,
+                    "kind": kind,
+                    "guests": scrubbedGuests,
                     "tableId": r.tableId ?? "",
                     "weight": r.weight,
                     "hard": r.hard,
                     "desc": r.desc ?? "",
                 ]
+                if !scrubbedSideA.isEmpty { entry["sideA"] = scrubbedSideA }
+                if !scrubbedSideB.isEmpty { entry["sideB"] = scrubbedSideB }
+                return entry
             }
         let context: [String: Any] = [
             "guests": guestPayload,
