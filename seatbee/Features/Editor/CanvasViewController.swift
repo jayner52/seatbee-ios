@@ -1006,12 +1006,18 @@ class CanvasViewController: UIViewController, UIScrollViewDelegate {
 
     @objc private func handleBackgroundTap(_ gesture: UITapGestureRecognizer) {
         let location = gesture.location(in: contentView)
-        // Check if tap hit any item
+        // Use point(inside:with:) per view so the hit test honours the
+        // view's transform (rotation). frame.contains returns the AABB
+        // of the rotated view — too generous for the "did the tap miss
+        // every item, deselect" check, and ALSO undefined per UIKit
+        // docs when a transform is applied.
         for (_, tv) in tableViews {
-            if tv.frame.contains(location) { return }
+            let local = tv.convert(location, from: contentView)
+            if tv.point(inside: local, with: nil) { return }
         }
         for (_, ov) in objectViews {
-            if ov.frame.contains(location) { return }
+            let local = ov.convert(location, from: contentView)
+            if ov.point(inside: local, with: nil) { return }
         }
         // Tapped empty space
         selectedId = nil
@@ -1199,7 +1205,13 @@ class CanvasTableView: UIView {
 
         let body = CanvasTableView.bodySize(for: table)
         let savedCenter = self.center
-        frame.size = CGSize(width: body.width + padding * 2, height: body.height + padding * 2)
+        // bounds.size, not frame.size — frame is undefined when a
+        // rotation transform is applied, and UIKit tries to keep the
+        // post-rotation AABB equal to the assigned size. For a long
+        // head table that means shrinking bounds enough that taps no
+        // longer land on the visible body. bounds.size is in local
+        // (untransformed) coords and stays correct.
+        bounds.size = CGSize(width: body.width + padding * 2, height: body.height + padding * 2)
         if savedCenter != .zero { self.center = savedCenter }
 
         let bodyCenter = CGPoint(x: padding + body.width/2, y: padding + body.height/2)
