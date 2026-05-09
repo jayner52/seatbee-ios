@@ -263,6 +263,8 @@ struct RSVPSheet: View {
         } label: {
             Text(label)
                 .font(SBFont.caption)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
                 .foregroundStyle(on ? Color.white : tint)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)

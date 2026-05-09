@@ -92,6 +92,12 @@ final class DatabaseService {
     // MARK: - Save Full Plan Data (write-back)
 
     func savePlanData(plan: SeatingPlan) async throws {
+        // Demo plan is local-only — never persist to Supabase. Silently
+        // return success so callers (autosave, undo/redo, drag-end) don't
+        // throw; the user's edits stay in memory until app restart, when
+        // SampleEventService re-loads the bundled state.
+        if plan.isDemo { return }
+
         let planData = plan.toPlanData()
 
         struct SavePayload: Codable {
@@ -129,6 +135,7 @@ final class DatabaseService {
     // MARK: - Simple Updates
 
     func updatePlan(id: String, updates: [String: String]) async throws {
+        if id == SampleEventService.samplePlanId { return }
         try await client
             .from("seating_plans")
             .update(updates)
@@ -137,6 +144,7 @@ final class DatabaseService {
     }
 
     func deletePlan(id: String) async throws {
+        if id == SampleEventService.samplePlanId { return }
         let now = ISO8601DateFormatter().string(from: Date())
         try await client
             .from("seating_plans")

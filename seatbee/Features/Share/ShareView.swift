@@ -59,6 +59,13 @@ struct ShareView: View {
                 } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: SBSpacing.sectionGap) {
+                        // Sample-event banner — explains why share-link /
+                        // collaborators are gated. Mirrors the Guests-tab
+                        // banner so the demo state is consistent across tabs.
+                        if appState.activePlan?.isDemo == true {
+                            sampleEventShareBanner
+                        }
+
                         // Plan preview + collaborator banner (when non-owner)
                         if let plan = appState.activePlan {
                             planPreview(plan)
@@ -67,8 +74,11 @@ struct ShareView: View {
                             }
                         }
 
-                        // Collaborators (web parity — /api/collab)
-                        if let plan = appState.activePlan {
+                        // Collaborators (web parity — /api/collab) — hidden
+                        // entirely on the demo plan. Inviting a collaborator
+                        // would require a real Supabase row, and there's no
+                        // value in showing an empty card on a sample.
+                        if let plan = appState.activePlan, !plan.isDemo {
                             collaboratorsCard(plan: plan)
                         }
 
@@ -126,6 +136,28 @@ struct ShareView: View {
         .padding(12)
         .background(Color.sbIvory2)
         .clipShape(RoundedRectangle(cornerRadius: SBRadius.chip))
+    }
+
+    // MARK: - Sample event banner
+
+    private var sampleEventShareBanner: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "sparkles")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(Color.sbGoldDk)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Sample event")
+                    .font(SBFont.bodySmallBold)
+                    .foregroundStyle(Color.sbCharcoal)
+                Text("Sharing, QR codes, and collaborators unlock when you sign up.")
+                    .font(SBFont.caption)
+                    .foregroundStyle(Color.sbWarm)
+            }
+            Spacer()
+        }
+        .padding(12)
+        .background(Color.sbChampagne2)
+        .clipShape(RoundedRectangle(cornerRadius: SBRadius.button))
     }
 
     // MARK: - Collaborator banner (when not the owner)
@@ -1186,6 +1218,13 @@ struct ShareView: View {
     /// `data` blob — so iOS has to ask the server rather than reading it
     /// off the local plan.
     private func fetchQRConfig(planId: String) async {
+        // Demo plan never hits the server. Show a friendly message instead.
+        if planId == SampleEventService.samplePlanId {
+            qrError = "Sign up to share with your guests."
+            qrEnabled = false
+            qrToken = nil
+            return
+        }
         qrError = nil
         guard let url = URL(string: "\(AppConfig.guestAPIBaseURL)?action=config&planId=\(planId)") else { return }
         var request = URLRequest(url: url)
@@ -1211,6 +1250,14 @@ struct ShareView: View {
     /// column and returns the (possibly newly-minted) token. iOS keeps the
     /// returned token in local @State; no JSONB writeback needed.
     private func saveQRConfig(planId: String, enabled: Bool) async {
+        // Demo plan: never mint a token — that would create a real Supabase
+        // row tied to a fake plan ID. Surface the conversion-pitch message.
+        if planId == SampleEventService.samplePlanId {
+            qrError = "Sign up to share your seating plan with guests."
+            qrEnabled = false
+            return
+        }
+
         qrError = nil
         qrSyncing = true
         defer { qrSyncing = false }
@@ -1294,6 +1341,19 @@ struct ShareView: View {
     // that strips Authorization headers in URLSession.
 
     private func loadCollaborators(planId: String) async {
+        // Demo plan: never call /api/collab — it returns "Plan not found"
+        // because the demo plan ID isn't in the database. Set a clean
+        // empty state and a friendly message instead.
+        if planId == SampleEventService.samplePlanId {
+            collabOwner = nil
+            collaborators = []
+            invitations = []
+            collabIsOwner = false
+            collabError = nil
+            collabLoading = false
+            return
+        }
+
         collabError = nil
         collabLoading = true
         defer { collabLoading = false }

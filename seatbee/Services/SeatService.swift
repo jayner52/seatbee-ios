@@ -174,6 +174,17 @@ final class SeatService {
         guard !plan.tables.isEmpty, !plan.guests.isEmpty else {
             throw SeatError.noTablesOrGuests
         }
+
+        // Demo plan: never hit /api/seat. Hand back the pre-baked 100%
+        // result bundled in SampleEvent.json. The user sees the full AI
+        // flow (loading shimmer, scorecard, applied seats) without any
+        // OpenAI cost. A small artificial delay makes the playback feel
+        // like a real network call.
+        if plan.isDemo {
+            try? await Task.sleep(nanoseconds: 1_400_000_000)
+            return try SampleEventService.shared.preBakedResult()
+        }
+
         guard let url = URL(string: baseURL) else { throw SeatError.server("Invalid URL") }
 
         guard let token = await AuthService().accessToken else { throw SeatError.unauthorized }

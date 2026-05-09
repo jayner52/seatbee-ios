@@ -6,6 +6,7 @@ struct RulesView: View {
     @State private var showAddRule = false
     @State private var showAddParty = false
     @State private var pendingAddType: SeatingRule.RuleType = .mustTogether
+    @State private var editingRule: SeatingRule?
     @State private var collapsedSections: Set<String>
 
     // Default every section collapsed on open so users see all categories
@@ -22,6 +23,15 @@ struct RulesView: View {
     private var rules: [SeatingRule] { appState.activePlan?.rules ?? [] }
     private var guests: [Guest] { appState.activePlan?.guests ?? [] }
     private var tables: [SeatTable] { appState.activePlan?.tables ?? [] }
+    private var objects: [RoomObject] { appState.activePlan?.objects ?? [] }
+    private var canonicalCategories: [(id: String, name: String)] {
+        guard let raw = appState.activePlan?.rawCategories else { return [] }
+        return raw.compactMap { entry in
+            guard let id = entry["id"]?.value as? String else { return nil }
+            let name = (entry["name"]?.value as? String) ?? id
+            return (id, name)
+        }
+    }
 
     // Section ordering mirrors web's Rules tab (src/App.jsx:13667-13939):
     // Seat Together, Keep Apart, Assign to Table, Near Venue, Near Table,
@@ -108,6 +118,10 @@ struct RulesView: View {
             }
             .sheet(isPresented: $showAddRule) {
                 AddRuleSheet(initialType: pendingAddType)
+                    .environment(appState)
+            }
+            .sheet(item: $editingRule) { rule in
+                AddRuleSheet(editingRule: rule)
                     .environment(appState)
             }
             .sheet(isPresented: $showAddParty) {
@@ -377,55 +391,146 @@ struct RulesView: View {
     }
 
     private func ruleCard(_ rule: SeatingRule) -> some View {
-        HStack(spacing: 12) {
-            // Icon
-            Image(systemName: ruleIcon(rule.type))
-                .font(.system(size: 18))
-                .foregroundStyle(ruleColor(rule.type))
-                .frame(width: 36, height: 36)
-                .background(ruleColor(rule.type).opacity(0.15))
-                .clipShape(Circle())
+        // Tappable row → opens AddRuleSheet in edit mode, pre-filled with
+        // this rule's values so users can tweak guests / object / weight.
+        Button {
+            editingRule = rule
+        } label: {
+            HStack(spacing: 12) {
+                // Icon
+                Image(systemName: ruleIcon(rule.type))
+                    .font(.system(size: 18))
+                    .foregroundStyle(ruleColor(rule.type))
+                    .frame(width: 36, height: 36)
+                    .background(ruleColor(rule.type).opacity(0.15))
+                    .clipShape(Circle())
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text(ruleLabel(rule.type))
-                    .font(SBFont.bodySmallBold)
-                    .foregroundStyle(Color.sbCharcoal)
+                VStack(alignment: .leading, spacing: 4) {
+                    // Context-aware title — venue object name on Near rules,
+                    // category name on Category rules, table name on table-
+                    // bound rules. Falls back to a custom desc or the
+                    // generic type label.
+                    Text(ruleTitle(rule))
+                        .font(SBFont.bodySmallBold)
+                        .foregroundStyle(Color.sbCharcoal)
+                        .lineLimit(1)
 
-                // Guest names
-                let names = rule.guests.compactMap { gId in guests.first { $0.id == gId }?.displayName }
-                Text(names.joined(separator: ", "))
-                    .font(SBFont.caption)
-                    .foregroundStyle(Color.sbWarm)
-                    .lineLimit(1)
+                    // Subtitle: who's affected, expressed in the way that
+                    // matches the rule type (guest names / category guest
+                    // count / etc.)
+                    Text(ruleSubtitle(rule))
+                        .font(SBFont.caption)
+                        .foregroundStyle(Color.sbWarm)
+                        .lineLimit(1)
 
-                if rule.hard {
-                    SBChip(text: "Required", variant: .gold)
+                    HStack(spacing: 6) {
+                        if rule.hard {
+                            SBChip(text: "Required", variant: .gold)
+                        } else if rule.weight > 0 {
+                            // Weight as an "importance" hint (web parity:
+                            // soft rules are stored 0-100; we show as %).
+                            SBChip(text: "\(rule.weight)% importance", variant: .muted)
+                        }
+                    }
                 }
-            }
 
-            Spacer()
+                Spacer()
 
-            // Toggle
-            Toggle("", isOn: Binding(
-                get: { rule.enabled },
-                set: { toggleRule(rule, enabled: $0) }
-            ))
-            .tint(Color.sbGold)
-            .labelsHidden()
+                // Toggle
+                Toggle("", isOn: Binding(
+                    get: { rule.enabled },
+                    set: { toggleRule(rule, enabled: $0) }
+                ))
+                .tint(Color.sbGold)
+                .labelsHidden()
 
-            // Delete
-            Button {
-                deleteRule(rule)
-            } label: {
-                Image(systemName: "trash")
-                    .font(.system(size: 14))
+                // Delete
+                Button {
+                    deleteRule(rule)
+                } label: {
+                    Image(systemName: "trash")
+                        .font(.system(size: 14))
+                        .foregroundStyle(Color.sbWarm2)
+                }
+                .buttonStyle(.plain)
+
+                // Chevron — affordance that the row is tappable
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(Color.sbWarm2)
             }
-            .buttonStyle(.plain)
+            .padding(14)
+            .background(Color.sbIvory2)
+            .clipShape(RoundedRectangle(cornerRadius: SBRadius.card))
         }
-        .padding(14)
-        .background(Color.sbIvory2)
-        .clipShape(RoundedRectangle(cornerRadius: SBRadius.card))
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Rule labels (context-aware)
+
+    /// Headline shown on the rule row. Replaces the generic type label
+    /// for Near / Assign / Category rules with the actual target name
+    /// (e.g. "Near Dance Floor" instead of "Seat Near Object"), so users
+    /// can read what each rule does at a glance without tapping in.
+    private func ruleTitle(_ rule: SeatingRule) -> String {
+        switch rule.type {
+        case .nearObject:
+            let name = objects.first(where: { $0.id == rule.objectId })?.name
+            return name.map { "Near \($0)" } ?? "Near venue object"
+        case .nearTable:
+            let name = tables.first(where: { $0.id == rule.tableId })?.name
+            return name.map { "Near \($0)" } ?? "Near table"
+        case .mustTable:
+            let name = tables.first(where: { $0.id == rule.tableId })?.name
+            return name.map { "Assigned to \($0)" } ?? "Assigned to table"
+        case .categoryTogether:
+            let name = canonicalCategories.first(where: { $0.id == rule.categoryId })?.name
+            return name.map { "\($0) seated together" } ?? "Category seated together"
+        case .seatAdjacent:
+            return "Seat adjacent"
+        default:
+            // Manual rules with a custom description ("Bride's coworkers
+            // seated together") read better than the generic type label.
+            if let desc = rule.desc, !desc.isEmpty, desc.count <= 60 {
+                return desc
+            }
+            return ruleLabel(rule.type)
+        }
+    }
+
+    /// One-line summary of who's affected. Tries to communicate scale
+    /// (e.g. "5 guests") rather than a long truncated name list when the
+    /// rule covers many guests.
+    private func ruleSubtitle(_ rule: SeatingRule) -> String {
+        switch rule.type {
+        case .categoryTogether:
+            // Category rules don't store a guest list — show a count of
+            // guests currently tagged with that category.
+            guard let catId = rule.categoryId else { return "All matching guests" }
+            let count = guests.filter { $0.categories.contains(catId) }.count
+            return count == 1 ? "1 guest tagged" : "\(count) guests tagged"
+        case .nearObject, .nearTable:
+            // Near rules: name a few guests, suffix overflow count.
+            return shortNameList(rule.guests, max: 2)
+        case .mustNot:
+            // Keep-apart shows "A, B vs C" using the side split if present.
+            if let a = rule.sideA, let b = rule.sideB, !a.isEmpty, !b.isEmpty {
+                let aNames = shortNameList(a, max: 2)
+                let bNames = shortNameList(b, max: 2)
+                return "\(aNames) ✕ \(bNames)"
+            }
+            return shortNameList(rule.guests, max: 3)
+        default:
+            return shortNameList(rule.guests, max: 3)
+        }
+    }
+
+    private func shortNameList(_ ids: [String], max: Int) -> String {
+        let names = ids.compactMap { id in guests.first { $0.id == id }?.displayName }
+        if names.isEmpty { return "No guests" }
+        if names.count <= max { return names.joined(separator: ", ") }
+        let head = names.prefix(max).joined(separator: ", ")
+        return "\(head) +\(names.count - max) more"
     }
 
     private func ruleIcon(_ type: SeatingRule.RuleType) -> String {
@@ -498,6 +603,12 @@ struct AddRuleSheet: View {
     // sheet opens with the contextually-correct default selected.
     var initialType: SeatingRule.RuleType = .mustTogether
 
+    /// When set, the sheet opens in EDIT mode pre-populated with this
+    /// rule's values. Save updates the existing rule by ID instead of
+    /// appending a new one. The rule-type picker is hidden in edit mode
+    /// (changing types would invalidate the form data).
+    var editingRule: SeatingRule? = nil
+
     @State private var ruleType: SeatingRule.RuleType = .mustTogether
     @State private var selectedGuestIds: Set<String> = []
     @State private var selectedTableId: String?
@@ -513,6 +624,8 @@ struct AddRuleSheet: View {
     @State private var isHard = false
     @State private var searchText = ""
 
+    private var isEditing: Bool { editingRule != nil }
+
     private var guests: [Guest] { appState.activePlan?.guests ?? [] }
     private var tables: [SeatTable] { appState.activePlan?.tables ?? [] }
     private var objects: [RoomObject] { appState.activePlan?.objects ?? [] }
@@ -524,8 +637,22 @@ struct AddRuleSheet: View {
         // pick one. RSVP-change cleanup in RSVPSheet strips already-
         // referenced declined guests from existing rules.
         let attending = guests.filter { $0.rsvp != .no }
-        if searchText.isEmpty { return attending }
-        return attending.filter { $0.displayName.localizedCaseInsensitiveContains(searchText) }
+        let matched: [Guest]
+        if searchText.isEmpty {
+            matched = attending
+        } else {
+            matched = attending.filter { $0.displayName.localizedCaseInsensitiveContains(searchText) }
+        }
+        // Sort already-selected guests to the top so users can see who's
+        // in the rule without scrolling — critical in edit mode where the
+        // picker pre-fills from the existing rule. Within each group keep
+        // the original order so the list isn't reshuffled mid-typing.
+        return matched.sorted { lhs, rhs in
+            let lSel = selectedGuestIds.contains(lhs.id)
+            let rSel = selectedGuestIds.contains(rhs.id)
+            if lSel == rSel { return false }
+            return lSel && !rSel
+        }
     }
 
     private var canonicalCategories: [(id: String, name: String, color: String?)] {
@@ -598,7 +725,7 @@ struct AddRuleSheet: View {
                 .padding(.top, 16)
             }
             .background(Color.sbIvory)
-            .navigationTitle("Add Rule")
+            .navigationTitle(isEditing ? "Edit Rule" : "Add Rule")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -606,22 +733,37 @@ struct AddRuleSheet: View {
                         .foregroundStyle(Color.sbWarm)
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Add") { addRule() }
+                    Button(isEditing ? "Save" : "Add") { addRule() }
                         .font(SBFont.bodySemibold)
                         .foregroundStyle(Color.sbGoldDk)
                         .disabled(!canSubmit)
                 }
             }
             .onAppear {
-                ruleType = initialType
-                // For Keep Apart, web auto-derives hard from weight ≥ 90.
-                // Default to a soft 75 so users start in the soft zone.
-                if case .mustNot = initialType { weight = 75 }
-                // Near rules default to weight 80 (matches web defaults).
-                if case .nearTable = initialType { weight = 80 }
-                if case .nearObject = initialType { weight = 80 }
-                // Category rules default to 40 (matches web's createCategoryRule).
-                if case .categoryTogether = initialType { weight = 40 }
+                if let r = editingRule {
+                    // Edit mode — hydrate state from the existing rule so
+                    // the form opens with the user's prior selections.
+                    ruleType          = r.type
+                    selectedGuestIds  = Set(r.guests)
+                    selectedTableId   = r.tableId
+                    selectedObjectId  = r.objectId
+                    selectedCategoryId = r.categoryId
+                    selectedSideAIds  = Set(r.sideA ?? [])
+                    selectedSideBIds  = Set(r.sideB ?? [])
+                    nameText          = r.desc ?? ""
+                    weight            = Double(r.weight)
+                    isHard            = r.hard
+                } else {
+                    ruleType = initialType
+                    // For Keep Apart, web auto-derives hard from weight ≥ 90.
+                    // Default to a soft 75 so users start in the soft zone.
+                    if case .mustNot = initialType { weight = 75 }
+                    // Near rules default to weight 80 (matches web defaults).
+                    if case .nearTable = initialType { weight = 80 }
+                    if case .nearObject = initialType { weight = 80 }
+                    // Category rules default to 40 (matches web's createCategoryRule).
+                    if case .categoryTogether = initialType { weight = 40 }
+                }
             }
         }
     }
@@ -708,6 +850,23 @@ struct AddRuleSheet: View {
                 )
             }
 
+            // Optional name — when blank, falls back to the auto-generated
+            // "<Side A> vs <Side B>" description on save. Parity with Seat
+            // Together, which already supports custom names.
+            VStack(alignment: .leading, spacing: 6) {
+                Text("RULE NAME (OPTIONAL)")
+                    .font(SBFont.label)
+                    .foregroundStyle(Color.sbWarm)
+                TextField("e.g. Divorced grandparents", text: $nameText)
+                    .padding(10)
+                    .background(Color.sbIvory2)
+                    .clipShape(RoundedRectangle(cornerRadius: SBRadius.small))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: SBRadius.small)
+                            .strokeBorder(Color.sbLine, lineWidth: 1)
+                    )
+            }
+
             weightSliderSection(label: weight >= 90 ? "Required (high priority)" : "Preferred")
         }
     }
@@ -721,8 +880,20 @@ struct AddRuleSheet: View {
         search: Binding<String>
     ) -> some View {
         let sideGuests: [Guest] = {
-            if search.wrappedValue.isEmpty { return guests }
-            return guests.filter { $0.displayName.localizedCaseInsensitiveContains(search.wrappedValue) }
+            let base: [Guest] = {
+                if search.wrappedValue.isEmpty { return guests }
+                return guests.filter { $0.displayName.localizedCaseInsensitiveContains(search.wrappedValue) }
+            }()
+            // Selected guests bubble to the top of THIS column so users can
+            // see who's already assigned to Side A / Side B at a glance —
+            // matters most in edit mode where pre-filled selections were
+            // previously buried in the middle of a 100+ guest list.
+            let sel = selection.wrappedValue
+            return base.sorted { lhs, rhs in
+                let l = sel.contains(lhs.id), r = sel.contains(rhs.id)
+                if l == r { return false }
+                return l && !r
+            }
         }()
 
         VStack(alignment: .leading, spacing: 8) {
@@ -1068,7 +1239,9 @@ struct AddRuleSheet: View {
     // prefer_together).
     private func addRule() {
         guard var plan = appState.activePlan, canSubmit else { return }
-        let ruleId = UUID().uuidString
+        // In edit mode, reuse the existing rule's ID so the upsert below
+        // updates instead of appending. New rules get a fresh UUID.
+        let ruleId = editingRule?.id ?? UUID().uuidString
 
         switch ruleType {
         case .mustTogether, .preferTogether:
@@ -1100,7 +1273,7 @@ struct AddRuleSheet: View {
                 auto: nil, source: "manual",
                 partyId: nil, groupId: groupId
             )
-            plan.rules.append(rule)
+            Self.upsert(rule: rule, into: &plan)
 
         case .mustNot:
             // Web parity (createKeepApartRule line 13321-13345): write
@@ -1115,6 +1288,11 @@ struct AddRuleSheet: View {
             }
             let aNames = sideA.map(nameOf).joined(separator: ", ")
             let bNames = sideB.map(nameOf).joined(separator: ", ")
+            // User-supplied name overrides the auto "A ✕ B" description.
+            // Trims whitespace and falls back to the auto string when blank
+            // — same behaviour as Seat Together rules.
+            let trimmedName = nameText.trimmingCharacters(in: .whitespaces)
+            let ruleDesc = trimmedName.isEmpty ? "\(aNames) ✕ \(bNames)" : trimmedName
             let rule = SeatingRule(
                 id: ruleId,
                 type: .mustNot,
@@ -1125,11 +1303,11 @@ struct AddRuleSheet: View {
                 enabled: true,
                 categoryId: nil, objectId: nil, sideValue: nil,
                 sideA: sideA, sideB: sideB,
-                desc: "\(aNames) ✕ \(bNames)",
+                desc: ruleDesc,
                 auto: nil, source: "manual",
                 partyId: nil, groupId: nil
             )
-            plan.rules.append(rule)
+            Self.upsert(rule: rule, into: &plan)
 
         case .mustTable:
             guard let tableId = selectedTableId else { return }
@@ -1146,7 +1324,7 @@ struct AddRuleSheet: View {
                 auto: nil, source: "manual",
                 partyId: nil, groupId: nil
             )
-            plan.rules.append(rule)
+            Self.upsert(rule: rule, into: &plan)
 
         case .nearTable:
             guard let tableId = selectedTableId else { return }
@@ -1167,7 +1345,7 @@ struct AddRuleSheet: View {
                 auto: nil, source: "manual",
                 partyId: nil, groupId: nil
             )
-            plan.rules.append(rule)
+            Self.upsert(rule: rule, into: &plan)
 
         case .nearObject:
             guard let objId = selectedObjectId else { return }
@@ -1188,7 +1366,7 @@ struct AddRuleSheet: View {
                 auto: nil, source: "manual",
                 partyId: nil, groupId: nil
             )
-            plan.rules.append(rule)
+            Self.upsert(rule: rule, into: &plan)
 
         case .categoryTogether:
             guard let catId = selectedCategoryId else { return }
@@ -1206,7 +1384,7 @@ struct AddRuleSheet: View {
                 auto: nil, source: "manual",
                 partyId: nil, groupId: nil
             )
-            plan.rules.append(rule)
+            Self.upsert(rule: rule, into: &plan)
 
         default:
             return
@@ -1227,6 +1405,18 @@ struct AddRuleSheet: View {
             guests.first(where: { $0.id == id })?.displayName.split(separator: " ").first.map(String.init)
         }
         return names.joined(separator: " & ")
+    }
+
+    /// Insert OR update a rule by id. Used so add-mode and edit-mode
+    /// share a single mutation path: the per-type build-the-rule
+    /// switch above produces a SeatingRule, this helper writes it
+    /// back to plan.rules in the right slot.
+    static func upsert(rule: SeatingRule, into plan: inout SeatingPlan) {
+        if let idx = plan.rules.firstIndex(where: { $0.id == rule.id }) {
+            plan.rules[idx] = rule
+        } else {
+            plan.rules.append(rule)
+        }
     }
 }
 
