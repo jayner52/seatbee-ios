@@ -746,6 +746,14 @@ struct TraceShapeSheet: View {
     @State private var flipV = false
     @State private var draggingIndex: Int? = nil
     @State private var pendingDelete: Int? = nil
+    /// User-controlled zoom on top of the auto-fit base scale. 1.0 = fit
+    /// the whole shape to canvas; >1.0 zooms in for fine-detail editing.
+    @State private var userZoom: CGFloat = 1.0
+    @State private var lastZoom: CGFloat = 1.0
+    /// User-controlled pan offset applied after auto-fit centering, so
+    /// the user can drag the canvas around when zoomed in.
+    @State private var panOffset: CGSize = .zero
+    @State private var lastPanOffset: CGSize = .zero
 
     private var unitLabel: String { RoomScale.unitLabel(for: measurementUnit) }
     private var pixelsPerUnit: Double { RoomScale.factor(for: measurementUnit) }
@@ -827,7 +835,7 @@ struct TraceShapeSheet: View {
                 .font(SBFont.capsLabel)
                 .foregroundStyle(Color.sbWarm)
                 .letterSpacing(1.5)
-            Text("Tap a wall to add a corner · Double-tap to curve · Tap the curve handle to flip · Drag handle to adjust depth · Long-press a corner to delete")
+            Text("Tap a wall to add a corner · Double-tap to curve · Tap the curve handle to flip · Drag handle to adjust depth · Long-press a corner to delete · Pinch to zoom, drag to pan")
                 .font(SBFont.caption)
                 .foregroundStyle(Color.sbCharcoal)
         }
@@ -891,11 +899,12 @@ struct TraceShapeSheet: View {
                     .allowsHitTesting(false)
             }
 
-            // Tap-to-add-corner / double-tap-to-curve: shared transparent
-            // layer covering the canvas. Single tap on a wall inserts a
-            // corner; double tap on a wall toggles a curve (semicircle by
-            // default, sweep outward). count:2 is checked first so the
-            // single-tap handler defers automatically.
+            // Tap-to-add-corner / double-tap-to-curve / drag-to-pan:
+            // shared transparent layer covering the canvas. Single tap
+            // on a wall inserts a corner; double tap toggles a curve;
+            // drag on empty area pans the canvas (10pt threshold so a
+            // tap doesn't accidentally pan). Pinch zooms via the
+            // simultaneous magnification gesture below.
             Color.clear
                 .contentShape(Rectangle())
                 .onTapGesture(count: 2) { location in
@@ -908,6 +917,23 @@ struct TraceShapeSheet: View {
                         insertCorner(after: edgeIndex, at: location, layout: layout)
                     }
                 }
+                .simultaneousGesture(
+                    DragGesture(minimumDistance: 10)
+                        .onChanged { value in
+                            panOffset = CGSize(
+                                width: lastPanOffset.width + value.translation.width,
+                                height: lastPanOffset.height + value.translation.height
+                            )
+                        }
+                        .onEnded { _ in lastPanOffset = panOffset }
+                )
+                .simultaneousGesture(
+                    MagnificationGesture()
+                        .onChanged { value in
+                            userZoom = max(1.0, min(8.0, lastZoom * value))
+                        }
+                        .onEnded { _ in lastZoom = userZoom }
+                )
 
             // Corner handles. Drawn last so they sit above the tap layer.
             ForEach(displayedPoints.indices, id: \.self) { i in
@@ -947,6 +973,31 @@ struct TraceShapeSheet: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .clipped()
+        .overlay(alignment: .topTrailing) {
+            // Floating "fit to shape" button — only appears when the user
+            // has zoomed or panned away from the auto-fit default. One
+            // tap snaps everything back to a clean view of the polygon.
+            if userZoom > 1.01 || panOffset != .zero {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        userZoom = 1
+                        lastZoom = 1
+                        panOffset = .zero
+                        lastPanOffset = .zero
+                    }
+                    HapticEngine.light()
+                } label: {
+                    Image(systemName: "arrow.up.left.and.arrow.down.right.magnifyingglass")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(Color.sbGoldDk)
+                        .padding(8)
+                        .background(.ultraThinMaterial)
+                        .clipShape(Circle())
+                        .shadow(color: .black.opacity(0.12), radius: 2, x: 0, y: 1)
+                }
+                .padding(8)
+            }
+        }
     }
 
     private func arcApexHandle() -> some View {
@@ -1151,13 +1202,17 @@ struct TraceShapeSheet: View {
             originX = 0
             originY = 0
         }
-        let scale = min(availW / fitW, availH / fitH)
+        // Auto-fit base scale, then layer the user's pinch-zoom on top.
+        // userZoom = 1 → fit whole shape, > 1 → zoom into a region.
+        let baseScale = min(availW / fitW, availH / fitH)
+        let scale = baseScale * Double(userZoom)
         let drawnW = fitW * scale
         let drawnH = fitH * scale
         // Subtract originX*scale so a point at x=originX maps to the
         // left side of the visible canvas (polygon's leftmost edge).
-        let offsetX = margin + (availW - drawnW) / 2 - originX * scale
-        let offsetY = margin + (availH - drawnH) / 2 - originY * scale
+        // Pan offset comes last so dragging the canvas slides everything.
+        let offsetX = margin + (availW - drawnW) / 2 - originX * scale + Double(panOffset.width)
+        let offsetY = margin + (availH - drawnH) / 2 - originY * scale + Double(panOffset.height)
         return CanvasLayout(scale: scale, offsetX: offsetX, offsetY: offsetY)
     }
 
