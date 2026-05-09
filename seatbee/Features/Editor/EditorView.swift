@@ -966,7 +966,10 @@ struct EditorView: View {
     private var unassignedGuests: [Guest] {
         guard let plan else { return [] }
         let assignedIds = Set(plan.tables.flatMap { $0.assignments.keys })
-        return plan.guests.filter { !assignedIds.contains($0.id) }
+        // Hide rsvp == .no — they can't be seated (assignGuestToNextEmpty
+        // rejects them), so showing them in the quick-assign column makes
+        // taps look broken. Matches GuestPickerSheet.unseatedGuests.
+        return plan.guests.filter { !assignedIds.contains($0.id) && $0.rsvp != .no }
     }
 
     private func assignGuestToNextEmpty(_ guest: Guest) {
