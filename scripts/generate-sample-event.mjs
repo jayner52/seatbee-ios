@@ -158,20 +158,24 @@ function addFamilyParty(name, members) {
 // bride/groom badge on guest rows reads correctly. The web solver auto-
 // synthesizes a side_together rule per side; with only one guest each
 // side, both rules trivially satisfy at the sweetheart table.
-// Special category ids 'sweetheart_table' and 'head_table' are recognised
-// by the web solver (src/lib/solve.js Phase 1.5/1.6) and pin guests to
-// those table types regardless of name. Adding them here is what actually
-// puts the couple at the sweetheart and the wedding party at head — the
-// existingAssignments map below only honours LOCKED tables, which we
-// don't lock in the demo.
+// Mirrors onboarding (OnboardingView.swift::coupleGuest, App.jsx:19816):
+// when the user enters bride/groom names + opts in to a sweetheart table,
+// the app tags the couple with TWO system categories:
+//   - 'bride' / 'groom'    — drives the white/dark seat highlight (App.jsx
+//                            line 7578) so the couple is visually flagged
+//                            on the canvas
+//   - 'sweetheart_table'   — pins them to the sweetheart at solve time
+//                            (solve.js Phase 1.5)
+// Without these the existingAssignments map below is silently dropped —
+// it only honours LOCKED tables, which the demo doesn't use.
 const bride = addGuest({
   firstName: 'Brooks', lastName: 'Williams',
-  side: 'bride', categories: ['cat-wedding-party', 'sweetheart_table'],
+  side: 'bride', categories: ['bride', 'cat-wedding-party', 'sweetheart_table'],
   meal: 'Pan-Seared Salmon', vip: true, isBride: true,
 })
 const groom = addGuest({
   firstName: 'Carter', lastName: 'Okonkwo',
-  side: 'groom', categories: ['cat-wedding-party', 'sweetheart_table'],
+  side: 'groom', categories: ['groom', 'cat-wedding-party', 'sweetheart_table'],
   meal: 'Beef Tenderloin', vip: true, isGroom: true,
 })
 

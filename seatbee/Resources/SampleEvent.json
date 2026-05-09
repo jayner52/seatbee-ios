@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-05-09T19:33:38.032Z",
+  "generatedAt": "2026-05-09T23:38:26.294Z",
   "solverScore": 100,
   "plan": {
     "id": "demo-sample-event",
@@ -145,14 +145,8 @@
         "diameter": 100,
         "color": "#C9A961",
         "assignments": {
-          "g-036": 0,
-          "g-047": 1,
-          "g-042": 2,
-          "g-053": 3,
-          "g-052": 4,
-          "g-041": 5,
-          "g-035": 6,
-          "g-080": 7
+          "g-014": 0,
+          "g-106": 1
         }
       },
       {
@@ -165,14 +159,14 @@
         "diameter": 100,
         "color": "#C9A961",
         "assignments": {
-          "g-070": 0,
-          "g-071": 1,
-          "g-058": 2,
-          "g-044": 3,
-          "g-059": 4,
-          "g-045": 5,
-          "g-068": 6,
-          "g-067": 7
+          "g-032": 0,
+          "g-053": 1,
+          "g-062": 2,
+          "g-033": 3,
+          "g-052": 4,
+          "g-061": 5,
+          "g-026": 6,
+          "g-027": 7
         }
       },
       {
@@ -185,13 +179,14 @@
         "diameter": 100,
         "color": "#C9A961",
         "assignments": {
-          "g-032": 0,
-          "g-033": 1,
-          "g-020": 2,
-          "g-024": 3,
-          "g-014": 4,
-          "g-023": 5,
-          "g-021": 6
+          "g-036": 0,
+          "g-058": 1,
+          "g-044": 2,
+          "g-059": 3,
+          "g-045": 4,
+          "g-068": 5,
+          "g-035": 6,
+          "g-067": 7
         }
       },
       {
@@ -204,13 +199,13 @@
         "diameter": 100,
         "color": "#C9A961",
         "assignments": {
-          "g-046": 0,
-          "g-056": 1,
-          "g-055": 2,
-          "g-065": 3,
-          "g-013": 4,
-          "g-064": 5,
-          "g-049": 6,
+          "g-029": 0,
+          "g-030": 1,
+          "g-013": 2,
+          "g-018": 3,
+          "g-049": 4,
+          "g-016": 5,
+          "g-017": 6,
           "g-048": 7
         }
       },
@@ -224,14 +219,14 @@
         "diameter": 100,
         "color": "#C9A961",
         "assignments": {
-          "g-077": 0,
-          "g-029": 1,
-          "g-073": 2,
-          "g-030": 3,
-          "g-062": 4,
-          "g-076": 5,
-          "g-074": 6,
-          "g-061": 7
+          "g-056": 0,
+          "g-055": 1,
+          "g-065": 2,
+          "g-077": 3,
+          "g-076": 4,
+          "g-020": 5,
+          "g-064": 6,
+          "g-021": 7
         }
       },
       {
@@ -244,8 +239,14 @@
         "diameter": 100,
         "color": "#C9A961",
         "assignments": {
-          "g-026": 0,
-          "g-027": 1
+          "g-070": 0,
+          "g-071": 1,
+          "g-073": 2,
+          "g-042": 3,
+          "g-074": 4,
+          "g-024": 5,
+          "g-023": 6,
+          "g-041": 7
         }
       },
       {
@@ -258,13 +259,13 @@
         "diameter": 100,
         "color": "#C9A961",
         "assignments": {
-          "g-116": 0,
-          "g-134": 1,
-          "g-131": 2,
-          "g-117": 3,
-          "g-140": 4,
-          "g-139": 5,
-          "g-132": 6,
+          "g-131": 0,
+          "g-084": 1,
+          "g-140": 2,
+          "g-139": 3,
+          "g-137": 4,
+          "g-132": 5,
+          "g-136": 6,
           "g-141": 7
         }
       },
@@ -279,12 +280,12 @@
         "color": "#C9A961",
         "assignments": {
           "g-095": 0,
-          "g-122": 1,
-          "g-133": 2,
-          "g-084": 3,
+          "g-134": 1,
+          "g-143": 2,
+          "g-129": 3,
           "g-144": 4,
           "g-142": 5,
-          "g-123": 6,
+          "g-128": 6,
           "g-145": 7
         }
       },
@@ -298,7 +299,14 @@
         "diameter": 100,
         "color": "#C9A961",
         "assignments": {
-          "g-143": 0
+          "g-046": 0,
+          "g-047": 1,
+          "g-039": 2,
+          "g-078": 3,
+          "g-079": 4,
+          "g-050": 5,
+          "g-038": 6,
+          "g-080": 7
         }
       },
       {
@@ -312,13 +320,13 @@
         "color": "#C9A961",
         "assignments": {
           "g-120": 0,
-          "g-126": 1,
-          "g-119": 2,
-          "g-129": 3,
-          "g-125": 4,
-          "g-137": 5,
-          "g-128": 6,
-          "g-136": 7
+          "g-116": 1,
+          "g-122": 2,
+          "g-126": 3,
+          "g-119": 4,
+          "g-117": 5,
+          "g-125": 6,
+          "g-123": 7
         }
       },
       {
@@ -330,16 +338,7 @@
         "y": 1020,
         "diameter": 100,
         "color": "#C9A961",
-        "assignments": {
-          "g-039": 0,
-          "g-078": 1,
-          "g-079": 2,
-          "g-018": 3,
-          "g-050": 4,
-          "g-016": 5,
-          "g-038": 6,
-          "g-017": 7
-        }
+        "assignments": {}
       },
       {
         "id": "t_round_16",
@@ -351,7 +350,7 @@
         "diameter": 100,
         "color": "#C9A961",
         "assignments": {
-          "g-106": 0
+          "g-133": 0
         }
       }
     ],
@@ -364,6 +363,7 @@
         "display": "Brooks Williams",
         "side": "bride",
         "categories": [
+          "bride",
           "cat-wedding-party",
           "sweetheart_table"
         ],
@@ -385,6 +385,7 @@
         "display": "Carter Okonkwo",
         "side": "groom",
         "categories": [
+          "groom",
           "cat-wedding-party",
           "sweetheart_table"
         ],
@@ -3348,77 +3349,77 @@
       "g-098": "t_round_04",
       "g-013": "t_round_08",
       "g-049": "t_round_08",
-      "g-016": "t_round_15",
-      "g-017": "t_round_15",
-      "g-018": "t_round_15",
+      "g-016": "t_round_08",
+      "g-017": "t_round_08",
+      "g-018": "t_round_08",
       "g-139": "t_round_11",
       "g-140": "t_round_11",
       "g-141": "t_round_11",
-      "g-020": "t_round_07",
-      "g-021": "t_round_07",
-      "g-023": "t_round_07",
-      "g-024": "t_round_07",
-      "g-026": "t_round_10",
-      "g-027": "t_round_10",
-      "g-029": "t_round_09",
-      "g-030": "t_round_09",
-      "g-032": "t_round_07",
-      "g-033": "t_round_07",
-      "g-035": "t_round_05",
-      "g-036": "t_round_05",
-      "g-038": "t_round_15",
-      "g-039": "t_round_15",
-      "g-041": "t_round_05",
-      "g-042": "t_round_05",
-      "g-044": "t_round_06",
-      "g-045": "t_round_06",
-      "g-052": "t_round_05",
-      "g-053": "t_round_05",
-      "g-055": "t_round_08",
-      "g-056": "t_round_08",
-      "g-058": "t_round_06",
-      "g-059": "t_round_06",
-      "g-061": "t_round_09",
-      "g-062": "t_round_09",
-      "g-064": "t_round_08",
-      "g-065": "t_round_08",
-      "g-067": "t_round_06",
-      "g-068": "t_round_06",
-      "g-070": "t_round_06",
-      "g-071": "t_round_06",
-      "g-073": "t_round_09",
-      "g-074": "t_round_09",
+      "g-020": "t_round_09",
+      "g-021": "t_round_09",
+      "g-023": "t_round_10",
+      "g-024": "t_round_10",
+      "g-026": "t_round_06",
+      "g-027": "t_round_06",
+      "g-029": "t_round_08",
+      "g-030": "t_round_08",
+      "g-032": "t_round_06",
+      "g-033": "t_round_06",
+      "g-035": "t_round_07",
+      "g-036": "t_round_07",
+      "g-038": "t_round_13",
+      "g-039": "t_round_13",
+      "g-041": "t_round_10",
+      "g-042": "t_round_10",
+      "g-044": "t_round_07",
+      "g-045": "t_round_07",
+      "g-052": "t_round_06",
+      "g-053": "t_round_06",
+      "g-055": "t_round_09",
+      "g-056": "t_round_09",
+      "g-058": "t_round_07",
+      "g-059": "t_round_07",
+      "g-061": "t_round_06",
+      "g-062": "t_round_06",
+      "g-064": "t_round_09",
+      "g-065": "t_round_09",
+      "g-067": "t_round_07",
+      "g-068": "t_round_07",
+      "g-070": "t_round_10",
+      "g-071": "t_round_10",
+      "g-073": "t_round_10",
+      "g-074": "t_round_10",
       "g-076": "t_round_09",
       "g-077": "t_round_09",
-      "g-116": "t_round_11",
-      "g-117": "t_round_11",
+      "g-116": "t_round_14",
+      "g-117": "t_round_14",
       "g-119": "t_round_14",
       "g-120": "t_round_14",
-      "g-122": "t_round_12",
-      "g-123": "t_round_12",
+      "g-122": "t_round_14",
+      "g-123": "t_round_14",
       "g-125": "t_round_14",
       "g-126": "t_round_14",
-      "g-128": "t_round_14",
-      "g-129": "t_round_14",
+      "g-128": "t_round_12",
+      "g-129": "t_round_12",
       "g-131": "t_round_11",
       "g-132": "t_round_11",
-      "g-136": "t_round_14",
-      "g-137": "t_round_14",
-      "g-014": "t_round_07",
-      "g-050": "t_round_15",
-      "g-046": "t_round_08",
-      "g-047": "t_round_05",
+      "g-136": "t_round_11",
+      "g-137": "t_round_11",
+      "g-014": "t_round_05",
+      "g-050": "t_round_13",
+      "g-046": "t_round_13",
+      "g-047": "t_round_13",
       "g-048": "t_round_08",
-      "g-078": "t_round_15",
-      "g-079": "t_round_15",
-      "g-080": "t_round_05",
-      "g-084": "t_round_12",
+      "g-078": "t_round_13",
+      "g-079": "t_round_13",
+      "g-080": "t_round_13",
+      "g-084": "t_round_11",
       "g-095": "t_round_12",
-      "g-106": "t_round_16",
-      "g-133": "t_round_12",
-      "g-134": "t_round_11",
+      "g-106": "t_round_05",
+      "g-133": "t_round_16",
+      "g-134": "t_round_12",
       "g-142": "t_round_12",
-      "g-143": "t_round_13",
+      "g-143": "t_round_12",
       "g-144": "t_round_12",
       "g-145": "t_round_12"
     },
@@ -3482,115 +3483,105 @@
       "t_round_08": [
         "g-013",
         "g-049",
-        "g-055",
-        "g-056",
-        "g-064",
-        "g-065",
-        "g-046",
-        "g-048"
-      ],
-      "t_round_15": [
         "g-016",
         "g-017",
         "g-018",
-        "g-038",
-        "g-039",
-        "g-050",
-        "g-078",
-        "g-079"
+        "g-029",
+        "g-030",
+        "g-048"
       ],
       "t_round_11": [
         "g-139",
         "g-140",
         "g-141",
-        "g-116",
-        "g-117",
         "g-131",
         "g-132",
-        "g-134"
-      ],
-      "t_round_07": [
-        "g-020",
-        "g-021",
-        "g-023",
-        "g-024",
-        "g-032",
-        "g-033",
-        "g-014",
-        null
-      ],
-      "t_round_10": [
-        "g-026",
-        "g-027",
-        null,
-        null,
-        null,
-        null,
-        null,
-        null
+        "g-136",
+        "g-137",
+        "g-084"
       ],
       "t_round_09": [
-        "g-029",
-        "g-030",
-        "g-061",
-        "g-062",
-        "g-073",
-        "g-074",
+        "g-020",
+        "g-021",
+        "g-055",
+        "g-056",
+        "g-064",
+        "g-065",
         "g-076",
         "g-077"
       ],
-      "t_round_05": [
-        "g-035",
-        "g-036",
+      "t_round_10": [
+        "g-023",
+        "g-024",
         "g-041",
         "g-042",
-        "g-052",
-        "g-053",
-        "g-047",
-        "g-080"
+        "g-070",
+        "g-071",
+        "g-073",
+        "g-074"
       ],
       "t_round_06": [
+        "g-026",
+        "g-027",
+        "g-032",
+        "g-033",
+        "g-052",
+        "g-053",
+        "g-061",
+        "g-062"
+      ],
+      "t_round_07": [
+        "g-035",
+        "g-036",
         "g-044",
         "g-045",
         "g-058",
         "g-059",
         "g-067",
-        "g-068",
-        "g-070",
-        "g-071"
+        "g-068"
+      ],
+      "t_round_13": [
+        "g-038",
+        "g-039",
+        "g-050",
+        "g-046",
+        "g-047",
+        "g-078",
+        "g-079",
+        "g-080"
       ],
       "t_round_14": [
+        "g-116",
+        "g-117",
         "g-119",
         "g-120",
-        "g-125",
-        "g-126",
-        "g-128",
-        "g-129",
-        "g-136",
-        "g-137"
-      ],
-      "t_round_12": [
         "g-122",
         "g-123",
-        "g-084",
+        "g-125",
+        "g-126"
+      ],
+      "t_round_12": [
+        "g-128",
+        "g-129",
         "g-095",
-        "g-133",
+        "g-134",
         "g-142",
+        "g-143",
         "g-144",
         "g-145"
       ],
-      "t_round_16": [
+      "t_round_05": [
+        "g-014",
         "g-106",
         null,
         null,
         null,
         null,
         null,
-        null,
         null
       ],
-      "t_round_13": [
-        "g-143",
+      "t_round_16": [
+        "g-133",
         null,
         null,
         null,
@@ -3600,7 +3591,7 @@
         null
       ]
     },
-    "score": 25081.13171246052,
+    "score": 25115.45865286512,
     "scorecard": {
       "overallPercent": 100,
       "overallLabel": "Perfect",
@@ -3662,7 +3653,7 @@
               "g-014"
             ],
             "status": "satisfied",
-            "score": 23.333333333333332,
+            "score": 50,
             "description": "Keep Margaret Williams apart from James Williams",
             "details": "No conflicts"
           },
@@ -3815,7 +3806,7 @@
           "id": "p-015",
           "names": "Owen & Sophie & Mia",
           "together": true,
-          "tableName": "Table 15",
+          "tableName": "Table 8",
           "guestIds": [
             "g-016",
             "g-017",
@@ -3828,7 +3819,7 @@
           "id": "p-019",
           "names": "Helen & Robert",
           "together": true,
-          "tableName": "Table 7",
+          "tableName": "Table 9",
           "guestIds": [
             "g-020",
             "g-021"
@@ -3840,7 +3831,7 @@
           "id": "p-022",
           "names": "Linda & Henry",
           "together": true,
-          "tableName": "Table 7",
+          "tableName": "Table 10",
           "guestIds": [
             "g-023",
             "g-024"
@@ -3852,7 +3843,7 @@
           "id": "p-025",
           "names": "Susan & Walter",
           "together": true,
-          "tableName": "Table 10",
+          "tableName": "Table 6",
           "guestIds": [
             "g-026",
             "g-027"
@@ -3864,7 +3855,7 @@
           "id": "p-028",
           "names": "Carol & Edward",
           "together": true,
-          "tableName": "Table 9",
+          "tableName": "Table 8",
           "guestIds": [
             "g-029",
             "g-030"
@@ -3876,7 +3867,7 @@
           "id": "p-031",
           "names": "Barbara & Frank",
           "together": true,
-          "tableName": "Table 7",
+          "tableName": "Table 6",
           "guestIds": [
             "g-032",
             "g-033"
@@ -3888,7 +3879,7 @@
           "id": "p-034",
           "names": "Sandra & Albert",
           "together": true,
-          "tableName": "Table 5",
+          "tableName": "Table 7",
           "guestIds": [
             "g-035",
             "g-036"
@@ -3900,7 +3891,7 @@
           "id": "p-037",
           "names": "Priya & Arjun",
           "together": true,
-          "tableName": "Table 15",
+          "tableName": "Table 13",
           "guestIds": [
             "g-038",
             "g-039"
@@ -3912,7 +3903,7 @@
           "id": "p-040",
           "names": "Mei & Daniel",
           "together": true,
-          "tableName": "Table 5",
+          "tableName": "Table 10",
           "guestIds": [
             "g-041",
             "g-042"
@@ -3924,7 +3915,7 @@
           "id": "p-043",
           "names": "Hana & Marcus",
           "together": true,
-          "tableName": "Table 6",
+          "tableName": "Table 7",
           "guestIds": [
             "g-044",
             "g-045"
@@ -3936,7 +3927,7 @@
           "id": "p-051",
           "names": "Ifeoma & Diego",
           "together": true,
-          "tableName": "Table 5",
+          "tableName": "Table 6",
           "guestIds": [
             "g-052",
             "g-053"
@@ -3948,7 +3939,7 @@
           "id": "p-054",
           "names": "Amara & Aaron",
           "together": true,
-          "tableName": "Table 8",
+          "tableName": "Table 9",
           "guestIds": [
             "g-055",
             "g-056"
@@ -3960,7 +3951,7 @@
           "id": "p-057",
           "names": "Folake & Idris",
           "together": true,
-          "tableName": "Table 6",
+          "tableName": "Table 7",
           "guestIds": [
             "g-058",
             "g-059"
@@ -3972,7 +3963,7 @@
           "id": "p-060",
           "names": "Sarah & Eli",
           "together": true,
-          "tableName": "Table 9",
+          "tableName": "Table 6",
           "guestIds": [
             "g-061",
             "g-062"
@@ -3984,7 +3975,7 @@
           "id": "p-063",
           "names": "Naomi & Asher",
           "together": true,
-          "tableName": "Table 8",
+          "tableName": "Table 9",
           "guestIds": [
             "g-064",
             "g-065"
@@ -3996,7 +3987,7 @@
           "id": "p-066",
           "names": "Sofia & Mateo",
           "together": true,
-          "tableName": "Table 6",
+          "tableName": "Table 7",
           "guestIds": [
             "g-067",
             "g-068"
@@ -4008,7 +3999,7 @@
           "id": "p-069",
           "names": "Camila & Carlos",
           "together": true,
-          "tableName": "Table 6",
+          "tableName": "Table 10",
           "guestIds": [
             "g-070",
             "g-071"
@@ -4020,7 +4011,7 @@
           "id": "p-072",
           "names": "Chiamaka & Femi",
           "together": true,
-          "tableName": "Table 9",
+          "tableName": "Table 10",
           "guestIds": [
             "g-073",
             "g-074"
@@ -4044,7 +4035,7 @@
           "id": "p-115",
           "names": "Beverly & George",
           "together": true,
-          "tableName": "Table 11",
+          "tableName": "Table 14",
           "guestIds": [
             "g-116",
             "g-117"
@@ -4068,7 +4059,7 @@
           "id": "p-121",
           "names": "Catherine & Thomas",
           "together": true,
-          "tableName": "Table 12",
+          "tableName": "Table 14",
           "guestIds": [
             "g-122",
             "g-123"
@@ -4092,7 +4083,7 @@
           "id": "p-127",
           "names": "Ruth & Frederick",
           "together": true,
-          "tableName": "Table 14",
+          "tableName": "Table 12",
           "guestIds": [
             "g-128",
             "g-129"
@@ -4116,7 +4107,7 @@
           "id": "p-135",
           "names": "Yasmin & Plus",
           "together": true,
-          "tableName": "Table 14",
+          "tableName": "Table 11",
           "guestIds": [
             "g-136",
             "g-137"
