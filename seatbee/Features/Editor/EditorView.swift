@@ -212,13 +212,22 @@ struct EditorView: View {
     // MARK: - Top Bar
 
     private var topBar: some View {
-        HStack(spacing: 10) {
+        // Spacing tightened from 10 → 6 to claw back ~24pt for the
+        // event-name title — was getting truncated to "tst…" at 5
+        // characters with the wider gap. Title also gets layoutPriority
+        // and minimumScaleFactor so long names shrink to fit before
+        // truncating.
+        HStack(spacing: 6) {
             Text(plan?.name ?? "")
                 .font(SBFont.displayNav)
                 .foregroundStyle(Color.sbCharcoal)
                 .lineLimit(1)
+                .truncationMode(.tail)
+                .minimumScaleFactor(0.7)
+                .layoutPriority(1)
+                .padding(.trailing, 4)
 
-            Spacer()
+            Spacer(minLength: 4)
 
             Button { appState.undo(); HapticEngine.light() } label: {
                 Image(systemName: "arrow.uturn.backward")
