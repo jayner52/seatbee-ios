@@ -1113,10 +1113,34 @@ struct TraceShapeSheet: View {
         let originX: Double
         let originY: Double
         if pts.count >= 2 {
-            let minX = pts.map(\.x).min() ?? 0
-            let maxX = pts.map(\.x).max() ?? roomWidth
-            let minY = pts.map(\.y).min() ?? 0
-            let maxY = pts.map(\.y).max() ?? roomHeight
+            // Walk corners AND arc apexes — a curved wall can bulge past
+            // the chord endpoints (sagitta), and if we only fit the
+            // corners the apex sticks off-canvas where the user can't
+            // grab the curve handle.
+            var minX = Double.infinity, maxX = -Double.infinity
+            var minY = Double.infinity, maxY = -Double.infinity
+            for (i, p) in pts.enumerated() {
+                if p.x < minX { minX = p.x }
+                if p.x > maxX { maxX = p.x }
+                if p.y < minY { minY = p.y }
+                if p.y > maxY { maxY = p.y }
+                if let arc = p.arc, i > 0 {
+                    let prev = pts[i - 1]
+                    let apex = arcApex(start: prev, end: p, arc: arc)
+                    if apex.x < minX { minX = apex.x }
+                    if apex.x > maxX { maxX = apex.x }
+                    if apex.y < minY { minY = apex.y }
+                    if apex.y > maxY { maxY = apex.y }
+                }
+            }
+            // Closing segment can also be an arc (when pts[0].arc != nil).
+            if let firstArc = pts.first?.arc, pts.count >= 2 {
+                let apex = arcApex(start: pts[pts.count - 1], end: pts[0], arc: firstArc)
+                if apex.x < minX { minX = apex.x }
+                if apex.x > maxX { maxX = apex.x }
+                if apex.y < minY { minY = apex.y }
+                if apex.y > maxY { maxY = apex.y }
+            }
             fitW = max(maxX - minX, 1)
             fitH = max(maxY - minY, 1)
             originX = minX
