@@ -222,20 +222,35 @@ final class AIService {
             "side_together":     "side-stays-together rule",
         ]
 
+        // Per-rule-type minimum membership for "rule still meaningful".
+        // A must_together with one survivor isn't a rule — it's a
+        // solo guest the AI would interpret as "needs a partner",
+        // which is exactly the false-positive Jayne hit ("Layla,
+        // your partner declined" — there IS no rule anymore).
+        let minGuestsByType: [String: Int] = [
+            "must_together":   2,
+            "prefer_together": 2,
+            "must_not":        2,
+            "seat_adjacent":   2,
+            "must_table":      1,
+            "near_table":      1,
+            "near_object":     1,
+        ]
+
         let rulesPayload: [[String: Any]] = plan.rules
             .filter { $0.enabled }
             .compactMap { r -> [String: Any]? in
                 let scrubbedGuests = r.guests.filter { !declinedIds.contains($0) }
                 let scrubbedSideA  = (r.sideA ?? []).filter { !declinedIds.contains($0) }
                 let scrubbedSideB  = (r.sideB ?? []).filter { !declinedIds.contains($0) }
-                // Drop rules whose surviving membership fell to zero
-                // — they'd register as phantom constraints. Side rules
-                // survive while at least one side has anyone; category
-                // rules survive regardless (they reference category id
-                // not guest list).
-                let hasGuests = !scrubbedGuests.isEmpty
+                let minRequired = minGuestsByType[r.type.rawValue] ?? 0
+                let hasGuests = scrubbedGuests.count >= max(minRequired, 1)
                 let hasSides = !scrubbedSideA.isEmpty || !scrubbedSideB.isEmpty
-                if !hasGuests && !hasSides && r.type.rawValue != "category_together" {
+                let isCategoryRule = r.type.rawValue == "category_together"
+                // Drop rules whose surviving membership falls below the
+                // type's minimum — model never sees them, never invents
+                // commentary about them.
+                if !hasGuests && !hasSides && !isCategoryRule {
                     return nil
                 }
                 let kind = kindByType[r.type.rawValue]
