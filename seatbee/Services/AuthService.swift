@@ -62,7 +62,12 @@ final class AuthService {
     //   - signup_platform: 'ios'   (replaces web's 'web' for this user)
     //   - tos_agreed_at: now       (Apple/Google/OTP imply TOS — link in
     //                                the consent sheet for #3 backs this up)
-    //   - email_marketing_opt_in: false (default; user can flip in Settings)
+    //   - email_marketing_opt_in: true (matches the pre-checked toggle
+    //     the user sees on the SignupConsentView a moment later — and
+    //     web parity, which writes true at signup time. The consent
+    //     sheet's Continue button overwrites with the user's actual
+    //     choice; this default just covers the dismiss-without-submit
+    //     edge case so the visual state never lies to the user.)
     //   - user_roles: []           (collected by the post-auth role sheet)
     //
     // Gated by `accountAgeSec < 60` so re-auth on returning sessions never
@@ -90,7 +95,7 @@ final class AuthService {
         let payload = ProfilePayload(
             signup_platform: "ios",
             tos_agreed_at: ISO8601DateFormatter().string(from: Date()),
-            email_marketing_opt_in: false,
+            email_marketing_opt_in: true,
             user_roles: [],
             full_name: nameToStore
         )
