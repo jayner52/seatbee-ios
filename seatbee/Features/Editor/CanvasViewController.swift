@@ -57,15 +57,19 @@ class CanvasViewController: UIViewController, UIScrollViewDelegate {
     private let alignmentEdgeGuides   = CAShapeLayer()
     private static let alignSnapThreshold: CGFloat = 8
 
-    // Ruler overlay — gold tick marks + unit labels along the top and
-    // left edges of the room rect. Toggled via setRulerVisible(_:unit:).
-    // Strokes live in `rulerLayer`; labels are individual CATextLayers
-    // rebuilt on every relevant update so we don't have to reposition
-    // 50+ tick labels frame-by-frame.
+    // Ruler overlay — gold tick marks + unit labels sitting just OUTSIDE
+    // the top and left edges of the room's actual bounding box. Toggled
+    // via setRulerVisible(_:unit:). Strokes live in `rulerLayer`; labels
+    // are individual CATextLayers rebuilt on every relevant update so we
+    // don't have to reposition 50+ tick labels frame-by-frame.
     private let rulerLayer = CAShapeLayer()
     private var rulerLabels: [CATextLayer] = []
     private var rulerVisible = false
     private var rulerUnit: String?
+    /// Tight bounding box of the rendered room outline in canvas coords
+    /// (post-canvasOrigin translation). Driven by updateRoom — for custom
+    /// polygons this tracks the actual scaled extent, not the rect dims.
+    private var currentRoomBounds: CGRect = .zero
 
     // Snapshots of the most recent table / object data so the guide
     // calculator can iterate without poking through the visual views.
@@ -236,9 +240,16 @@ class CanvasViewController: UIViewController, UIScrollViewDelegate {
             )
             // Translate to canvasOrigin so the room aligns with table x/y.
             var transform = CGAffineTransform(translationX: canvasOrigin.x, y: canvasOrigin.y)
-            roomOutlineLayer.path = path.cgPath.copy(using: &transform)
+            let translated = path.cgPath.copy(using: &transform)
+            roomOutlineLayer.path = translated
+            // Tight bounding box of the rendered shape — this is what the
+            // ruler measures against. For custom polygons that have been
+            // scaled in the trace sheet, this picks up the new extent
+            // even though roomWidth/roomHeight (the rect dims) didn't change.
+            currentRoomBounds = translated?.boundingBoxOfPath ?? .zero
         } else {
             roomOutlineLayer.path = nil
+            currentRoomBounds = .zero
         }
 
         // Zones
@@ -307,9 +318,9 @@ class CanvasViewController: UIViewController, UIScrollViewDelegate {
             rulerLabels.removeAll()
             return
         }
-        // Room not sized yet — wait for updateRoom to provide
-        // dimensions; nothing to draw against.
-        guard currentRoomWidth > 0, currentRoomHeight > 0 else { return }
+        // Room not sized yet — wait for updateRoom to provide a bounding
+        // box; nothing to draw against.
+        guard currentRoomBounds.width > 0, currentRoomBounds.height > 0 else { return }
 
         let factor = CGFloat(RoomScale.factor(for: rulerUnit))
         let unitLabel = RoomScale.unitLabel(for: rulerUnit)
@@ -323,38 +334,44 @@ class CanvasViewController: UIViewController, UIScrollViewDelegate {
         for label in rulerLabels { label.removeFromSuperlayer() }
         rulerLabels.removeAll()
 
-        // Top ruler: ticks hang DOWN from the top edge of the room
-        // into the canvas; labels sit just below the tick.
-        let topY = canvasOrigin.y
+        // Anchor to the rendered room's actual bbox so scaled custom
+        // polygons get a ruler that wraps the new extent — not the
+        // original (now-stale) roomWidth/roomHeight rect.
+        let bounds = currentRoomBounds
+        // Top ruler: sits 4pt above the room. Ticks point UP (outward),
+        // labels sit above the ticks. This way the room interior stays
+        // clean and the ruler reads as scale, not chrome.
+        let topY = bounds.minY - 4
         var u: CGFloat = 0
-        let widthInUnits = currentRoomWidth / factor
+        let widthInUnits = bounds.width / factor
         while u <= widthInUnits + 0.001 {
-            let x = canvasOrigin.x + u * factor
+            let x = bounds.minX + u * factor
             let isMajor = abs((u / majorStep).rounded() - (u / majorStep)) < 0.001
             let tickLen: CGFloat = isMajor ? 6 : 3
             path.move(to: CGPoint(x: x, y: topY))
-            path.addLine(to: CGPoint(x: x, y: topY + tickLen))
+            path.addLine(to: CGPoint(x: x, y: topY - tickLen))
             if isMajor && u > 0 {
-                addRulerLabel(at: CGPoint(x: x + 2, y: topY + tickLen + 1),
+                addRulerLabel(at: CGPoint(x: x + 2, y: topY - tickLen - 12),
                               text: rulerLabelText(value: u, unit: unitLabel))
             }
             u += minorStep
         }
 
-        // Left ruler: ticks point RIGHT from the left edge; labels
-        // sit just to the right of the tick.
-        let leftX = canvasOrigin.x
+        // Left ruler: sits 4pt left of the room. Ticks point LEFT
+        // (outward), labels sit to the left of the ticks.
+        let leftX = bounds.minX - 4
         u = 0
-        let heightInUnits = currentRoomHeight / factor
+        let heightInUnits = bounds.height / factor
         while u <= heightInUnits + 0.001 {
-            let y = canvasOrigin.y + u * factor
+            let y = bounds.minY + u * factor
             let isMajor = abs((u / majorStep).rounded() - (u / majorStep)) < 0.001
             let tickLen: CGFloat = isMajor ? 6 : 3
             path.move(to: CGPoint(x: leftX, y: y))
-            path.addLine(to: CGPoint(x: leftX + tickLen, y: y))
+            path.addLine(to: CGPoint(x: leftX - tickLen, y: y))
             if isMajor && u > 0 {
-                addRulerLabel(at: CGPoint(x: leftX + tickLen + 1, y: y - 5),
-                              text: rulerLabelText(value: u, unit: unitLabel))
+                addRulerLabel(at: CGPoint(x: leftX - tickLen - 34, y: y - 5),
+                              text: rulerLabelText(value: u, unit: unitLabel),
+                              align: .right)
             }
             u += minorStep
         }
@@ -375,12 +392,13 @@ class CanvasViewController: UIViewController, UIScrollViewDelegate {
         return String(format: "%.1f %@", Double(value), unit)
     }
 
-    private func addRulerLabel(at origin: CGPoint, text: String) {
+    private func addRulerLabel(at origin: CGPoint, text: String, align: CATextLayerAlignmentMode = .left) {
         let label = CATextLayer()
         label.contentsScale = UIScreen.main.scale
         label.string = text
         label.font = UIFont.systemFont(ofSize: 9, weight: .regular)
         label.fontSize = 9
+        label.alignmentMode = align
         // sbCharcoal at 70% alpha — readable against the ivory
         // canvas without competing with table glyphs.
         label.foregroundColor = UIColor(red: 45/255, green: 45/255, blue: 45/255, alpha: 0.7).cgColor
@@ -569,6 +587,18 @@ class CanvasViewController: UIViewController, UIScrollViewDelegate {
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         recomputeMinZoom()
+        // Generous contentInset on every side lets the user pan any part
+        // of the canvas to any position on screen — including pulling
+        // the room down from under the toolbar overlay. Without this,
+        // contentOffset is clamped to [0, contentSize - viewport] and
+        // a polygon that sits at the top of the canvas can't be slid
+        // visually downward.
+        let hInset = scrollView.bounds.width * 0.6
+        let vInset = scrollView.bounds.height * 0.6
+        let newInset = UIEdgeInsets(top: vInset, left: hInset, bottom: vInset, right: hInset)
+        if scrollView.contentInset != newInset {
+            scrollView.contentInset = newInset
+        }
         // First time we have both a sized scrollView and any content,
         // either restore the user's last viewport for this plan or
         // auto-fit so they see the whole layout. Restore wins so users

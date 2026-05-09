@@ -384,6 +384,12 @@ struct RoomSetupSheet: View {
             if let traced = workingPoints { return traced }
             let saved = appState.activePlan?.customRoomPoints
             if let saved = saved, !saved.isEmpty {
+                // Always trust saved points when the plan is in custom shape
+                // mode — user explicitly authored them and may have scaled
+                // or rotated them past the rect dims. The bbox-vs-dims check
+                // below is only a heuristic to detect stale points left
+                // behind when the user switched presets without re-tracing.
+                if selectedShape == "custom" { return saved }
                 let maxX = saved.map(\.x).max() ?? 0
                 let maxY = saved.map(\.y).max() ?? 0
                 let widthMatches = widthPx > 0 && abs(maxX - widthPx) / widthPx < 0.15
@@ -459,6 +465,25 @@ struct RoomSetupSheet: View {
         if let shape = plan.roomShape, !shape.isEmpty { selectedShape = shape }
         flipH = plan.roomFlipH ?? false
         flipV = plan.roomFlipV ?? false
+        // Decode the saved floor plan into local state so the trace sheet
+        // shows it as a backdrop for tracing — without this, an existing
+        // plan's uploaded floor plan was invisible inside Edit Shape.
+        if floorPlanImage == nil,
+           let raw = plan.rawFloorPlanImage?.value as? String,
+           let image = decodeBase64ImageDataURL(raw) {
+            floorPlanImage = image
+        }
+    }
+
+    /// Decode a base64 `data:image/...` URL string into a UIImage. Web
+    /// persists floor plans this way (so they round-trip through Supabase
+    /// JSONB without external storage). Returns nil if the prefix is
+    /// missing or the bytes don't form a valid image.
+    private func decodeBase64ImageDataURL(_ raw: String) -> UIImage? {
+        guard let comma = raw.firstIndex(of: ",") else { return nil }
+        let b64 = String(raw[raw.index(after: comma)...])
+        guard let data = Data(base64Encoded: b64) else { return nil }
+        return UIImage(data: data)
     }
 
     private func applySetup() {
@@ -721,6 +746,14 @@ struct TraceShapeSheet: View {
     @State private var flipV = false
     @State private var draggingIndex: Int? = nil
     @State private var pendingDelete: Int? = nil
+    /// User-controlled zoom on top of the auto-fit base scale. 1.0 = fit
+    /// the whole shape to canvas; >1.0 zooms in for fine-detail editing.
+    @State private var userZoom: CGFloat = 1.0
+    @State private var lastZoom: CGFloat = 1.0
+    /// User-controlled pan offset applied after auto-fit centering, so
+    /// the user can drag the canvas around when zoomed in.
+    @State private var panOffset: CGSize = .zero
+    @State private var lastPanOffset: CGSize = .zero
 
     private var unitLabel: String { RoomScale.unitLabel(for: measurementUnit) }
     private var pixelsPerUnit: Double { RoomScale.factor(for: measurementUnit) }
@@ -802,7 +835,7 @@ struct TraceShapeSheet: View {
                 .font(SBFont.capsLabel)
                 .foregroundStyle(Color.sbWarm)
                 .letterSpacing(1.5)
-            Text("Tap a wall to add a corner · Double-tap to curve · Drag corners to move · Long-press to delete")
+            Text("Tap a wall to add a corner · Double-tap to curve · Tap the curve handle to flip · Drag handle to adjust depth · Long-press a corner to delete · Pinch to zoom, drag to pan")
                 .font(SBFont.caption)
                 .foregroundStyle(Color.sbCharcoal)
         }
@@ -866,11 +899,12 @@ struct TraceShapeSheet: View {
                     .allowsHitTesting(false)
             }
 
-            // Tap-to-add-corner / double-tap-to-curve: shared transparent
-            // layer covering the canvas. Single tap on a wall inserts a
-            // corner; double tap on a wall toggles a curve (semicircle by
-            // default, sweep outward). count:2 is checked first so the
-            // single-tap handler defers automatically.
+            // Tap-to-add-corner / double-tap-to-curve / drag-to-pan:
+            // shared transparent layer covering the canvas. Single tap
+            // on a wall inserts a corner; double tap toggles a curve;
+            // drag on empty area pans the canvas (10pt threshold so a
+            // tap doesn't accidentally pan). Pinch zooms via the
+            // simultaneous magnification gesture below.
             Color.clear
                 .contentShape(Rectangle())
                 .onTapGesture(count: 2) { location in
@@ -883,6 +917,23 @@ struct TraceShapeSheet: View {
                         insertCorner(after: edgeIndex, at: location, layout: layout)
                     }
                 }
+                .simultaneousGesture(
+                    DragGesture(minimumDistance: 10)
+                        .onChanged { value in
+                            panOffset = CGSize(
+                                width: lastPanOffset.width + value.translation.width,
+                                height: lastPanOffset.height + value.translation.height
+                            )
+                        }
+                        .onEnded { _ in lastPanOffset = panOffset }
+                )
+                .simultaneousGesture(
+                    MagnificationGesture()
+                        .onChanged { value in
+                            userZoom = max(1.0, min(8.0, lastZoom * value))
+                        }
+                        .onEnded { _ in lastZoom = userZoom }
+                )
 
             // Corner handles. Drawn last so they sit above the tap layer.
             ForEach(displayedPoints.indices, id: \.self) { i in
@@ -895,9 +946,74 @@ struct TraceShapeSheet: View {
                         else { HapticEngine.error() }
                     }
             }
+
+            // Arc apex handles — one per curved wall. The handle is the
+            // canonical control for an existing curve:
+            //   • TAP   → flip the bulge to the other side of the chord
+            //   • DRAG  → adjust depth (drag past the chord also flips)
+            // Smaller than corner handles so they read as adjustments,
+            // not anchors. Double-tap on the wall itself just adds /
+            // removes the curve — once it exists, the handle takes over.
+            ForEach(displayedPoints.indices, id: \.self) { i in
+                if let arc = displayedPoints[i].arc {
+                    let prev = displayedPoints[(i - 1 + displayedPoints.count) % displayedPoints.count]
+                    let curr = displayedPoints[i]
+                    let apexRoom = arcApex(start: prev, end: curr, arc: arc)
+                    let apexScreen = CGPoint(
+                        x: apexRoom.x * layout.scale + layout.offsetX,
+                        y: apexRoom.y * layout.scale + layout.offsetY
+                    )
+                    let underlyingIdx = underlyingIndex(forDisplayed: i)
+                    arcApexHandle()
+                        .position(apexScreen)
+                        .gesture(arcApexDragGesture(forEndIndex: underlyingIdx, layout: layout))
+                        .onTapGesture { flipArcDirection(forEndIndex: underlyingIdx) }
+                }
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .clipped()
+        .overlay(alignment: .topTrailing) {
+            // Floating "fit to shape" button — only appears when the user
+            // has zoomed or panned away from the auto-fit default. One
+            // tap snaps everything back to a clean view of the polygon.
+            if userZoom > 1.01 || panOffset != .zero {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        userZoom = 1
+                        lastZoom = 1
+                        panOffset = .zero
+                        lastPanOffset = .zero
+                    }
+                    HapticEngine.light()
+                } label: {
+                    Image(systemName: "arrow.up.left.and.arrow.down.right.magnifyingglass")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(Color.sbGoldDk)
+                        .padding(8)
+                        .background(.ultraThinMaterial)
+                        .clipShape(Circle())
+                        .shadow(color: .black.opacity(0.12), radius: 2, x: 0, y: 1)
+                }
+                .padding(8)
+            }
+        }
+    }
+
+    private func arcApexHandle() -> some View {
+        ZStack {
+            Circle()
+                .fill(Color.sbIvory)
+                .frame(width: 18, height: 18)
+                .shadow(color: .black.opacity(0.18), radius: 2, x: 0, y: 1)
+            Circle()
+                .strokeBorder(Color.sbGoldDk, lineWidth: 1.5)
+                .frame(width: 18, height: 18)
+            Image(systemName: "arrow.up.and.down.and.arrow.left.and.right")
+                .font(.system(size: 8, weight: .bold))
+                .foregroundStyle(Color.sbGoldDk)
+        }
+        .contentShape(Circle().inset(by: -6))
     }
 
     private func cornerHandle(index: Int, isDragging: Bool) -> some View {
@@ -1031,14 +1147,72 @@ struct TraceShapeSheet: View {
     }
 
     private func canvasLayout(canvasSize: CGSize) -> CanvasLayout {
-        let margin: Double = 30
+        // Margin reserves space for corner handles (28pt circles) and arc
+        // apex handles to extend past the polygon edge without clipping.
+        let margin: Double = 36
         let availW = max(canvasSize.width - 2 * margin, 1)
         let availH = max(canvasSize.height - 2 * margin, 1)
-        let scale = min(availW / max(roomWidth, 1), availH / max(roomHeight, 1))
-        let drawnW = roomWidth * scale
-        let drawnH = roomHeight * scale
-        let offsetX = margin + (availW - drawnW) / 2
-        let offsetY = margin + (availH - drawnH) / 2
+        // Fit to the actual displayed-polygon bounding box, NOT to
+        // roomWidth/roomHeight. Scaling the polygon up via the Bigger
+        // tool used to push points beyond the rect — the polygon would
+        // visually clip and the user couldn't see the edges. Fitting to
+        // the live bbox keeps the whole shape on screen always. Falls
+        // back to the rect dims when no points are loaded yet.
+        let pts = displayedPoints
+        let fitW: Double
+        let fitH: Double
+        let originX: Double
+        let originY: Double
+        if pts.count >= 2 {
+            // Walk corners AND arc apexes — a curved wall can bulge past
+            // the chord endpoints (sagitta), and if we only fit the
+            // corners the apex sticks off-canvas where the user can't
+            // grab the curve handle.
+            var minX = Double.infinity, maxX = -Double.infinity
+            var minY = Double.infinity, maxY = -Double.infinity
+            for (i, p) in pts.enumerated() {
+                if p.x < minX { minX = p.x }
+                if p.x > maxX { maxX = p.x }
+                if p.y < minY { minY = p.y }
+                if p.y > maxY { maxY = p.y }
+                if let arc = p.arc, i > 0 {
+                    let prev = pts[i - 1]
+                    let apex = arcApex(start: prev, end: p, arc: arc)
+                    if apex.x < minX { minX = apex.x }
+                    if apex.x > maxX { maxX = apex.x }
+                    if apex.y < minY { minY = apex.y }
+                    if apex.y > maxY { maxY = apex.y }
+                }
+            }
+            // Closing segment can also be an arc (when pts[0].arc != nil).
+            if let firstArc = pts.first?.arc, pts.count >= 2 {
+                let apex = arcApex(start: pts[pts.count - 1], end: pts[0], arc: firstArc)
+                if apex.x < minX { minX = apex.x }
+                if apex.x > maxX { maxX = apex.x }
+                if apex.y < minY { minY = apex.y }
+                if apex.y > maxY { maxY = apex.y }
+            }
+            fitW = max(maxX - minX, 1)
+            fitH = max(maxY - minY, 1)
+            originX = minX
+            originY = minY
+        } else {
+            fitW = max(roomWidth, 1)
+            fitH = max(roomHeight, 1)
+            originX = 0
+            originY = 0
+        }
+        // Auto-fit base scale, then layer the user's pinch-zoom on top.
+        // userZoom = 1 → fit whole shape, > 1 → zoom into a region.
+        let baseScale = min(availW / fitW, availH / fitH)
+        let scale = baseScale * Double(userZoom)
+        let drawnW = fitW * scale
+        let drawnH = fitH * scale
+        // Subtract originX*scale so a point at x=originX maps to the
+        // left side of the visible canvas (polygon's leftmost edge).
+        // Pan offset comes last so dragging the canvas slides everything.
+        let offsetX = margin + (availW - drawnW) / 2 - originX * scale + Double(panOffset.width)
+        let offsetY = margin + (availH - drawnH) / 2 - originY * scale + Double(panOffset.height)
         return CanvasLayout(scale: scale, offsetX: offsetX, offsetY: offsetY)
     }
 
@@ -1215,15 +1389,11 @@ struct TraceShapeSheet: View {
     // MARK: Mutations
 
     /// Toggle a curve on the wall between displayedPoints[edgeIndex]
-    /// and displayedPoints[edgeIndex+1]. The arc lives on the END
-    /// point (web parity — the arc field on a point describes how
-    /// that point is reached from the previous one). Default is a
-    /// semicircular bulge outward from the polygon centroid; toggle
-    /// removes it. Editing curvature / direction is a follow-up.
+    /// and displayedPoints[edgeIndex+1]. Add a semicircular bulge
+    /// outward from the polygon centroid if none exists, otherwise
+    /// remove the existing curve. To FLIP an existing curve to the
+    /// other side, tap the apex handle (see flipArcDirection).
     private func toggleArcOnWall(edgeIndex: Int) {
-        // Map back to underlying-points index. displayedPoints applies
-        // flipH/V to a copy of points; we mutate `points` and let the
-        // flip pipeline reapply on render.
         guard points.count >= 3 else { return }
         let endIdx = (edgeIndex + 1) % points.count
         var working = points
@@ -1232,34 +1402,96 @@ struct TraceShapeSheet: View {
             working[endIdx] = RoomPoint(x: working[endIdx].x, y: working[endIdx].y, arc: nil)
             HapticEngine.error()
         } else {
-            // Add: chord-half radius (semicircle) with sweep chosen so
-            // the bulge points OUTWARD from the polygon centroid. That
-            // matches how room expansion typically reads — bay-window
-            // outward, not pinched inward.
-            let startIdx = edgeIndex
-            let s = working[startIdx]
+            // None → outward semicircle (bulge away from polygon centroid)
+            let s = working[edgeIndex]
             let e = working[endIdx]
             let chord = ((e.x - s.x) * (e.x - s.x) + (e.y - s.y) * (e.y - s.y)).squareRoot()
             let r = max(1, chord / 2)
             let cx = working.map(\.x).reduce(0, +) / Double(working.count)
             let cy = working.map(\.y).reduce(0, +) / Double(working.count)
-            // Midpoint of the chord
             let mx = (s.x + e.x) / 2
             let my = (s.y + e.y) / 2
-            // Cross product of (e - s) and (centroid - mid): positive
-            // means centroid is to the LEFT of the wall direction. We
-            // want the arc to bulge AWAY from the centroid, so pick
-            // sweep accordingly. SVG sweep flag: 1 = clockwise.
             let cross = (e.x - s.x) * (cy - my) - (e.y - s.y) * (cx - mx)
-            let sweep = cross > 0 ? 0 : 1
+            let outwardSweep = cross > 0 ? 0 : 1
             working[endIdx] = RoomPoint(
                 x: working[endIdx].x,
                 y: working[endIdx].y,
-                arc: RoomArc(rx: r, ry: r, sweep: sweep, largeArc: 0)
+                arc: RoomArc(rx: r, ry: r, sweep: outwardSweep, largeArc: 0)
             )
             HapticEngine.selection()
         }
         points = working
+    }
+
+    /// Flip an existing arc to the opposite side of its chord. Triggered
+    /// by tapping the apex handle. Preserves radius, just inverts sweep.
+    private func flipArcDirection(forEndIndex endIdx: Int) {
+        guard points.indices.contains(endIdx), let arc = points[endIdx].arc else { return }
+        let p = points[endIdx]
+        points[endIdx] = RoomPoint(
+            x: p.x, y: p.y,
+            arc: RoomArc(rx: arc.rx, ry: arc.ry, sweep: 1 - arc.sweep, largeArc: 0)
+        )
+        HapticEngine.selection()
+    }
+
+    /// Compute the apex of an arc in ROOM coordinates given the chord
+    /// endpoints + arc parameters. The apex is the point on the arc
+    /// that's farthest from the chord — the natural place for a
+    /// drag handle. h = sagitta = r - sqrt(r² - (chord/2)²).
+    private func arcApex(start: RoomPoint, end: RoomPoint, arc: RoomArc) -> CGPoint {
+        let dx = end.x - start.x
+        let dy = end.y - start.y
+        let chord = (dx * dx + dy * dy).squareRoot()
+        let half = chord / 2
+        let r = max(arc.rx, half) // clamp so sqrt arg can't go negative
+        let h = r - max(0, (r * r - half * half).squareRoot())
+        let mx = (start.x + end.x) / 2
+        let my = (start.y + end.y) / 2
+        let len = max(1, chord)
+        // Perpendicular to the chord, normalized. Sweep flag picks
+        // which side of the chord the arc bulges to.
+        let perpX = -dy / len
+        let perpY = dx / len
+        let sign: Double = arc.sweep == 1 ? -1 : 1
+        return CGPoint(x: mx + sign * perpX * h, y: my + sign * perpY * h)
+    }
+
+    /// User dragged the apex handle for the wall ending at `endIdx`.
+    /// Recompute the arc's radius (and sweep direction, if the user
+    /// pulled the handle past the chord to the other side) so the arc
+    /// passes through the new apex location. Result is always a
+    /// circular arc (rx == ry) since that's all we author.
+    private func updateArc(forEndIndex endIdx: Int, newApex roomApex: CGPoint) {
+        guard points.indices.contains(endIdx), points.count >= 3 else { return }
+        let startIdx = (endIdx - 1 + points.count) % points.count
+        let s = points[startIdx]
+        let e = points[endIdx]
+        let dx = e.x - s.x
+        let dy = e.y - s.y
+        let chord = (dx * dx + dy * dy).squareRoot()
+        guard chord > 0.5 else { return }
+        let half = chord / 2
+        let mx = (s.x + e.x) / 2
+        let my = (s.y + e.y) / 2
+        let len = max(1, chord)
+        let perpX = -dy / len
+        let perpY = dx / len
+        // Signed distance from chord midpoint to apex along the
+        // perpendicular. Sign tells us which side the arc bulges to.
+        let signedH = (Double(roomApex.x) - mx) * perpX + (Double(roomApex.y) - my) * perpY
+        let h = max(2.0, abs(signedH)) // floor so the arc never collapses
+        // Radius from chord half + sagitta: r = (h² + half²) / (2h)
+        let r = (h * h + half * half) / (2 * h)
+        // Existing sweep flag is sweep==1 → sign=-1 (perpendicular flipped).
+        // Recompute sweep so the arc lives on the same side the user
+        // dragged the handle to: if signedH > 0 we want sign=+1 (sweep=0),
+        // else sweep=1.
+        let sweep = signedH > 0 ? 0 : 1
+        points[endIdx] = RoomPoint(
+            x: e.x, y: e.y,
+            arc: RoomArc(rx: r, ry: r, sweep: sweep, largeArc: 0)
+        )
     }
 
     private func insertCorner(after edgeIndex: Int, at screenPoint: CGPoint, layout: CanvasLayout) {
@@ -1296,14 +1528,30 @@ struct TraceShapeSheet: View {
                 // displayedPoints index → underlying index
                 let underlyingIdx = underlyingIndex(forDisplayed: displayedIndex)
                 if points.indices.contains(underlyingIdx) {
-                    var p = points[underlyingIdx]
-                    p.x = max(0, min(roomWidth, roomPt.x))
-                    p.y = max(0, min(roomHeight, roomPt.y))
-                    points[underlyingIdx] = p
+                    // No clamp to the room rect — scaled-up polygons can
+                    // legitimately live outside [0, roomWidth/roomHeight].
+                    // The fit-to-bbox layout keeps everything visible.
+                    points[underlyingIdx] = RoomPoint(x: roomPt.x, y: roomPt.y, arc: points[underlyingIdx].arc)
                 }
             }
             .onEnded { _ in
                 draggingIndex = nil
+                HapticEngine.light()
+            }
+    }
+
+    /// Drag handle for an arc apex. Pulls the curve in or out; pulling
+    /// it across the chord flips the bulge direction. Updates the arc
+    /// in place via `updateArc`.
+    private func arcApexDragGesture(forEndIndex endIdx: Int, layout: CanvasLayout) -> some Gesture {
+        DragGesture(minimumDistance: 1)
+            .onChanged { value in
+                var roomPt = screenToRoom(value.location, layout: layout)
+                if flipH { roomPt.x = roomWidth - roomPt.x }
+                if flipV { roomPt.y = roomHeight - roomPt.y }
+                updateArc(forEndIndex: endIdx, newApex: CGPoint(x: roomPt.x, y: roomPt.y))
+            }
+            .onEnded { _ in
                 HapticEngine.light()
             }
     }
