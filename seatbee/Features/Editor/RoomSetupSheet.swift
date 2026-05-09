@@ -821,7 +821,7 @@ struct TraceShapeSheet: View {
                 .font(SBFont.capsLabel)
                 .foregroundStyle(Color.sbWarm)
                 .letterSpacing(1.5)
-            Text("Tap a wall to add a corner · Double-tap to curve / flip / clear · Drag corners or curve handles to adjust · Long-press to delete")
+            Text("Tap a wall to add a corner · Double-tap to curve · Tap the curve handle to flip · Drag handle to adjust depth · Long-press a corner to delete")
                 .font(SBFont.caption)
                 .foregroundStyle(Color.sbCharcoal)
         }
@@ -915,9 +915,13 @@ struct TraceShapeSheet: View {
                     }
             }
 
-            // Arc apex handles — one per curved wall. Dragging adjusts
-            // the depth + direction of the curve. Smaller than corner
-            // handles so they read as adjustments, not anchors.
+            // Arc apex handles — one per curved wall. The handle is the
+            // canonical control for an existing curve:
+            //   • TAP   → flip the bulge to the other side of the chord
+            //   • DRAG  → adjust depth (drag past the chord also flips)
+            // Smaller than corner handles so they read as adjustments,
+            // not anchors. Double-tap on the wall itself just adds /
+            // removes the curve — once it exists, the handle takes over.
             ForEach(displayedPoints.indices, id: \.self) { i in
                 if let arc = displayedPoints[i].arc {
                     let prev = displayedPoints[(i - 1 + displayedPoints.count) % displayedPoints.count]
@@ -927,9 +931,11 @@ struct TraceShapeSheet: View {
                         x: apexRoom.x * layout.scale + layout.offsetX,
                         y: apexRoom.y * layout.scale + layout.offsetY
                     )
+                    let underlyingIdx = underlyingIndex(forDisplayed: i)
                     arcApexHandle()
                         .position(apexScreen)
-                        .gesture(arcApexDragGesture(forEndIndex: underlyingIndex(forDisplayed: i), layout: layout))
+                        .gesture(arcApexDragGesture(forEndIndex: underlyingIdx, layout: layout))
+                        .onTapGesture { flipArcDirection(forEndIndex: underlyingIdx) }
                 }
             }
         }
@@ -1297,52 +1303,31 @@ struct TraceShapeSheet: View {
 
     // MARK: Mutations
 
-    /// Cycle the curve on the wall between displayedPoints[edgeIndex]
-    /// and displayedPoints[edgeIndex+1]. The arc lives on the END
-    /// point (web parity — the arc field on a point describes how
-    /// that point is reached from the previous one).
-    /// State machine on each double-tap:
-    ///   none → outward bulge (away from centroid)
-    ///   outward → inward bulge (flip direction)
-    ///   inward → none (clear)
-    /// Drag the apex handle for fine control of the depth + direction.
+    /// Toggle a curve on the wall between displayedPoints[edgeIndex]
+    /// and displayedPoints[edgeIndex+1]. Add a semicircular bulge
+    /// outward from the polygon centroid if none exists, otherwise
+    /// remove the existing curve. To FLIP an existing curve to the
+    /// other side, tap the apex handle (see flipArcDirection).
     private func toggleArcOnWall(edgeIndex: Int) {
         guard points.count >= 3 else { return }
         let endIdx = (edgeIndex + 1) % points.count
         var working = points
-        let startIdx = edgeIndex
-        let s = working[startIdx]
-        let e = working[endIdx]
-        let chord = ((e.x - s.x) * (e.x - s.x) + (e.y - s.y) * (e.y - s.y)).squareRoot()
-        let cx = working.map(\.x).reduce(0, +) / Double(working.count)
-        let cy = working.map(\.y).reduce(0, +) / Double(working.count)
-        let mx = (s.x + e.x) / 2
-        let my = (s.y + e.y) / 2
-        // Cross product of (e - s) and (centroid - mid): positive
-        // means centroid is to the LEFT of the wall direction.
-        // SVG sweep 1 = clockwise — for our coord system (y down),
-        // sweep == 1 puts the arc on one side; sweep == 0 the other.
-        let cross = (e.x - s.x) * (cy - my) - (e.y - s.y) * (cx - mx)
-        let outwardSweep = cross > 0 ? 0 : 1
-        let inwardSweep  = 1 - outwardSweep
-
-        if let existing = working[endIdx].arc {
-            if existing.sweep == outwardSweep {
-                // Outward → flip to inward
-                working[endIdx] = RoomPoint(
-                    x: working[endIdx].x,
-                    y: working[endIdx].y,
-                    arc: RoomArc(rx: existing.rx, ry: existing.ry, sweep: inwardSweep, largeArc: 0)
-                )
-                HapticEngine.selection()
-            } else {
-                // Inward (or any non-outward) → clear
-                working[endIdx] = RoomPoint(x: working[endIdx].x, y: working[endIdx].y, arc: nil)
-                HapticEngine.error()
-            }
+        if working[endIdx].arc != nil {
+            // Already curved → remove
+            working[endIdx] = RoomPoint(x: working[endIdx].x, y: working[endIdx].y, arc: nil)
+            HapticEngine.error()
         } else {
-            // None → outward semicircle
+            // None → outward semicircle (bulge away from polygon centroid)
+            let s = working[edgeIndex]
+            let e = working[endIdx]
+            let chord = ((e.x - s.x) * (e.x - s.x) + (e.y - s.y) * (e.y - s.y)).squareRoot()
             let r = max(1, chord / 2)
+            let cx = working.map(\.x).reduce(0, +) / Double(working.count)
+            let cy = working.map(\.y).reduce(0, +) / Double(working.count)
+            let mx = (s.x + e.x) / 2
+            let my = (s.y + e.y) / 2
+            let cross = (e.x - s.x) * (cy - my) - (e.y - s.y) * (cx - mx)
+            let outwardSweep = cross > 0 ? 0 : 1
             working[endIdx] = RoomPoint(
                 x: working[endIdx].x,
                 y: working[endIdx].y,
@@ -1351,6 +1336,18 @@ struct TraceShapeSheet: View {
             HapticEngine.selection()
         }
         points = working
+    }
+
+    /// Flip an existing arc to the opposite side of its chord. Triggered
+    /// by tapping the apex handle. Preserves radius, just inverts sweep.
+    private func flipArcDirection(forEndIndex endIdx: Int) {
+        guard points.indices.contains(endIdx), let arc = points[endIdx].arc else { return }
+        let p = points[endIdx]
+        points[endIdx] = RoomPoint(
+            x: p.x, y: p.y,
+            arc: RoomArc(rx: arc.rx, ry: arc.ry, sweep: 1 - arc.sweep, largeArc: 0)
+        )
+        HapticEngine.selection()
     }
 
     /// Compute the apex of an arc in ROOM coordinates given the chord
