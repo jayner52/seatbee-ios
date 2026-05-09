@@ -257,8 +257,14 @@ private struct TableTypeRow: View {
 
     private func sizeChip(ft: Int, selected: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Text("\(ft)ft")
+            // lineLimit(1) + fixedSize stops "10ft" from wrapping to
+            // "10f / t" when the parent HStack runs tight; a non-
+            // breaking space between the digits and "ft" keeps the
+            // glyph cluster atomic for good measure.
+            Text("\(ft)\u{00A0}ft")
                 .font(SBFont.inter(11, weight: .semibold))
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
                 .foregroundStyle(selected ? Color.white : Color.sbCharcoal)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
