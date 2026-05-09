@@ -159,6 +159,12 @@ struct GuestsView: View {
                         guestsContent
                     }
                 }
+                // Swipe-down on the list dismisses the search keyboard
+                // — without this users had no way out except tapping
+                // the tiny return key on the keyboard. Interactive
+                // mode tracks the gesture so the keyboard slides
+                // smoothly with the finger.
+                .scrollDismissesKeyboard(.interactively)
             }
             .background(Color.sbIvory)
             .task {
