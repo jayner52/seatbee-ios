@@ -384,6 +384,12 @@ struct RoomSetupSheet: View {
             if let traced = workingPoints { return traced }
             let saved = appState.activePlan?.customRoomPoints
             if let saved = saved, !saved.isEmpty {
+                // Always trust saved points when the plan is in custom shape
+                // mode — user explicitly authored them and may have scaled
+                // or rotated them past the rect dims. The bbox-vs-dims check
+                // below is only a heuristic to detect stale points left
+                // behind when the user switched presets without re-tracing.
+                if selectedShape == "custom" { return saved }
                 let maxX = saved.map(\.x).max() ?? 0
                 let maxY = saved.map(\.y).max() ?? 0
                 let widthMatches = widthPx > 0 && abs(maxX - widthPx) / widthPx < 0.15

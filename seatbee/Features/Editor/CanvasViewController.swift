@@ -587,6 +587,18 @@ class CanvasViewController: UIViewController, UIScrollViewDelegate {
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         recomputeMinZoom()
+        // Generous contentInset on every side lets the user pan any part
+        // of the canvas to any position on screen — including pulling
+        // the room down from under the toolbar overlay. Without this,
+        // contentOffset is clamped to [0, contentSize - viewport] and
+        // a polygon that sits at the top of the canvas can't be slid
+        // visually downward.
+        let hInset = scrollView.bounds.width * 0.6
+        let vInset = scrollView.bounds.height * 0.6
+        let newInset = UIEdgeInsets(top: vInset, left: hInset, bottom: vInset, right: hInset)
+        if scrollView.contentInset != newInset {
+            scrollView.contentInset = newInset
+        }
         // First time we have both a sized scrollView and any content,
         // either restore the user's last viewport for this plan or
         // auto-fit so they see the whole layout. Restore wins so users
