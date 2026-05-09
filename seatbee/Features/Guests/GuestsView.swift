@@ -42,6 +42,7 @@ struct GuestsView: View {
     @State private var showMeals = false
     @State private var showRSVP = false
     @State private var editingGuest: Guest?
+    @FocusState private var searchFocused: Bool
 
     private var plan: SeatingPlan? { appState.activePlan }
     private var guests: [Guest] { plan?.guests ?? [] }
@@ -166,7 +167,24 @@ struct GuestsView: View {
                 // smoothly with the finger.
                 .scrollDismissesKeyboard(.interactively)
             }
-            .background(Color.sbIvory)
+            .background(
+                // Tap-to-dismiss: when the search returns no matches,
+                // the scroll view has no draggable content, so swipe-
+                // down can't dismiss the keyboard. A clear tap target
+                // on the background gives users a reliable escape.
+                Color.sbIvory
+                    .ignoresSafeArea()
+                    .contentShape(Rectangle())
+                    .onTapGesture { searchFocused = false }
+            )
+            .toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") { searchFocused = false }
+                        .foregroundStyle(Color.sbGoldDk)
+                        .fontWeight(.semibold)
+                }
+            }
             .task {
                 // Auto-load active plan if not set
                 if appState.activePlan == nil {
@@ -420,6 +438,21 @@ struct GuestsView: View {
             TextField("Search guests...", text: $searchText)
                 .font(SBFont.body)
                 .textInputAutocapitalization(.never)
+                .focused($searchFocused)
+                .submitLabel(.done)
+                .onSubmit { searchFocused = false }
+            if !searchText.isEmpty {
+                Button {
+                    searchText = ""
+                    searchFocused = false
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 16))
+                        .foregroundStyle(Color.sbWarm)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Clear search")
+            }
         }
         .padding(12)
         .background(Color.sbIvory2)
