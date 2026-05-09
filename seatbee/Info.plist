@@ -25,5 +25,17 @@
 	</array>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<!-- Required by Apple App Store 5.1.1 for any code path that
+	     writes to the user's photo library. We use this when a guest
+	     saves their personal QR code from the Share screen. Without
+	     a usage description, the OS hard-crashes on first save call. -->
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Save your event's QR code or floor plan to your photo library so you can text it, print it, or attach it to invites.</string>
+	<!-- Onboarding lets users pick a floor-plan image from their
+	     library to trace their venue outline. Photos picker (PHPicker)
+	     doesn't strictly require this on iOS 14+, but we declare it so
+	     review never flags it during a permission audit. -->
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Pick a floor-plan photo from your library so you can trace your venue's outline on the canvas.</string>
 </dict>
 </plist>

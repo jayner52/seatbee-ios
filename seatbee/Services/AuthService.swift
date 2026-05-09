@@ -339,6 +339,68 @@ final class AuthService {
         }
     }
 
+    // MARK: - Account Deletion (App Store 5.1.1(v))
+    //
+    // Calls /api/delete-account on the web backend, which verifies the
+    // bearer token, then runs the same delete sequence the admin
+    // panel uses (variants → FK cleanups → master plans → auth user).
+    // The endpoint is self-serve — Apple requires the user be able to
+    // delete their own account in-app, not via email-support.
+    //
+    // On 200, signs out locally so the app returns to the auth screen.
+
+    enum DeleteAccountError: LocalizedError {
+        case unauthorized
+        case server(String)
+        case network(Error)
+
+        var errorDescription: String? {
+            switch self {
+            case .unauthorized:    return "Please sign in again before deleting your account."
+            case .server(let m):   return m
+            case .network(let e):  return e.localizedDescription
+            }
+        }
+    }
+
+    func deleteAccount() async throws {
+        guard let token = await accessToken else {
+            throw DeleteAccountError.unauthorized
+        }
+        guard let url = URL(string: "https://www.seatbee.app/api/delete-account") else {
+            throw DeleteAccountError.server("Invalid URL")
+        }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.timeoutInterval = 30
+
+        let (data, response): (Data, URLResponse)
+        do {
+            (data, response) = try await URLSession.shared.data(for: req)
+        } catch {
+            throw DeleteAccountError.network(error)
+        }
+        guard let http = response as? HTTPURLResponse else {
+            throw DeleteAccountError.server("Invalid response")
+        }
+        switch http.statusCode {
+        case 200:
+            // Server already nuked the auth record + all the data. Just
+            // clear local state so the app routes back to auth.
+            currentUser = nil
+            try? await supabase.auth.signOut()
+        case 401:
+            throw DeleteAccountError.unauthorized
+        default:
+            struct ErrorBody: Decodable { let error: String? }
+            let msg = (try? JSONDecoder().decode(ErrorBody.self, from: data))?.error
+                ?? "Server error (\(http.statusCode))"
+            throw DeleteAccountError.server(msg)
+        }
+    }
+
     // MARK: - Access Token
 
     var accessToken: String? {
