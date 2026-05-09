@@ -158,66 +158,72 @@ function addFamilyParty(name, members) {
 // bride/groom badge on guest rows reads correctly. The web solver auto-
 // synthesizes a side_together rule per side; with only one guest each
 // side, both rules trivially satisfy at the sweetheart table.
+// Special category ids 'sweetheart_table' and 'head_table' are recognised
+// by the web solver (src/lib/solve.js Phase 1.5/1.6) and pin guests to
+// those table types regardless of name. Adding them here is what actually
+// puts the couple at the sweetheart and the wedding party at head — the
+// existingAssignments map below only honours LOCKED tables, which we
+// don't lock in the demo.
 const bride = addGuest({
   firstName: 'Brooks', lastName: 'Williams',
-  side: 'bride', categories: ['cat-wedding-party'],
+  side: 'bride', categories: ['cat-wedding-party', 'sweetheart_table'],
   meal: 'Pan-Seared Salmon', vip: true, isBride: true,
 })
 const groom = addGuest({
   firstName: 'Carter', lastName: 'Okonkwo',
-  side: 'groom', categories: ['cat-wedding-party'],
+  side: 'groom', categories: ['cat-wedding-party', 'sweetheart_table'],
   meal: 'Beef Tenderloin', vip: true, isGroom: true,
 })
 
 // WEDDING PARTY — head table 10. side='both' so they don't drag side_together.
 const brideMOH = addGuest({   // bride's sister
   firstName: 'Charlotte', lastName: 'Williams',
-  side: 'both', categories: ['cat-wedding-party','cat-family'],
+  side: 'both', categories: ['cat-wedding-party','cat-family','head_table'],
   meal: 'Pan-Seared Salmon', vip: true,
 })
 const brideMaid1 = addGuest({
   firstName: 'Maya', lastName: 'Patel',
-  side: 'both', categories: ['cat-wedding-party','cat-friends'],
+  side: 'both', categories: ['cat-wedding-party','cat-friends','head_table'],
   meal: 'Vegetarian Risotto', dietaryTags: ['kosher'], vip: true,
 })
 const brideMaid2 = addGuest({
   firstName: 'Yuki', lastName: 'Tanaka',
-  side: 'both', categories: ['cat-wedding-party','cat-friends'],
+  side: 'both', categories: ['cat-wedding-party','cat-friends','head_table'],
   meal: 'Pan-Seared Salmon', vip: true,
 })
 const brideMaid3 = addGuest({
   firstName: 'Aisha', lastName: 'Khan',
-  side: 'both', categories: ['cat-wedding-party','cat-friends'],
+  side: 'both', categories: ['cat-wedding-party','cat-friends','head_table'],
   meal: 'Beef Tenderloin', dietaryTags: ['halal'], vip: true,
 })
 const brideDad = addGuest({
   firstName: 'David', lastName: 'Williams',
-  side: 'both', categories: ['cat-wedding-party','cat-family'],
+  side: 'both', categories: ['cat-wedding-party','cat-family','head_table'],
   meal: 'Beef Tenderloin', vip: true,
 })
 const brideMom = addGuest({
   firstName: 'Patricia', lastName: 'Williams',
-  side: 'both', categories: ['cat-wedding-party','cat-family'],
+  side: 'both', categories: ['cat-wedding-party','cat-family','head_table'],
   meal: 'Pan-Seared Salmon', vip: true,
 })
 const groomDad = addGuest({
   firstName: 'Chinedu', lastName: 'Okonkwo',
-  side: 'both', categories: ['cat-wedding-party','cat-family'],
+  side: 'both', categories: ['cat-wedding-party','cat-family','head_table'],
   meal: 'Beef Tenderloin', dietaryTags: ['gluten-free'], vip: true,
 })
 const groomMom = addGuest({
   firstName: 'Adaeze', lastName: 'Okonkwo',
-  side: 'both', categories: ['cat-wedding-party','cat-family'],
+  side: 'both', categories: ['cat-wedding-party','cat-family','head_table'],
   meal: 'Vegetarian Risotto', vip: true,
 })
 const groomBM = addGuest({   // groom's brother
   firstName: 'Tunde', lastName: 'Okonkwo',
-  side: 'both', categories: ['cat-wedding-party','cat-family'],
+  side: 'both', categories: ['cat-wedding-party','cat-family','head_table'],
   meal: 'Beef Tenderloin', vip: true,
 })
 const groomMan1 = addGuest({
   firstName: 'Jelani', lastName: 'Adebayo',
-  side: 'both', categories: ['cat-wedding-party','cat-friends'],
+  side: 'both', categories: ['cat-wedding-party','cat-friends','head_table'],
   meal: 'Beef Tenderloin', dietaryTags: ['halal'], vip: true,
 })
 
@@ -489,7 +495,7 @@ console.log(`Generated ${guests.length} guests; declined: ${guests.filter(g => g
 // ── Tables (T-shape venue) ─────────────────────────────────────────────────
 
 const ROOM_W = 1200
-const ROOM_H = 1000  // taller than v2 to fit a real-sized dance floor + 4 rows of rounds + bar/DJ along the bottom wall
+const ROOM_H = 1350  // 90 ft tall — gives the 4×4 grid breathing room between rows + headroom for the bar against the back wall
 const tables = []
 
 // Sweetheart at top center
@@ -512,7 +518,7 @@ tables.push(head)
 // so there's a real ~10ft gap between the head table and the first row
 // of guest tables — that's where the dance floor actually lives.
 const roundCols = [180, 460, 740, 1020]
-const roundRows = [500, 620, 740, 860]
+const roundRows = [560, 730, 900, 1070]  // 170 px (~11 ft) between centers — was 120 px, too tight
 let roundIdx = 0
 for (const y of roundRows) {
   for (const x of roundCols) {
@@ -542,10 +548,11 @@ const objects = [
     x: ROOM_W / 2 - 120, y: 300, width: 240, height: 130,
     color: '#EDE0C4', category: 'entertainment', isObstacle: false },
 
-  // Cake table — flanks the head table on the right so cake-cutting
-  // plays out near the wedding party.
+  // Cake table — inside the top stem of the T, right of the head table
+  // (top stem right wall is at ROOM_W * 0.8 = 960, so x=870 keeps the
+  // 70px-wide cake fully inside with breathing room).
   { id: 'obj_cake', type: 'cake', name: 'Cake Table',
-    x: 940, y: 200, width: 70, height: 70,
+    x: 870, y: 200, width: 70, height: 70,
     color: '#D4A5A5', category: 'food', isObstacle: false },
 
   // DJ Booth — embedded at the back-centre of the dance floor, where a
@@ -565,9 +572,11 @@ const objects = [
     x: 30, y: 60, width: 40, height: 60,
     color: '#2D2D2D', category: 'structure', isObstacle: false },
 
-  // Emergency Exit — right wall mid-height.
+  // Emergency Exit — right wall mid-height. Pushed below the T-stem
+  // boundary (ROOM_H * 0.35 ≈ 472) so it lands on the wide bottom
+  // section's right wall, not the top stem's narrower one.
   { id: 'obj_exit', type: 'exit', name: 'Emergency Exit',
-    x: ROOM_W - 50, y: 470, width: 40, height: 50,
+    x: ROOM_W - 50, y: 600, width: 40, height: 50,
     color: '#9CAF88', category: 'structure', isObstacle: false },
 ]
 
