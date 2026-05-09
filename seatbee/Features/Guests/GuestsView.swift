@@ -140,15 +140,17 @@ struct GuestsView: View {
             VStack(spacing: 0) {
                 SBNavHeader(
                     title: "Guests",
-                    rightContent: AnyView(
-                        Button {
-                            showAddGuest = true
-                        } label: {
-                            Image(systemName: "plus")
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundStyle(Color.sbGoldDk)
-                        }
-                    )
+                    rightContent: plan?.isDemo == true
+                        ? AnyView(EmptyView())
+                        : AnyView(
+                            Button {
+                                showAddGuest = true
+                            } label: {
+                                Image(systemName: "plus")
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundStyle(Color.sbGoldDk)
+                            }
+                        )
                 )
 
                 ScrollView {
@@ -304,6 +306,12 @@ struct GuestsView: View {
 
     private var guestsContent: some View {
         VStack(alignment: .leading, spacing: SBSpacing.sectionGap) {
+            // Sample event — soft banner so users know guests are read-only
+            // before they go looking for the missing Add / Import buttons.
+            if plan?.isDemo == true {
+                sampleEventBanner
+            }
+
             statsRow
                 .animation(.seatbee, value: guests.count)
 
@@ -320,8 +328,12 @@ struct GuestsView: View {
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
-                    SBButton(title: "Import", icon: "square.and.arrow.down", variant: .default, size: .small) {
-                        showCSVImport = true
+                    // Add / Import are hidden for the sample plan — guest
+                    // list is curated and locked in the demo.
+                    if plan?.isDemo != true {
+                        SBButton(title: "Import", icon: "square.and.arrow.down", variant: .default, size: .small) {
+                            showCSVImport = true
+                        }
                     }
                     SBButton(title: "Categories", icon: "tag", variant: .default, size: .small) {
                         showCategories = true
@@ -426,6 +438,31 @@ struct GuestsView: View {
             }
             Spacer()
         }
+    }
+
+    // MARK: - Sample event banner
+    //
+    // Shown only on the bundled demo plan. Tells users why Add / Import /
+    // delete are missing without making them guess.
+
+    private var sampleEventBanner: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "sparkles")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(Color.sbGoldDk)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Sample event")
+                    .font(SBFont.bodySmallBold)
+                    .foregroundStyle(Color.sbCharcoal)
+                Text("Guest list is read-only. Tap AI to see seating in action.")
+                    .font(SBFont.caption)
+                    .foregroundStyle(Color.sbWarm)
+            }
+            Spacer()
+        }
+        .padding(12)
+        .background(Color.sbChampagne2)
+        .clipShape(RoundedRectangle(cornerRadius: SBRadius.button))
     }
 
     // MARK: - Search
@@ -535,14 +572,21 @@ struct GuestsView: View {
     }
 
     private func guestRowWithSwipe(_ guest: Guest) -> some View {
-        guestRow(guest)
-            .swipeActions(edge: .trailing) {
-                Button(role: .destructive) {
-                    deleteGuest(guest)
-                } label: {
-                    Label("Delete", systemImage: "trash")
+        // Sample plan: no destructive swipe — guests are part of the
+        // curated demo and can't be removed.
+        if plan?.isDemo == true {
+            return AnyView(guestRow(guest))
+        }
+        return AnyView(
+            guestRow(guest)
+                .swipeActions(edge: .trailing) {
+                    Button(role: .destructive) {
+                        deleteGuest(guest)
+                    } label: {
+                        Label("Delete", systemImage: "trash")
+                    }
                 }
-            }
+        )
     }
 
     private func sectionHeader(_ section: GuestSection) -> some View {

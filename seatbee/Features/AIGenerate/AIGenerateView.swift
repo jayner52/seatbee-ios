@@ -1096,6 +1096,16 @@ struct AIGenerateView: View {
     /// the "Seating generated" UX.
     @MainActor
     private func fetchAIInsight(for plan: SeatingPlan) async {
+        // Demo plan: no /api/ai call. Show a static "perfect" insight so
+        // the UI matches the real flow without spending OpenAI credits.
+        if plan.isDemo {
+            aiInsight = .ready(AIService.ConflictResult(
+                conflicts: [],
+                score: 100,
+                summary: "Sample wedding seated at 100%. Every must-sit family is together, every can't-sit pair is apart, and the head table holds the wedding party."
+            ))
+            return
+        }
         aiInsight = .loading
         do {
             let result = try await appState.ai.detectConflicts(plan: plan)

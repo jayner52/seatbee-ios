@@ -624,6 +624,15 @@ struct RoomSetupSheet: View {
         }
         let base64 = "data:image/jpeg;base64," + imageData.base64EncodedString()
 
+        // Demo plan: never run Vision against an uploaded image — that's
+        // the most expensive single AI call in the app. Surface a friendly
+        // message instead.
+        if appState.activePlan?.isDemo == true {
+            isAnalyzing = false
+            analysisResult = "AI floor plan detection is available on real plans. Sign up to try it on your own venue."
+            return
+        }
+
         Task {
             do {
                 let result = try await appState.ai.call(

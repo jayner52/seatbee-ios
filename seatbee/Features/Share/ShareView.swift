@@ -1186,6 +1186,13 @@ struct ShareView: View {
     /// `data` blob — so iOS has to ask the server rather than reading it
     /// off the local plan.
     private func fetchQRConfig(planId: String) async {
+        // Demo plan never hits the server. Show a friendly message instead.
+        if planId == SampleEventService.samplePlanId {
+            qrError = "Sign up to share with your guests."
+            qrEnabled = false
+            qrToken = nil
+            return
+        }
         qrError = nil
         guard let url = URL(string: "\(AppConfig.guestAPIBaseURL)?action=config&planId=\(planId)") else { return }
         var request = URLRequest(url: url)
@@ -1211,6 +1218,14 @@ struct ShareView: View {
     /// column and returns the (possibly newly-minted) token. iOS keeps the
     /// returned token in local @State; no JSONB writeback needed.
     private func saveQRConfig(planId: String, enabled: Bool) async {
+        // Demo plan: never mint a token — that would create a real Supabase
+        // row tied to a fake plan ID. Surface the conversion-pitch message.
+        if planId == SampleEventService.samplePlanId {
+            qrError = "Sign up to share your seating plan with guests."
+            qrEnabled = false
+            return
+        }
+
         qrError = nil
         qrSyncing = true
         defer { qrSyncing = false }

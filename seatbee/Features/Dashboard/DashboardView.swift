@@ -3,12 +3,34 @@ import SwiftUI
 struct DashboardView: View {
     @Environment(AppState.self) private var appState
     @State private var plans: [SeatingPlan] = []
+    @State private var samplePlan: SeatingPlan?
     @State private var isLoading = true
     @State private var loadError: String?
     @State private var showEditPlan = false
     @State private var showSettings = false
 
-    private var activePlan: SeatingPlan? { plans.first }
+    /// Plan currently driving the hero card. Mirrors appState.activePlan so
+    /// switches initiated from any tab keep the dashboard in sync, falling
+    /// back to the first real plan on initial load.
+    private var activePlan: SeatingPlan? {
+        if let active = appState.activePlan { return active }
+        return plans.first
+    }
+
+    /// True when the user has no real plans yet — drives the empty-state
+    /// CTA. Demo plan never counts as a "real" plan for this check.
+    private var hasNoRealPlans: Bool { plans.isEmpty }
+
+    /// "Other Plans" feed: every plan that's not the active one, with the
+    /// sample plan always pinned to the bottom (or only entry when there
+    /// are no real plans yet).
+    private var otherPlanRows: [SeatingPlan] {
+        var rows = plans.filter { $0.id != activePlan?.id }
+        if let sample = samplePlan, sample.id != activePlan?.id {
+            rows.append(sample)
+        }
+        return rows
+    }
 
     var body: some View {
         NavigationStack {
@@ -39,8 +61,12 @@ struct DashboardView: View {
                             .padding(.top, 40)
                     }
 
-                    // Empty state — prompt to create wedding
-                    if !isLoading && plans.isEmpty && loadError == nil {
+                    // Empty state — prompt to create wedding. Renders when
+                    // the user has no real plans yet AND hasn't tapped the
+                    // sample card to make it active. Sample plan still
+                    // appears in the "Other plans" list below for them
+                    // to discover.
+                    if !isLoading && hasNoRealPlans && activePlan == nil && loadError == nil {
                         VStack(spacing: 20) {
                             Spacer().frame(height: 20)
 
@@ -77,13 +103,17 @@ struct DashboardView: View {
                         .buttonStyle(.plain)
                     }
 
-                    // Quick actions
-                    if !plans.isEmpty {
+                    // Quick actions — show whenever we have an active plan
+                    // (real or sample) so the demo lets users explore the
+                    // same UI flow real plans use.
+                    if activePlan != nil {
                         quickActions
                     }
 
-                    // Other plans
-                    if plans.count > 1 {
+                    // Other plans — always rendered when there's at least
+                    // one row to show. With the sample plan pinned at the
+                    // bottom, this section is essentially always visible.
+                    if !otherPlanRows.isEmpty {
                         otherPlans
                     }
 
@@ -383,7 +413,7 @@ struct DashboardView: View {
                 .foregroundStyle(Color.sbWarm)
                 .textCase(.uppercase)
 
-            ForEach(plans.dropFirst()) { plan in
+            ForEach(otherPlanRows) { plan in
                 planRow(plan)
             }
         }
@@ -431,8 +461,13 @@ struct DashboardView: View {
     /// Free renders muted so paid plans visually pop on the list.
     @ViewBuilder
     private func planTierPill(for plan: SeatingPlan) -> some View {
-        let tier = plan.resolvedTier(against: appState.userPasses)
         let (label, fg, bg): (String, Color, Color) = {
+            // Sample plan gets its own pill so it's instantly recognisable
+            // as "this isn't a real plan you can save".
+            if plan.isDemo {
+                return ("SAMPLE", Color.sbCharcoal, Color.sbChampagne2)
+            }
+            let tier = plan.resolvedTier(against: appState.userPasses)
             switch tier {
             case .free:           return ("FREE",      Color.sbWarm,    Color.sbWarm.opacity(0.10))
             case .eventPass:      return ("EVENT",     Color.sbGoldDk,  Color.sbChampagne)
@@ -459,9 +494,13 @@ struct DashboardView: View {
         // Guard against re-selecting the already-active plan — the hero
         // card itself calls selectPlan, so a hero tap shouldn't trigger
         // a redundant reorder animation.
-        guard plan.id != plans.first?.id else { return }
+        guard plan.id != activePlan?.id else { return }
         withAnimation(.spring(response: 0.35, dampingFraction: 0.78)) {
-            if let idx = plans.firstIndex(where: { $0.id == plan.id }) {
+            // Reorder among real plans only. The sample plan stays separate
+            // and is always pinned to the bottom of "Other plans" via
+            // otherPlanRows; promoting it visually happens by setting
+            // appState.activePlan, not by mutating the plans array.
+            if !plan.isDemo, let idx = plans.firstIndex(where: { $0.id == plan.id }) {
                 plans.remove(at: idx)
                 plans.insert(plan, at: 0)
             }
@@ -484,6 +523,16 @@ struct DashboardView: View {
     }
 
     private func loadPlans() async {
+        // Sample plan loads from the bundle once and stays cached. Lazy-
+        // load it the first time we render and reuse from the cache after.
+        if samplePlan == nil {
+            do {
+                samplePlan = try SampleEventService.shared.load().plan
+            } catch {
+                print("[Dashboard] Sample plan load failed: \(error)")
+            }
+        }
+
         do {
             plans = try await appState.database.fetchPlans()
             // Preserve the user's current plan selection across
@@ -493,20 +542,25 @@ struct DashboardView: View {
             // the selection by re-pinning to plans.first — which
             // shifts as plans get re-sorted by updated_at after any
             // edit. Three cases:
-            //   - No selection yet (initial load): pin to first.
-            //   - Selection still valid: refresh its data from the
-            //     latest fetch so edits made elsewhere flow through,
-            //     but keep it as the active plan.
-            //   - Selection was deleted: fall back to first.
-            if let currentId = appState.activePlan?.id,
-               let freshIdx = plans.firstIndex(where: { $0.id == currentId }) {
+            //   - No selection yet (initial load): leave nil so the
+            //     empty state surfaces (user gets the "Plan your wedding"
+            //     CTA on first launch with zero real plans).
+            //   - Selection is the sample plan: leave it active so the
+            //     dashboard keeps showing the demo even after a refresh.
+            //   - Selection still valid in real plans: refresh its data
+            //     and pin it to the top of the visible list.
+            //   - Selection was deleted: fall back to first real plan
+            //     (or nil → empty state).
+            if appState.activePlan?.isDemo == true {
+                // Keep sample as active — refresh from bundle in case the
+                // generator was re-run mid-session.
+                if let sample = samplePlan {
+                    appState.activePlan = sample
+                }
+            } else if let currentId = appState.activePlan?.id,
+                      let freshIdx = plans.firstIndex(where: { $0.id == currentId }) {
                 let fresh = plans[freshIdx]
                 appState.activePlan = fresh
-                // Pin the active plan to the top of the visible list
-                // so the user's selection stays visually anchored as
-                // they navigate around. Without this, the list re-
-                // sorts by updated_at on every fetch and the user's
-                // selection can fall to the middle of a long list.
                 if freshIdx != 0 {
                     plans.remove(at: freshIdx)
                     plans.insert(fresh, at: 0)
@@ -514,7 +568,7 @@ struct DashboardView: View {
             } else {
                 appState.activePlan = plans.first
             }
-            print("[Dashboard] Loaded \(plans.count) plans, active: \(appState.activePlan?.name ?? "none")")
+            print("[Dashboard] Loaded \(plans.count) real plans + sample, active: \(appState.activePlan?.name ?? "none")")
         } catch {
             print("[Dashboard] Error loading plans: \(error)")
             loadError = error.localizedDescription

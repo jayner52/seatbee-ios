@@ -46,6 +46,14 @@ struct SeatingPlan: Identifiable, Codable {
     var eventPassExpiresAt: Date?
     var eventPassPurchasedAt: Date?
 
+    // Sample-event demo flag. True only for the bundled SampleEvent.json
+    // hydrated by SampleEventService. Local-only — never written to or
+    // read from Supabase. Used by views and services to gate destructive
+    // actions and route AI calls through the pre-baked playback instead
+    // of /api/ai. Default false so every Supabase-loaded plan is a real
+    // plan unless explicitly flagged.
+    var isDemo: Bool = false
+
     // Raw passthrough: entities iOS doesn't model but must preserve on round-trip
     var rawCategories: [[String: AnyCodable]]?
     var rawParties: [[String: AnyCodable]]?
