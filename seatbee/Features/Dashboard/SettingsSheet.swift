@@ -6,6 +6,9 @@ struct SettingsSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var showSignOutConfirm = false
     @State private var showDeletePlanConfirm = false
+    @State private var showDeleteAccountConfirm = false
+    @State private var deletingAccount = false
+    @State private var deleteAccountError: String?
 
     // Profile-backed state — loaded from `profiles` on appear and
     // written live to Supabase on every change. Mirrors web's
@@ -217,7 +220,38 @@ struct SettingsSheet: View {
                     Text("About")
                 }
 
-                // Sign out
+                // Legal — Apple App Store 5.1.1 requires Privacy
+                // Policy + Terms of Service to be reachable in-app,
+                // not just on first signup.
+                Section {
+                    Link(destination: URL(string: "https://seatbee.app/privacy")!) {
+                        HStack {
+                            Text("Privacy Policy")
+                            Spacer()
+                            Image(systemName: "arrow.up.right")
+                                .font(.system(size: 12))
+                                .foregroundStyle(Color.sbWarm)
+                        }
+                    }
+                    Link(destination: URL(string: "https://seatbee.app/terms")!) {
+                        HStack {
+                            Text("Terms of Service")
+                            Spacer()
+                            Image(systemName: "arrow.up.right")
+                                .font(.system(size: 12))
+                                .foregroundStyle(Color.sbWarm)
+                        }
+                    }
+                } header: {
+                    Text("Legal")
+                }
+
+                // Sign out + Delete account
+                // Apple App Store 5.1.1(v) requires in-app account
+                // deletion for any app that creates user accounts.
+                // Calls AuthService.deleteAccount → /api/delete-account
+                // on web, which runs the same admin-panel delete
+                // sequence scoped to the requesting user.
                 Section {
                     Button {
                         showSignOutConfirm = true
@@ -230,6 +264,18 @@ struct SettingsSheet: View {
                             Spacer()
                         }
                     }
+                    Button {
+                        showDeleteAccountConfirm = true
+                    } label: {
+                        HStack {
+                            Spacer()
+                            Text("Delete Account")
+                                .font(SBFont.bodySemibold)
+                                .foregroundStyle(Color.sbError)
+                            Spacer()
+                        }
+                    }
+                    .disabled(deletingAccount)
                 }
             }
             .listStyle(.insetGrouped)
@@ -272,6 +318,45 @@ struct SettingsSheet: View {
                 Button("Cancel", role: .cancel) {}
             } message: {
                 Text("This will permanently delete \"\(appState.activePlan?.name ?? "this plan")\". This cannot be undone.")
+            }
+            .alert("Delete account?", isPresented: $showDeleteAccountConfirm) {
+                Button("Delete", role: .destructive) {
+                    runDeleteAccount()
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This permanently deletes your account, every plan you've created, and any passes you own. This cannot be undone.")
+            }
+            .alert(
+                "Couldn't delete account",
+                isPresented: Binding(
+                    get: { deleteAccountError != nil },
+                    set: { if !$0 { deleteAccountError = nil } }
+                ),
+                presenting: deleteAccountError
+            ) { _ in
+                Button("OK") { deleteAccountError = nil }
+            } message: { msg in
+                Text(msg)
+            }
+        }
+    }
+
+    /// Kicks off the network call. Set `deletingAccount` so the
+    /// button disables for the duration; on success the AppRouter
+    /// will route back to auth automatically as soon as
+    /// AuthService.currentUser flips to nil.
+    private func runDeleteAccount() {
+        guard !deletingAccount else { return }
+        deletingAccount = true
+        Task {
+            do {
+                try await appState.auth.deleteAccount()
+                deletingAccount = false
+                dismiss()
+            } catch {
+                deletingAccount = false
+                deleteAccountError = error.localizedDescription
             }
         }
     }
