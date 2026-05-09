@@ -65,13 +65,24 @@ struct EditorView: View {
                     fitToken: fitToken,
                     planId: plan?.id,
                     onSelectTable: { id in
+                        // Close any open object sheet before opening the
+                        // table sheet — iOS suppresses a second sheet
+                        // presented while another is still onscreen,
+                        // which manifests as an empty white pane.
                         selectedObjectId = nil
+                        showEditObject = false
                         selectedTableId = id
                         showDetailSheet = true
                         HapticEngine.selection()
                     },
                     onSelectObject: { id in
+                        // Close the table sheet — without this it stays
+                        // onscreen with no content (selectedTable is now
+                        // nil) and renders as a blank white pane. The
+                        // object's edit sheet opens via the pencil in
+                        // the selection toolbar, not on tap.
                         selectedTableId = nil
+                        showDetailSheet = false
                         selectedObjectId = id
                         HapticEngine.selection()
                     },
@@ -79,6 +90,7 @@ struct EditorView: View {
                         selectedTableId = nil
                         selectedObjectId = nil
                         showDetailSheet = false
+                        showEditObject = false
                     },
                     onMoveTable: { id, x, y in
                         updateTablePosition(id: id, x: x, y: y)
