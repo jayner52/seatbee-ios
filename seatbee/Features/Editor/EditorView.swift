@@ -238,6 +238,8 @@ struct EditorView: View {
                     .clipShape(Circle())
             }
             .disabled(!appState.undoManager.canUndo)
+            .accessibilityLabel("Undo")
+            .accessibilityHint("Reverse your last edit")
 
             Button { appState.redo(); HapticEngine.light() } label: {
                 Image(systemName: "arrow.uturn.forward")
@@ -248,6 +250,8 @@ struct EditorView: View {
                     .clipShape(Circle())
             }
             .disabled(!appState.undoManager.canRedo)
+            .accessibilityLabel("Redo")
+            .accessibilityHint("Reapply the change you just undid")
 
             Button { fitToken &+= 1; HapticEngine.light() } label: {
                 Image(systemName: "arrow.up.left.and.arrow.down.right")
@@ -257,6 +261,8 @@ struct EditorView: View {
                     .background(.ultraThinMaterial)
                     .clipShape(Circle())
             }
+            .accessibilityLabel("Fit to screen")
+            .accessibilityHint("Zoom out so every table fits in view")
 
             // Floor plan show/hide — only renders when the plan has an image.
             // Tinted gold when visible so the active state reads at a glance.
@@ -273,6 +279,9 @@ struct EditorView: View {
                         .background(.ultraThinMaterial)
                         .clipShape(Circle())
                 }
+                .accessibilityLabel(floorPlanVisible ? "Hide floor plan" : "Show floor plan")
+                .accessibilityHint("Toggle the uploaded floor plan image behind the tables")
+                .accessibilityValue(floorPlanVisible ? "Visible" : "Hidden")
             }
 
             // Ruler overlay toggle — gold tick marks + unit labels on
@@ -291,6 +300,9 @@ struct EditorView: View {
                     .background(.ultraThinMaterial)
                     .clipShape(Circle())
             }
+            .accessibilityLabel(rulerVisible ? "Hide ruler" : "Show ruler")
+            .accessibilityHint("Toggle measurement ticks along the room edges")
+            .accessibilityValue(rulerVisible ? "On" : "Off")
 
             Button { showAllTablesList = true; HapticEngine.light() } label: {
                 Image(systemName: "list.bullet")
@@ -300,6 +312,8 @@ struct EditorView: View {
                     .background(.ultraThinMaterial)
                     .clipShape(Circle())
             }
+            .accessibilityLabel("Tables list")
+            .accessibilityHint("Open a sheet listing every table and who's seated there")
 
 
             Button { showRoomSetup = true } label: {
@@ -310,6 +324,8 @@ struct EditorView: View {
                     .background(.ultraThinMaterial)
                     .clipShape(Circle())
             }
+            .accessibilityLabel("Room setup")
+            .accessibilityHint("Edit room shape, dimensions, floor plan, and zones")
         }
         .padding(.horizontal, 16)
         .padding(.top, 8)
@@ -349,6 +365,9 @@ struct EditorView: View {
                 .buttonStyle(.plain)
                 .padding(.horizontal, 12)
                 .padding(.bottom, 8)
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Open \(table.name) details")
+                .accessibilityValue("\(table.filledCount) of \(table.seats) seated")
             } else if let objId = selectedObjectId, let obj = objects.first(where: { $0.id == objId }) {
                 HStack(spacing: 6) {
                     let def = venueObjectTypes.byType(obj.type)
@@ -380,6 +399,8 @@ struct EditorView: View {
                             .clipShape(Circle())
                     }
                     .disabled(obj.locked == true)
+                    .accessibilityLabel("Rotate left")
+                    .accessibilityHint("Turn this object 45 degrees counter-clockwise")
                     Button {
                         rotateObject(id: objId, by: 45)
                         HapticEngine.selection()
@@ -392,6 +413,8 @@ struct EditorView: View {
                             .clipShape(Circle())
                     }
                     .disabled(obj.locked == true)
+                    .accessibilityLabel("Rotate right")
+                    .accessibilityHint("Turn this object 45 degrees clockwise")
                     Button {
                         toggleObjectLock(id: objId)
                         HapticEngine.selection()
@@ -403,6 +426,9 @@ struct EditorView: View {
                             .background(.regularMaterial)
                             .clipShape(Circle())
                     }
+                    .accessibilityLabel(obj.locked == true ? "Unlock object" : "Lock object")
+                    .accessibilityHint("Locked objects can't be moved or rotated by accident")
+                    .accessibilityValue(obj.locked == true ? "Locked" : "Unlocked")
                     Button {
                         showEditObject = true
                         HapticEngine.selection()
@@ -414,6 +440,8 @@ struct EditorView: View {
                             .background(.regularMaterial)
                             .clipShape(Circle())
                     }
+                    .accessibilityLabel("Edit object")
+                    .accessibilityHint("Open the venue object editor")
                     Button {
                         showDeleteConfirm = true
                     } label: {
@@ -424,6 +452,8 @@ struct EditorView: View {
                             .background(.regularMaterial)
                             .clipShape(Circle())
                     }
+                    .accessibilityLabel("Delete object")
+                    .accessibilityHint("Remove this object from the canvas")
                     // Duplicate — handy for mirrored stages / dance
                     // floors. Direct button (not in a menu) so the
                     // toolbar reads as a flat icon row.
@@ -437,6 +467,8 @@ struct EditorView: View {
                             .background(.regularMaterial)
                             .clipShape(Circle())
                     }
+                    .accessibilityLabel("Duplicate object")
+                    .accessibilityHint("Create an offset copy of this object")
                 }
                 .padding(14)
                 .background(.regularMaterial)
@@ -467,6 +499,8 @@ struct EditorView: View {
                         .clipShape(Circle())
                         .shadow(color: Color.black.opacity(0.15), radius: 8, x: 0, y: 4)
                 }
+                .accessibilityLabel("Add to canvas")
+                .accessibilityHint("Add a new table or venue object")
 
                 Spacer()
 
@@ -483,6 +517,8 @@ struct EditorView: View {
                     .shadow(color: Color.sbGold.opacity(0.3), radius: 8, x: 0, y: 3)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("AI seat \(unseatedCount) remaining guests")
+                .accessibilityHint("Open the AI seating screen to auto-assign guests to tables")
             }
             .padding(.horizontal, 12)
             .padding(.bottom, 6)
