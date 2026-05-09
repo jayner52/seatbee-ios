@@ -60,6 +60,12 @@ class CanvasViewController: UIViewController, UIScrollViewDelegate {
     // Snapshots of the most recent table / object data so the guide
     // calculator can iterate without poking through the visual views.
     private var currentTables: [SeatTable] = []
+    /// Per-axis snap latches — flip true the frame an alignment guide
+    /// engages, stay true while held, reset on disengage or drag end.
+    /// Drag closures fire HapticEngine.selection() only on the false→true
+    /// transition so a sustained snap doesn't buzz every frame.
+    private var lastSnapX = false
+    private var lastSnapY = false
     private var currentObjects: [RoomObject] = []
     private var currentRoomWidth: CGFloat = 0
     private var currentRoomHeight: CGFloat = 0
@@ -504,8 +510,20 @@ class CanvasViewController: UIViewController, UIScrollViewDelegate {
     //
     // The 8pt threshold is in canvas-local (room) coords so the snap
     // zone scales with zoom — easier to land on a guide when zoomed in.
+    /// Snap result — `center` is the proposed center clamped to any
+    /// engaged guides; `snappedX` / `snappedY` flag which axes
+    /// engaged this frame. Drag closures use the bool flags to fire
+    /// a haptic exactly on the engage transition (see lastSnapX /
+    /// lastSnapY ivars), avoiding a per-frame buzz while a snap is
+    /// sustained.
+    struct AlignmentSnapResult {
+        let center: CGPoint
+        let snappedX: Bool
+        let snappedY: Bool
+    }
+
     func computeAlignmentSnap(forDragID id: String, isObject: Bool,
-                              proposedCenter: CGPoint, size: CGSize) -> CGPoint {
+                              proposedCenter: CGPoint, size: CGSize) -> AlignmentSnapResult {
         let cx = proposedCenter.x - canvasOrigin.x
         let cy = proposedCenter.y - canvasOrigin.y
         let dw = size.width
@@ -604,9 +622,13 @@ class CanvasViewController: UIViewController, UIScrollViewDelegate {
         // Convert the snapped canvas-local centre back to contentView
         // coords. Either axis may be unsnapped — fall back to the
         // proposed value on that axis.
-        return CGPoint(
-            x: canvasOrigin.x + (snapCx ?? cx),
-            y: canvasOrigin.y + (snapCy ?? cy)
+        return AlignmentSnapResult(
+            center: CGPoint(
+                x: canvasOrigin.x + (snapCx ?? cx),
+                y: canvasOrigin.y + (snapCy ?? cy)
+            ),
+            snappedX: snapCx != nil,
+            snappedY: snapCy != nil
         )
     }
 
@@ -718,11 +740,24 @@ class CanvasViewController: UIViewController, UIScrollViewDelegate {
                     self?.selectTable(table.id)
                 }
                 tv.onDragMove = { [weak self] proposed, body in
-                    self?.computeAlignmentSnap(forDragID: table.id, isObject: false,
-                                               proposedCenter: proposed, size: body) ?? proposed
+                    guard let self else { return proposed }
+                    let result = self.computeAlignmentSnap(
+                        forDragID: table.id, isObject: false,
+                        proposedCenter: proposed, size: body)
+                    // Fire on engage transition only — see lastSnapX /
+                    // lastSnapY ivar comment for the latch contract.
+                    if (result.snappedX && !self.lastSnapX) ||
+                       (result.snappedY && !self.lastSnapY) {
+                        HapticEngine.selection()
+                    }
+                    self.lastSnapX = result.snappedX
+                    self.lastSnapY = result.snappedY
+                    return result.center
                 }
                 tv.onDragEnd = { [weak self] center in
                     self?.clearAlignmentGuides()
+                    self?.lastSnapX = false
+                    self?.lastSnapY = false
                     // Store top-left: subtract canvasOrigin and half-body
                     let halfW = Double(body.width)  / 2
                     let halfH = Double(body.height) / 2
@@ -763,11 +798,22 @@ class CanvasViewController: UIViewController, UIScrollViewDelegate {
                     self?.selectObject(obj.id)
                 }
                 ov.onDragMove = { [weak self] proposed, body in
-                    self?.computeAlignmentSnap(forDragID: obj.id, isObject: true,
-                                               proposedCenter: proposed, size: body) ?? proposed
+                    guard let self else { return proposed }
+                    let result = self.computeAlignmentSnap(
+                        forDragID: obj.id, isObject: true,
+                        proposedCenter: proposed, size: body)
+                    if (result.snappedX && !self.lastSnapX) ||
+                       (result.snappedY && !self.lastSnapY) {
+                        HapticEngine.selection()
+                    }
+                    self.lastSnapX = result.snappedX
+                    self.lastSnapY = result.snappedY
+                    return result.center
                 }
                 ov.onDragEnd = { [weak self] center in
                     self?.clearAlignmentGuides()
+                    self?.lastSnapX = false
+                    self?.lastSnapY = false
                     // Store top-left: subtract canvasOrigin and half-body
                     let x = Double(center.x - (self?.canvasOrigin.x ?? 0)) - Double(halfW)
                     let y = Double(center.y - (self?.canvasOrigin.y ?? 0)) - Double(halfH)
