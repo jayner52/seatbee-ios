@@ -802,7 +802,7 @@ struct TraceShapeSheet: View {
                 .font(SBFont.capsLabel)
                 .foregroundStyle(Color.sbWarm)
                 .letterSpacing(1.5)
-            Text("Tap a wall to add a corner · Drag corners to move · Long-press to delete")
+            Text("Tap a wall to add a corner · Double-tap to curve · Drag corners to move · Long-press to delete")
                 .font(SBFont.caption)
                 .foregroundStyle(Color.sbCharcoal)
         }
@@ -866,12 +866,18 @@ struct TraceShapeSheet: View {
                     .allowsHitTesting(false)
             }
 
-            // Tap-to-add-corner: a transparent layer covering the canvas.
-            // We hit-test against the original (un-flipped) point order so
-            // the new corner is inserted in the right slot regardless of
-            // the current flip state.
+            // Tap-to-add-corner / double-tap-to-curve: shared transparent
+            // layer covering the canvas. Single tap on a wall inserts a
+            // corner; double tap on a wall toggles a curve (semicircle by
+            // default, sweep outward). count:2 is checked first so the
+            // single-tap handler defers automatically.
             Color.clear
                 .contentShape(Rectangle())
+                .onTapGesture(count: 2) { location in
+                    if let edgeIndex = nearestEdgeIndex(to: location, layout: layout, threshold: 28) {
+                        toggleArcOnWall(edgeIndex: edgeIndex)
+                    }
+                }
                 .onTapGesture { location in
                     if let edgeIndex = nearestEdgeIndex(to: location, layout: layout, threshold: 28) {
                         insertCorner(after: edgeIndex, at: location, layout: layout)
@@ -1070,11 +1076,81 @@ struct TraceShapeSheet: View {
         guard !displayedPoints.isEmpty else { return path }
         let first = roomToScreen(displayedPoints[0], layout: layout)
         path.move(to: first)
+        // Walk every segment. If the END point has an arc, render
+        // the segment as a circular arc (we author rx == ry on
+        // double-tap toggle, and the canvas's SVG-arc renderer
+        // handles the same data identically). Else straight line.
         for i in 1..<displayedPoints.count {
-            path.addLine(to: roomToScreen(displayedPoints[i], layout: layout))
+            appendSegment(
+                from: displayedPoints[i - 1],
+                to: displayedPoints[i],
+                into: &path,
+                layout: layout
+            )
+        }
+        // Close: arc on the FIRST point means the closing segment is
+        // also curved — match how CanvasViewController.roomBezierPath
+        // closes the polygon.
+        if displayedPoints[0].arc != nil {
+            appendSegment(
+                from: displayedPoints[displayedPoints.count - 1],
+                to: displayedPoints[0],
+                into: &path,
+                layout: layout
+            )
         }
         path.closeSubpath()
         return path
+    }
+
+    /// Append a single edge to `path`. Straight when the destination
+    /// has no arc; circular arc when it does. Mirrors the trace's
+    /// own toggleArcOnWall (rx == ry) so the visual matches what the
+    /// user just authored.
+    private func appendSegment(from a: RoomPoint, to b: RoomPoint, into path: inout Path, layout: CanvasLayout) {
+        let endScreen = roomToScreen(b, layout: layout)
+        guard let arc = b.arc, arc.rx > 0 else {
+            path.addLine(to: endScreen)
+            return
+        }
+        let startScreen = roomToScreen(a, layout: layout)
+        let r = arc.rx * layout.scale
+        let chord = (
+            (endScreen.x - startScreen.x) * (endScreen.x - startScreen.x) +
+            (endScreen.y - startScreen.y) * (endScreen.y - startScreen.y)
+        ).squareRoot()
+        // Arc center sits perpendicular to the chord, offset by the
+        // height of the circular segment (h = √(r² − (chord/2)²)).
+        let half = chord / 2
+        let hSq = r * r - half * half
+        let h = hSq > 0 ? hSq.squareRoot() : 0
+        let mx = (startScreen.x + endScreen.x) / 2
+        let my = (startScreen.y + endScreen.y) / 2
+        // Perpendicular unit vector — rotate (end - start) 90° one
+        // way or the other based on sweep flag. SVG sweep 1 =
+        // clockwise.
+        let dx = endScreen.x - startScreen.x
+        let dy = endScreen.y - startScreen.y
+        let len = max(1, (dx * dx + dy * dy).squareRoot())
+        let perpX = -dy / len
+        let perpY = dx / len
+        let sign: CGFloat = arc.sweep == 1 ? -1 : 1
+        let centerX = mx + sign * perpX * h
+        let centerY = my + sign * perpY * h
+        let center = CGPoint(x: centerX, y: centerY)
+        let startAngle = atan2(startScreen.y - centerY, startScreen.x - centerX)
+        let endAngle = atan2(endScreen.y - centerY, endScreen.x - centerX)
+        // SwiftUI's clockwise flag is INVERTED relative to what you'd
+        // expect (Apple's coordinate system) — `clockwise: true` draws
+        // counter-clockwise on screen. Sweep 1 == clockwise on web,
+        // so we pass `clockwise: false` for sweep 1.
+        path.addArc(
+            center: center,
+            radius: r,
+            startAngle: .radians(startAngle),
+            endAngle: .radians(endAngle),
+            clockwise: arc.sweep != 1
+        )
     }
 
     private func shapeFillPath(layout: CanvasLayout) -> Path {
@@ -1137,6 +1213,54 @@ struct TraceShapeSheet: View {
     }
 
     // MARK: Mutations
+
+    /// Toggle a curve on the wall between displayedPoints[edgeIndex]
+    /// and displayedPoints[edgeIndex+1]. The arc lives on the END
+    /// point (web parity — the arc field on a point describes how
+    /// that point is reached from the previous one). Default is a
+    /// semicircular bulge outward from the polygon centroid; toggle
+    /// removes it. Editing curvature / direction is a follow-up.
+    private func toggleArcOnWall(edgeIndex: Int) {
+        // Map back to underlying-points index. displayedPoints applies
+        // flipH/V to a copy of points; we mutate `points` and let the
+        // flip pipeline reapply on render.
+        guard points.count >= 3 else { return }
+        let endIdx = (edgeIndex + 1) % points.count
+        var working = points
+        if working[endIdx].arc != nil {
+            // Already curved → remove
+            working[endIdx] = RoomPoint(x: working[endIdx].x, y: working[endIdx].y, arc: nil)
+            HapticEngine.error()
+        } else {
+            // Add: chord-half radius (semicircle) with sweep chosen so
+            // the bulge points OUTWARD from the polygon centroid. That
+            // matches how room expansion typically reads — bay-window
+            // outward, not pinched inward.
+            let startIdx = edgeIndex
+            let s = working[startIdx]
+            let e = working[endIdx]
+            let chord = ((e.x - s.x) * (e.x - s.x) + (e.y - s.y) * (e.y - s.y)).squareRoot()
+            let r = max(1, chord / 2)
+            let cx = working.map(\.x).reduce(0, +) / Double(working.count)
+            let cy = working.map(\.y).reduce(0, +) / Double(working.count)
+            // Midpoint of the chord
+            let mx = (s.x + e.x) / 2
+            let my = (s.y + e.y) / 2
+            // Cross product of (e - s) and (centroid - mid): positive
+            // means centroid is to the LEFT of the wall direction. We
+            // want the arc to bulge AWAY from the centroid, so pick
+            // sweep accordingly. SVG sweep flag: 1 = clockwise.
+            let cross = (e.x - s.x) * (cy - my) - (e.y - s.y) * (cx - mx)
+            let sweep = cross > 0 ? 0 : 1
+            working[endIdx] = RoomPoint(
+                x: working[endIdx].x,
+                y: working[endIdx].y,
+                arc: RoomArc(rx: r, ry: r, sweep: sweep, largeArc: 0)
+            )
+            HapticEngine.selection()
+        }
+        points = working
+    }
 
     private func insertCorner(after edgeIndex: Int, at screenPoint: CGPoint, layout: CanvasLayout) {
         // edgeIndex is in displayedPoints order. With flips applied, that's a
