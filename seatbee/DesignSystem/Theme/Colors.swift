@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 extension Color {
     // MARK: - Seatbee Brand Colors
@@ -47,5 +48,20 @@ extension Color {
             blue: Double(b) / 255,
             opacity: Double(a) / 255
         )
+    }
+
+    /// "#RRGGBB" hex string for the receiver's sRGB components. Used
+    /// when the system ColorPicker round-trips into a hex-string
+    /// field (e.g. SeatTable.color). Alpha is dropped — table /
+    /// category colours don't use it.
+    func toHexString() -> String {
+        let resolved = UIColor(self).cgColor.components ?? [0, 0, 0, 1]
+        let r = Int((resolved.indices.contains(0) ? resolved[0] : 0) * 255)
+        let g = Int((resolved.indices.contains(1) ? resolved[1] : 0) * 255)
+        let b = Int((resolved.indices.contains(2) ? resolved[2] : 0) * 255)
+        return String(format: "#%02X%02X%02X",
+                      max(0, min(255, r)),
+                      max(0, min(255, g)),
+                      max(0, min(255, b)))
     }
 }

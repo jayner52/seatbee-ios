@@ -6,8 +6,18 @@ struct TableDrawerView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var selectedTab = "Layout"
     @State private var renameText = ""
+    @State private var showColorPicker = false
 
     private let tabs = ["Layout", "Seats", "Notes", "Tags"]
+
+    /// Web parity: COLOR_PRESETS at App.jsx:2715 — shared with the
+    /// web table colour picker so iOS-edited and web-edited table
+    /// rings draw from the same palette.
+    private static let colorPresets: [String] = [
+        "#C9A961", "#9CAF88", "#D4A5A5", "#8B9DC3",
+        "#DDA0DD", "#87CEEB", "#98D8C8", "#FFD700",
+        "#F4A460", "#20B2AA", "#778899", "#DB7093",
+    ]
 
     // Web parity (src/App.jsx): SCALE = 15 px / foot.
     private let pxPerFoot: Double = 15
@@ -74,6 +84,13 @@ struct TableDrawerView: View {
 
                 Spacer()
 
+                // Ring colour swatch — same 12-colour palette as the
+                // web table colour picker (App.jsx COLOR_PRESETS at
+                // line 2715), so a table edited on either app draws
+                // from the same set. Tap → popover grid + native
+                // ColorPicker for custom colours.
+                colorSwatchButton
+
                 // Table type
                 Menu {
                     ForEach(SeatTable.TableType.allCases, id: \.self) { type in
@@ -130,6 +147,92 @@ struct TableDrawerView: View {
     }
 
     // MARK: - Action Strip
+
+    /// Tap-target colour swatch — small filled circle with a thin
+    /// gold ring matching the canvas chrome. Popover shows the 12
+    /// shared presets in a 4×3 grid plus a system ColorPicker for
+    /// custom colours (matches web's inline `<input type="color">`).
+    private var colorSwatchButton: some View {
+        Button {
+            showColorPicker.toggle()
+            HapticEngine.selection()
+        } label: {
+            Circle()
+                .fill(Color(hex: table.color ?? "#C9A961"))
+                .frame(width: 28, height: 28)
+                .overlay(
+                    Circle().strokeBorder(Color.sbCharcoal.opacity(0.15), lineWidth: 1)
+                )
+                .shadow(color: Color.black.opacity(0.06), radius: 1, x: 0, y: 1)
+        }
+        .buttonStyle(.plain)
+        .popover(isPresented: $showColorPicker, arrowEdge: .top) {
+            colorPickerPopover
+                .presentationCompactAdaptation(.popover)
+        }
+    }
+
+    private var colorPickerPopover: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("RING COLOUR")
+                .font(SBFont.capsLabel)
+                .foregroundStyle(Color.sbWarm)
+                .letterSpacing(1.5)
+
+            LazyVGrid(columns: Array(repeating: GridItem(.fixed(28), spacing: 8), count: 4),
+                      spacing: 8) {
+                ForEach(Self.colorPresets, id: \.self) { hex in
+                    Button {
+                        applyColor(hex)
+                        showColorPicker = false
+                        HapticEngine.success()
+                    } label: {
+                        Circle()
+                            .fill(Color(hex: hex))
+                            .frame(width: 28, height: 28)
+                            .overlay(
+                                // Selected state — double ring (white
+                                // inner, hex outer) so the active swatch
+                                // pops regardless of background.
+                                Circle()
+                                    .strokeBorder(Color.white, lineWidth: 2)
+                                    .padding(2)
+                                    .opacity(table.color?.lowercased() == hex.lowercased() ? 1 : 0)
+                            )
+                            .overlay(
+                                Circle()
+                                    .strokeBorder(Color(hex: hex), lineWidth: 2)
+                                    .opacity(table.color?.lowercased() == hex.lowercased() ? 1 : 0)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            Divider()
+
+            // Custom colour — uses the system ColorPicker. Bound via
+            // a computed binding because table.color is a hex string,
+            // not a Color.
+            ColorPicker("Custom colour",
+                        selection: Binding(
+                            get: { Color(hex: table.color ?? "#C9A961") },
+                            set: { newColor in applyColor(newColor.toHexString()) }
+                        ),
+                        supportsOpacity: false)
+                .font(SBFont.bodySmall)
+                .foregroundStyle(Color.sbCharcoal)
+        }
+        .padding(14)
+        .frame(width: 200)
+    }
+
+    /// Apply a new ring colour and persist. Wraps mutateTable so the
+    /// canvas updates live and Supabase saves on the same path the
+    /// rest of the drawer mutations use.
+    private func applyColor(_ hex: String) {
+        mutateTable { $0.color = hex }
+    }
 
     private var actionStrip: some View {
         ScrollView(.horizontal, showsIndicators: false) {
