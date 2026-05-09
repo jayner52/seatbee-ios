@@ -830,10 +830,36 @@ struct AIGenerateView: View {
                 legendChip(color: Color.sbSage,   count: preferenceRulesCount, label: "Preferences")
                 Spacer()
             }
+
+            // Parties footer — parties are guaranteed-together at solve
+            // time (passed as atomic units to /api/seat) but live in
+            // their own UI section, not the rules array, so they don't
+            // show up in the Required count above. Surface them here
+            // so users can see they're being honoured.
+            if partiesCount > 0 {
+                HStack(spacing: 6) {
+                    Image(systemName: "person.3.fill")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Color.sbGoldDk)
+                    Text("\(partiesCount) part\(partiesCount == 1 ? "y" : "ies") always seated together")
+                        .font(SBFont.caption)
+                        .foregroundStyle(Color.sbWarm)
+                    Spacer()
+                }
+                .padding(.top, 2)
+            }
         }
         .padding(14)
         .background(Color.sbIvory2)
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    /// Number of parties on the active plan. Parties live in
+    /// `plan.rawParties` as a passthrough from web/iOS UI creation;
+    /// they're not in plan.rules even though they behave like a hard
+    /// must_together rule at solve time.
+    private var partiesCount: Int {
+        (appState.activePlan?.rawParties ?? []).count
     }
 
     private func legendChip(color: Color, count: Int, label: String) -> some View {

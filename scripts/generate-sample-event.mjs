@@ -634,12 +634,19 @@ addRule({
   weight: 20, hard: false,
 })
 
-// 7: near_object — groom's college friends near the DJ booth
+// 7: near_object — two grandmothers near the emergency exit. Realistic
+// planner instinct: elderly guests get tables close to easy egress.
+// Tight 2-guest rule keeps the demo varied (small near-rule next to
+// the larger college-friends-near-dance-floor one).
+const guestByName = (first, last) => guests.find(g => g.firstName === first && g.lastName === last)
+const grandmaW = guestByName('Margaret', 'Williams')
+const grandpaW = guestByName('James', 'Williams')
+const grandmaO = guestByName('Ngozi', 'Okonkwo')
 addRule({
   type: 'near_object',
-  objectId: 'obj_dj',
-  guests: groomCollege.filter(g => g.rsvp !== 'no').map(g => g.id),
-  desc: "Groom's college friends near the DJ booth",
+  objectId: 'obj_exit',
+  guests: [grandmaW.id, grandmaO.id],
+  desc: 'Grandmothers near the emergency exit',
   weight: 20, hard: false,
 })
 
@@ -650,7 +657,6 @@ addRule({
 // from the split (not the flat list); without sideA/sideB the form
 // opens with both columns empty even when the rule is otherwise
 // correctly applied at solve time.
-const guestByName = (first, last) => guests.find(g => g.firstName === first && g.lastName === last)
 const addMustNot = (a, b, desc, weight = 30) => addRule({
   type: 'must_not',
   guests: [a, b],
@@ -661,13 +667,20 @@ const addMustNot = (a, b, desc, weight = 30) => addRule({
   hard: true,
 })
 
-const grandmaW = guestByName('Margaret', 'Williams')
-const grandpaW = guestByName('James', 'Williams')
 addMustNot(grandmaW.id, grandpaW.id, 'Divorced grandparents kept apart', 50)
 addMustNot(brideWork[0].id, groomWork[0].id, 'Ex-colleagues from rival firms apart')
 addMustNot(brideCollege[0].id, groomCollege[0].id, 'Old roommates with bad history apart')
 addMustNot(brideCollege[1].id, brideWork[2].id, 'Past workplace incident apart')
 
+// Note on parties: web/iOS UI auto-generates a must_together rule per
+// party when a user creates one (RulesView.swift::AddPartySheet).
+// Adding those same auto-rules here was tried and dropped the solver
+// score to 84% — placing 27 small atomic groups first leaves no room
+// to fit the 7-8-person coworker must_together rule at a single table.
+// Parties are still GUARANTEED together at solve time via the `units`
+// argument we pass to generateSeating below (units > rules in priority);
+// we just don't double-write them as rules. The iOS Active Rules card
+// surfaces party count separately via the parties-summary footer line.
 console.log(`Rules: ${rules.length}`)
 
 // ── Run the solver ────────────────────────────────────────────────────────
@@ -728,9 +741,12 @@ if (solverResult.fallback) {
 }
 
 if (sc.overallPercent < 95) {
-  console.error('❌ Score below 95%. Inspect rules:')
+  console.error('❌ Score below 95%. Non-satisfied rules:')
   for (const r of [...sc.hardConstraints.rules, ...sc.softPreferences.rules]) {
-    console.error(`  [${r.status}] ${r.type}: ${r.desc || ''}`)
+    if (r.status !== 'satisfied') {
+      console.error(`  [${r.status}] ${r.type}: ${r.description || r.desc || '(no desc)'}`)
+      if (r.details) console.error(`            details: ${r.details}`)
+    }
   }
   process.exit(1)
 }
