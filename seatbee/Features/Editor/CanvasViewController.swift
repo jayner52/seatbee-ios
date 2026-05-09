@@ -922,7 +922,7 @@ class CanvasViewController: UIViewController, UIScrollViewDelegate {
                     self.lastSnapY = result.snappedY
                     return result.center
                 }
-                tv.onDragEnd = { [weak self] center in
+                tv.onDragEnd = { [weak self] center, body in
                     self?.clearAlignmentGuides()
                     self?.lastSnapX = false
                     self?.lastSnapY = false
@@ -978,13 +978,13 @@ class CanvasViewController: UIViewController, UIScrollViewDelegate {
                     self.lastSnapY = result.snappedY
                     return result.center
                 }
-                ov.onDragEnd = { [weak self] center in
+                ov.onDragEnd = { [weak self] center, body in
                     self?.clearAlignmentGuides()
                     self?.lastSnapX = false
                     self?.lastSnapY = false
                     // Store top-left: subtract canvasOrigin and half-body
-                    let x = Double(center.x - (self?.canvasOrigin.x ?? 0)) - Double(halfW)
-                    let y = Double(center.y - (self?.canvasOrigin.y ?? 0)) - Double(halfH)
+                    let x = Double(center.x - (self?.canvasOrigin.x ?? 0)) - Double(body.width)  / 2
+                    let y = Double(center.y - (self?.canvasOrigin.y ?? 0)) - Double(body.height) / 2
                     self?.delegate?.canvasDidMoveObject(obj.id, x: x, y: y)
                 }
                 contentView.addSubview(ov)
@@ -1074,7 +1074,7 @@ class CanvasTableView: UIView {
     /// Receiver can return a snapped centre (alignment guides) which
     /// the view will adopt instead of the raw finger position.
     var onDragMove: ((CGPoint, CGSize) -> CGPoint)?
-    var onDragEnd: ((CGPoint) -> Void)?
+    var onDragEnd: ((CGPoint, CGSize) -> Void)?
 
     private var table: SeatTable
     private var isItemSelected = false
@@ -1778,7 +1778,8 @@ class CanvasTableView: UIView {
                                            y: proposed.y - snapped.y),
                                    in: superview)
         case .ended, .cancelled:
-            onDragEnd?(center)
+            let body = CanvasTableView.bodySize(for: table)
+            onDragEnd?(center, body)
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
         default: break
         }
@@ -1790,7 +1791,7 @@ class CanvasTableView: UIView {
 class CanvasObjectView: UIView {
     var onTap: (() -> Void)?
     var onDragMove: ((CGPoint, CGSize) -> CGPoint)?
-    var onDragEnd: ((CGPoint) -> Void)?
+    var onDragEnd: ((CGPoint, CGSize) -> Void)?
 
     private var object: RoomObject
     private var isItemSelected = false
@@ -1941,7 +1942,7 @@ class CanvasObjectView: UIView {
                                            y: proposed.y - snapped.y),
                                    in: superview)
         case .ended, .cancelled:
-            onDragEnd?(center)
+            onDragEnd?(center, frame.size)
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
         default: break
         }
