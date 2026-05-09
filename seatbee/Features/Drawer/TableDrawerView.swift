@@ -40,10 +40,15 @@ struct TableDrawerView: View {
                     Image(systemName: "xmark")
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(Color.sbWarm)
-                        .frame(width: 32, height: 32)
-                        .background(Color.sbIvory2)
-                        .clipShape(Circle())
+                        .frame(width: 44, height: 44)
+                        .background(
+                            Circle()
+                                .fill(Color.sbIvory2)
+                                .frame(width: 32, height: 32)
+                        )
                 }
+                .accessibilityLabel("Close")
+                .accessibilityHint("Dismiss the table editor")
             }
             .padding(.horizontal, SBSpacing.cardPadding)
             .padding(.top, SBSpacing.screenMargin)
@@ -55,26 +60,35 @@ struct TableDrawerView: View {
                     Button { changeSeatCount(-1) } label: {
                         Image(systemName: "minus")
                             .font(.system(size: 14, weight: .bold))
-                            .frame(width: 32, height: 32)
-                            .background(Color.sbIvory2)
-                            .clipShape(Circle())
+                            .frame(width: 44, height: 44)
+                            .background(
+                                Circle()
+                                    .fill(Color.sbIvory2)
+                                    .frame(width: 32, height: 32)
+                            )
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("Decrease seats")
 
                     Text("\(table.seats)")
                         .font(SBFont.statNumberSmall)
                         .foregroundStyle(Color.sbCharcoal)
                         .frame(width: 40)
                         .contentTransition(.numericText())
+                        .accessibilityLabel("\(table.seats) seats")
 
                     Button { changeSeatCount(1) } label: {
                         Image(systemName: "plus")
                             .font(.system(size: 14, weight: .bold))
-                            .frame(width: 32, height: 32)
-                            .background(Color.sbIvory2)
-                            .clipShape(Circle())
+                            .frame(width: 44, height: 44)
+                            .background(
+                                Circle()
+                                    .fill(Color.sbIvory2)
+                                    .frame(width: 32, height: 32)
+                            )
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("Increase seats")
 
                     Text("seats")
                         .font(SBFont.caption)
@@ -157,6 +171,9 @@ struct TableDrawerView: View {
             showColorPicker.toggle()
             HapticEngine.selection()
         } label: {
+            // 28pt visible swatch + invisible 44pt hit box around it
+            // (Apple HIG min tap target). contentShape on the outer
+            // Circle makes the whole 44pt area register taps.
             Circle()
                 .fill(Color(hex: table.color ?? "#C9A961"))
                 .frame(width: 28, height: 28)
@@ -164,8 +181,12 @@ struct TableDrawerView: View {
                     Circle().strokeBorder(Color.sbCharcoal.opacity(0.15), lineWidth: 1)
                 )
                 .shadow(color: Color.black.opacity(0.06), radius: 1, x: 0, y: 1)
+                .frame(width: 44, height: 44)
+                .contentShape(Circle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("Change ring colour")
+        .accessibilityHint("Pick a colour for this table's outline")
         .popover(isPresented: $showColorPicker, arrowEdge: .top) {
             colorPickerPopover
                 .presentationCompactAdaptation(.popover)
