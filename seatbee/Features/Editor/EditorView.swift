@@ -24,6 +24,11 @@ struct EditorView: View {
     // crowd the canvas with the source image. Persists per-plan in
     // UserDefaults keyed by plan ID so user preference survives switches.
     @State private var floorPlanVisible: Bool = false
+    // Ruler overlay — gold tick marks + unit labels on top + left
+    // edges of the room rect. Same per-plan UserDefaults persistence
+    // as floorPlanVisible. Off by default to keep the default canvas
+    // clean.
+    @State private var rulerVisible: Bool = false
 
     // Selection tracking
 
@@ -55,6 +60,8 @@ struct EditorView: View {
                     roomZones: plan?.roomZones,
                     floorPlanBase64: floorPlanVisible ? (plan?.rawFloorPlanImage?.value as? String) : nil,
                     floorPlanOpacity: plan?.rawFloorPlanOpacity,
+                    rulerVisible: rulerVisible,
+                    measurementUnit: plan?.measurementUnit,
                     fitToken: fitToken,
                     planId: plan?.id,
                     onSelectTable: { id in
@@ -166,8 +173,12 @@ struct EditorView: View {
                 selectedTableId = first.id
             }
             loadFloorPlanVisible()
+            loadRulerVisible()
         }
-        .onChange(of: plan?.id) { _, _ in loadFloorPlanVisible() }
+        .onChange(of: plan?.id) { _, _ in
+            loadFloorPlanVisible()
+            loadRulerVisible()
+        }
         .onReceive(NotificationCenter.default.publisher(for: .selectTable)) { notification in
             if let tableId = notification.userInfo?["tableId"] as? String {
                 withAnimation(.seatbee) {
@@ -253,6 +264,23 @@ struct EditorView: View {
                         .background(.ultraThinMaterial)
                         .clipShape(Circle())
                 }
+            }
+
+            // Ruler overlay toggle — gold tick marks + unit labels on
+            // the top + left edges of the room rect. Always available
+            // (no plan precondition); off by default so the canvas
+            // stays clean unless the user wants scale context.
+            Button {
+                rulerVisible.toggle()
+                persistRulerVisible()
+                HapticEngine.selection()
+            } label: {
+                Image(systemName: rulerVisible ? "ruler.fill" : "ruler")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(rulerVisible ? Color.sbGoldDk : Color.sbCharcoal)
+                    .frame(width: 34, height: 34)
+                    .background(.ultraThinMaterial)
+                    .clipShape(Circle())
             }
 
             Button { showAllTablesList = true; HapticEngine.light() } label: {
@@ -1035,6 +1063,22 @@ struct EditorView: View {
     private func persistFloorPlanVisible() {
         guard let id = plan?.id else { return }
         UserDefaults.standard.set(floorPlanVisible, forKey: floorPlanVisibleKey(id))
+    }
+
+    // MARK: - Ruler visibility (mirrors floor-plan persistence)
+
+    private func rulerVisibleKey(_ planId: String) -> String {
+        "seatbee.rulerVisible.\(planId)"
+    }
+
+    private func loadRulerVisible() {
+        guard let id = plan?.id else { rulerVisible = false; return }
+        rulerVisible = UserDefaults.standard.bool(forKey: rulerVisibleKey(id))
+    }
+
+    private func persistRulerVisible() {
+        guard let id = plan?.id else { return }
+        UserDefaults.standard.set(rulerVisible, forKey: rulerVisibleKey(id))
     }
 
     // MARK: - Category lookup (web parity)
