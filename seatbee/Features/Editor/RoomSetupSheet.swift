@@ -912,29 +912,87 @@ struct TraceShapeSheet: View {
     }
 
     // MARK: Bottom toolbar
+    //
+    // Two rows. Top row = transforms that change the polygon as a
+    // whole (scale ±5%, rotate ±15°) — web parity with App.jsx
+    // RoomEditorModal phase 2 (scalePts / rotatePts). Bottom row =
+    // mirror toggles + reset that already shipped before scale.
 
     private var toolbar: some View {
-        HStack(spacing: 10) {
-            toolButton(label: "Flip H", icon: "arrow.left.and.right", isOn: flipH) {
-                flipH.toggle()
-                HapticEngine.selection()
+        VStack(spacing: 8) {
+            HStack(spacing: 10) {
+                toolButton(label: "Smaller", icon: "minus.magnifyingglass", isOn: false) {
+                    scalePoints(by: 0.95)
+                }
+                toolButton(label: "Bigger", icon: "plus.magnifyingglass", isOn: false) {
+                    scalePoints(by: 1.05)
+                }
+                toolButton(label: "Rotate -15°", icon: "rotate.left", isOn: false) {
+                    rotatePoints(byDegrees: -15)
+                }
+                toolButton(label: "Rotate +15°", icon: "rotate.right", isOn: false) {
+                    rotatePoints(byDegrees: 15)
+                }
             }
-            toolButton(label: "Flip V", icon: "arrow.up.and.down", isOn: flipV) {
-                flipV.toggle()
-                HapticEngine.selection()
-            }
-            toolButton(label: "Reset", icon: "arrow.counterclockwise", isOn: false) {
-                points = RoomShapePresets.defaultPoints(
-                    shape: currentShape, width: roomWidth, height: roomHeight
-                )
-                flipH = false
-                flipV = false
-                HapticEngine.error()
+            HStack(spacing: 10) {
+                toolButton(label: "Flip H", icon: "arrow.left.and.right", isOn: flipH) {
+                    flipH.toggle()
+                    HapticEngine.selection()
+                }
+                toolButton(label: "Flip V", icon: "arrow.up.and.down", isOn: flipV) {
+                    flipV.toggle()
+                    HapticEngine.selection()
+                }
+                toolButton(label: "Reset", icon: "arrow.counterclockwise", isOn: false) {
+                    points = RoomShapePresets.defaultPoints(
+                        shape: currentShape, width: roomWidth, height: roomHeight
+                    )
+                    flipH = false
+                    flipV = false
+                    HapticEngine.error()
+                }
             }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .background(Color.sbIvory2)
+    }
+
+    /// Scale every polygon point about the centroid by `factor`.
+    /// Direct port of web App.jsx:9481 scalePts. Used by ±5% buttons.
+    private func scalePoints(by factor: Double) {
+        guard points.count >= 3 else { return }
+        let cx = points.map(\.x).reduce(0, +) / Double(points.count)
+        let cy = points.map(\.y).reduce(0, +) / Double(points.count)
+        points = points.map { p in
+            RoomPoint(
+                x: (cx + (p.x - cx) * factor).rounded(),
+                y: (cy + (p.y - cy) * factor).rounded(),
+                arc: p.arc
+            )
+        }
+        HapticEngine.selection()
+    }
+
+    /// Rotate every polygon point about the centroid by `angleDegrees`.
+    /// Port of web App.jsx:9488 rotatePts.
+    private func rotatePoints(byDegrees angleDegrees: Double) {
+        guard points.count >= 3 else { return }
+        let cx = points.map(\.x).reduce(0, +) / Double(points.count)
+        let cy = points.map(\.y).reduce(0, +) / Double(points.count)
+        let rad = angleDegrees * .pi / 180
+        let cos = Foundation.cos(rad)
+        let sin = Foundation.sin(rad)
+        points = points.map { p in
+            let dx = p.x - cx
+            let dy = p.y - cy
+            return RoomPoint(
+                x: (cx + dx * cos - dy * sin).rounded(),
+                y: (cy + dx * sin + dy * cos).rounded(),
+                arc: p.arc
+            )
+        }
+        HapticEngine.selection()
     }
 
     private func toolButton(label: String, icon: String, isOn: Bool, action: @escaping () -> Void) -> some View {
