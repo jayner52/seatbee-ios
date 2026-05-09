@@ -36,12 +36,23 @@ struct AddTableSheet: View {
                 VStack(spacing: 12) {
                     ForEach(tableTypes, id: \.type) { item in
                         TableTypeRow(
+                            planId: appState.activePlan?.id,
                             type: item.type,
                             name: item.name,
                             icon: item.icon,
                             defaultSeats: item.seats,
                             description: item.description
                         ) { seats, sizeFt in
+                            // Remember the user's last settings for this
+                            // table type WITHIN this plan only — persisted
+                            // before we dismiss so the next open of this
+                            // sheet seeds with the same values.
+                            AddTableSheet.persistLastSettings(
+                                planId: appState.activePlan?.id,
+                                type: item.type,
+                                seats: seats,
+                                sizeFt: sizeFt
+                            )
                             addTable(type: item.type, seats: seats, name: item.name, sizeFt: sizeFt)
                             dismiss()
                         }
@@ -52,6 +63,54 @@ struct AddTableSheet: View {
             }
         }
         .background(Color.sbIvory)
+    }
+
+    // MARK: - Per-plan persistence
+    //
+    // Each (planId, tableType) pair gets its own slot in
+    // UserDefaults. Two keys per pair: ".seats" (Int) and
+    // ".sizeFt" (Int, may be 0 to mean "no preset"). Scoped to
+    // planId so per-event preferences don't leak across events
+    // (Jayne explicitly asked for per-event scoping).
+
+    fileprivate static func seatsKey(planId: String?, type: SeatTable.TableType) -> String? {
+        guard let planId else { return nil }
+        return "seatbee.addTable.\(planId).\(type.rawValue).seats"
+    }
+
+    fileprivate static func sizeFtKey(planId: String?, type: SeatTable.TableType) -> String? {
+        guard let planId else { return nil }
+        return "seatbee.addTable.\(planId).\(type.rawValue).sizeFt"
+    }
+
+    fileprivate static func loadLastSettings(planId: String?, type: SeatTable.TableType) -> (seats: Int?, sizeFt: Int?) {
+        let defaults = UserDefaults.standard
+        let savedSeats: Int? = {
+            guard let key = seatsKey(planId: planId, type: type),
+                  defaults.object(forKey: key) != nil else { return nil }
+            let v = defaults.integer(forKey: key)
+            return v > 0 ? v : nil
+        }()
+        let savedSizeFt: Int? = {
+            guard let key = sizeFtKey(planId: planId, type: type),
+                  defaults.object(forKey: key) != nil else { return nil }
+            let v = defaults.integer(forKey: key)
+            // 0 was used as a "no preset" sentinel for head /
+            // sweetheart — treat as nil here so the row falls back
+            // to its default sizing path.
+            return v > 0 ? v : nil
+        }()
+        return (savedSeats, savedSizeFt)
+    }
+
+    fileprivate static func persistLastSettings(planId: String?, type: SeatTable.TableType, seats: Int, sizeFt: Int?) {
+        let defaults = UserDefaults.standard
+        if let key = seatsKey(planId: planId, type: type) {
+            defaults.set(seats, forKey: key)
+        }
+        if let key = sizeFtKey(planId: planId, type: type) {
+            defaults.set(sizeFt ?? 0, forKey: key)
+        }
     }
 
     private func addTable(type: SeatTable.TableType, seats: Int, name: String, sizeFt: Int?) {
@@ -110,6 +169,7 @@ struct AddTableSheet: View {
 /// stepper + preset chips are independent (changing the round
 /// table's seat count doesn't reset the oval table's pick).
 private struct TableTypeRow: View {
+    let planId: String?
     let type: SeatTable.TableType
     let name: String
     let icon: String
@@ -120,20 +180,23 @@ private struct TableTypeRow: View {
     @State private var seats: Int
     @State private var sizeFt: Int?
 
-    init(type: SeatTable.TableType, name: String, icon: String,
+    init(planId: String?, type: SeatTable.TableType, name: String, icon: String,
          defaultSeats: Int, description: String,
          onAdd: @escaping (_ seats: Int, _ sizeFt: Int?) -> Void) {
+        self.planId = planId
         self.type = type
         self.name = name
         self.icon = icon
         self.defaultSeats = defaultSeats
         self.description = description
         self.onAdd = onAdd
-        _seats = State(initialValue: defaultSeats)
-        // Size preset only seeded for shape-only types; head /
-        // sweetheart use semantic dimensions and don't expose
-        // a preset row.
-        _sizeFt = State(initialValue: TableDefaults.defaultSizeFt(for: type))
+        // Seed from per-plan persisted values when present, so the
+        // sheet remembers the last seats / size the user picked for
+        // each table type within this event. Falls back to the
+        // hardcoded defaults on first open of a fresh plan.
+        let persisted = AddTableSheet.loadLastSettings(planId: planId, type: type)
+        _seats = State(initialValue: persisted.seats ?? defaultSeats)
+        _sizeFt = State(initialValue: persisted.sizeFt ?? TableDefaults.defaultSizeFt(for: type))
     }
 
     /// Sensible bounds for the seat stepper. Sweetheart caps at 2
