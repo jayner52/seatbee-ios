@@ -292,13 +292,16 @@ private struct SampleObject: Decodable {
     let y: Double
     let width: Double
     let height: Double
+    let color: String?
+    let category: String?
+    let isObstacle: Bool?
 
     func toDomain() -> RoomObject {
         RoomObject(
             id: id, type: type, name: name,
             x: x, y: y, width: width, height: height,
-            rotation: nil, color: nil, category: nil, icon: nil,
-            isObstacle: nil, locked: nil
+            rotation: nil, color: color, category: category, icon: nil,
+            isObstacle: isObstacle, locked: nil
         )
     }
 }

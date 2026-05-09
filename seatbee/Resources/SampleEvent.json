@@ -1,7 +1,7 @@
 {
-  "schemaVersion": 1,
-  "generatedAt": "2026-05-09T16:42:24.475Z",
-  "solverScore": 100,
+  "schemaVersion": 2,
+  "generatedAt": "2026-05-09T17:23:15.820Z",
+  "solverScore": 97,
   "plan": {
     "id": "demo-sample-event",
     "name": "Carter & Brooks Wedding",
@@ -28,7 +28,7 @@
         "sweetShape": "heart",
         "color": "#C9A961",
         "assignments": {
-          "g-071": 0
+          "g-013": 0
         }
       },
       {
@@ -43,16 +43,16 @@
         "oneSide": true,
         "color": "#C9A961",
         "assignments": {
-          "g-108": 0,
-          "g-036": 1,
-          "g-062": 2,
-          "g-016": 3,
-          "g-026": 4,
-          "g-120": 5,
-          "g-066": 6,
-          "g-096": 7,
-          "g-095": 8,
-          "g-126": 9
+          "g-056": 0,
+          "g-055": 1,
+          "g-053": 2,
+          "g-052": 3,
+          "g-018": 4,
+          "g-016": 5,
+          "g-017": 6,
+          "g-026": 7,
+          "g-027": 8,
+          "g-080": 9
         }
       },
       {
@@ -65,14 +65,14 @@
         "diameter": 100,
         "color": "#C9A961",
         "assignments": {
-          "g-082": 0,
-          "g-085": 1,
-          "g-080": 2,
-          "g-086": 3,
-          "g-079": 4,
-          "g-083": 5,
-          "g-081": 6,
-          "g-084": 7
+          "g-113": 0,
+          "g-107": 1,
+          "g-112": 2,
+          "g-114": 3,
+          "g-108": 4,
+          "g-110": 5,
+          "g-109": 6,
+          "g-111": 7
         }
       },
       {
@@ -85,14 +85,13 @@
         "diameter": 100,
         "color": "#C9A961",
         "assignments": {
-          "g-094": 0,
-          "g-089": 1,
-          "g-092": 2,
-          "g-090": 3,
-          "g-088": 4,
-          "g-087": 5,
-          "g-093": 6,
-          "g-091": 7
+          "g-099": 0,
+          "g-102": 1,
+          "g-101": 2,
+          "g-105": 3,
+          "g-103": 4,
+          "g-100": 5,
+          "g-104": 6
         }
       },
       {
@@ -105,14 +104,14 @@
         "diameter": 100,
         "color": "#C9A961",
         "assignments": {
-          "g-034": 0,
-          "g-028": 1,
-          "g-032": 2,
-          "g-031": 3,
-          "g-030": 4,
-          "g-029": 5,
-          "g-033": 6,
-          "g-027": 7
+          "g-087": 0,
+          "g-086": 1,
+          "g-085": 2,
+          "g-082": 3,
+          "g-083": 4,
+          "g-089": 5,
+          "g-081": 6,
+          "g-088": 7
         }
       },
       {
@@ -125,14 +124,14 @@
         "diameter": 100,
         "color": "#C9A961",
         "assignments": {
-          "g-049": 0,
-          "g-048": 1,
-          "g-053": 2,
-          "g-054": 3,
-          "g-047": 4,
-          "g-052": 5,
-          "g-050": 6,
-          "g-051": 7
+          "g-090": 0,
+          "g-097": 1,
+          "g-096": 2,
+          "g-092": 3,
+          "g-094": 4,
+          "g-091": 5,
+          "g-098": 6,
+          "g-093": 7
         }
       },
       {
@@ -145,14 +144,14 @@
         "diameter": 100,
         "color": "#C9A961",
         "assignments": {
-          "g-113": 0,
-          "g-009": 1,
-          "g-007": 2,
-          "g-006": 3,
-          "g-022": 4,
-          "g-005": 5,
-          "g-070": 6,
-          "g-004": 7
+          "g-006": 0,
+          "g-001": 1,
+          "g-002": 2,
+          "g-003": 3,
+          "g-007": 4,
+          "g-004": 5,
+          "g-008": 6,
+          "g-005": 7
         }
       },
       {
@@ -165,14 +164,10 @@
         "diameter": 100,
         "color": "#C9A961",
         "assignments": {
-          "g-014": 0,
-          "g-021": 1,
-          "g-011": 2,
-          "g-104": 3,
-          "g-112": 4,
-          "g-019": 5,
-          "g-012": 6,
-          "g-013": 7
+          "g-010": 0,
+          "g-009": 1,
+          "g-012": 2,
+          "g-011": 3
         }
       },
       {
@@ -185,14 +180,14 @@
         "diameter": 100,
         "color": "#C9A961",
         "assignments": {
-          "g-069": 0,
-          "g-100": 1,
-          "g-045": 2,
-          "g-017": 3,
+          "g-036": 0,
+          "g-039": 1,
+          "g-020": 2,
+          "g-068": 3,
           "g-038": 4,
-          "g-067": 5,
-          "g-077": 6,
-          "g-061": 7
+          "g-021": 5,
+          "g-035": 6,
+          "g-067": 7
         }
       },
       {
@@ -205,13 +200,11 @@
         "diameter": 100,
         "color": "#C9A961",
         "assignments": {
-          "g-068": 0,
-          "g-037": 1,
-          "g-059": 2,
-          "g-106": 3,
-          "g-116": 4,
-          "g-058": 5,
-          "g-109": 6
+          "g-046": 0,
+          "g-058": 1,
+          "g-044": 2,
+          "g-059": 3,
+          "g-045": 4
         }
       },
       {
@@ -224,13 +217,14 @@
         "diameter": 100,
         "color": "#C9A961",
         "assignments": {
-          "g-008": 0,
-          "g-057": 1,
-          "g_groom": 2,
-          "g-003": 3,
-          "g-124": 4,
-          "g-114": 5,
-          "g-055": 6
+          "g-029": 0,
+          "g-073": 1,
+          "g-042": 2,
+          "g-030": 3,
+          "g-062": 4,
+          "g-074": 5,
+          "g-041": 6,
+          "g-061": 7
         }
       },
       {
@@ -243,12 +237,14 @@
         "diameter": 100,
         "color": "#C9A961",
         "assignments": {
-          "g-117": 0,
-          "g-110": 1,
-          "g-097": 2,
+          "g-065": 0,
+          "g-032": 1,
+          "g-077": 2,
           "g-076": 3,
-          "g-107": 4,
-          "g-015": 5
+          "g-033": 4,
+          "g-024": 5,
+          "g-023": 6,
+          "g-064": 7
         }
       },
       {
@@ -261,13 +257,14 @@
         "diameter": 100,
         "color": "#C9A961",
         "assignments": {
-          "g-039": 0,
-          "g_bride": 1,
-          "g-099": 2,
-          "g-072": 3,
-          "g-115": 4,
+          "g-116": 0,
+          "g-122": 1,
+          "g-129": 2,
+          "g-117": 3,
+          "g-137": 4,
           "g-128": 5,
-          "g-056": 6
+          "g-123": 6,
+          "g-136": 7
         }
       },
       {
@@ -280,13 +277,14 @@
         "diameter": 100,
         "color": "#C9A961",
         "assignments": {
-          "g-098": 0,
-          "g-125": 1,
-          "g-101": 2,
+          "g-047": 0,
+          "g-070": 1,
+          "g-071": 2,
           "g-078": 3,
-          "g-018": 4,
-          "g-111": 5,
-          "g-024": 6
+          "g-079": 4,
+          "g-049": 5,
+          "g-050": 6,
+          "g-048": 7
         }
       },
       {
@@ -299,14 +297,14 @@
         "diameter": 100,
         "color": "#C9A961",
         "assignments": {
-          "g-129": 0,
-          "g-121": 1,
-          "g-042": 2,
-          "g-063": 3,
-          "g-023": 4,
-          "g-102": 5,
-          "g-043": 6,
-          "g-041": 7
+          "g-095": 0,
+          "g-143": 1,
+          "g-133": 2,
+          "g-084": 3,
+          "g-144": 4,
+          "g-014": 5,
+          "g-142": 6,
+          "g-145": 7
         }
       },
       {
@@ -319,13 +317,14 @@
         "diameter": 100,
         "color": "#C9A961",
         "assignments": {
-          "g-025": 0,
-          "g-002": 1,
-          "g-105": 2,
-          "g-064": 3,
-          "g-044": 4,
-          "g-118": 5,
-          "g-010": 6
+          "g-126": 0,
+          "g-134": 1,
+          "g-131": 2,
+          "g-125": 3,
+          "g-140": 4,
+          "g-139": 5,
+          "g-132": 6,
+          "g-141": 7
         }
       },
       {
@@ -337,16 +336,7 @@
         "y": 770,
         "diameter": 100,
         "color": "#C9A961",
-        "assignments": {
-          "g-060": 0,
-          "g-130": 1,
-          "g-040": 2,
-          "g-103": 3,
-          "g-001": 4,
-          "g-127": 5,
-          "g-075": 6,
-          "g-046": 7
-        }
+        "assignments": {}
       },
       {
         "id": "t_round_16",
@@ -358,2492 +348,2485 @@
         "diameter": 100,
         "color": "#C9A961",
         "assignments": {
-          "g-035": 0,
-          "g-123": 1,
-          "g-119": 2,
-          "g-074": 3,
-          "g-020": 4,
-          "g-065": 5,
-          "g-122": 6,
-          "g-073": 7
+          "g-120": 0,
+          "g-119": 1,
+          "g-106": 2
         }
       }
     ],
     "guests": [
       {
-        "id": "g_bride",
+        "id": "g-001",
         "firstName": "Brooks",
         "lastName": "Williams",
         "name": "Brooks Williams",
-        "display": "Brooks",
-        "side": "none",
-        "vip": true,
-        "rsvp": "yes",
-        "party": "p_bride_imm",
+        "display": "Brooks Williams",
+        "side": "bride",
+        "categories": [
+          "cat-wedding-party"
+        ],
         "meal": "Pan-Seared Salmon",
-        "categories": [],
         "dietaryTags": [],
-        "plusOne": false,
-        "isBride": true
-      },
-      {
-        "id": "g_groom",
-        "firstName": "Carter",
-        "lastName": "Okonkwo",
-        "name": "Carter Okonkwo",
-        "display": "Carter",
-        "side": "none",
-        "vip": true,
         "rsvp": "yes",
-        "party": "p_groom_imm",
-        "meal": "Beef Tenderloin",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isGroom": true
-      },
-      {
-        "id": "g-001",
-        "firstName": "Patricia",
-        "lastName": "Williams",
-        "name": "Patricia Williams",
-        "display": "Patricia",
-        "side": "none",
         "vip": true,
-        "rsvp": "yes",
-        "party": "p_bride_imm",
-        "meal": "Beef Tenderloin",
-        "categories": [],
-        "dietaryTags": [],
+        "isChild": false,
         "plusOne": false,
-        "isChild": false
+        "isBride": true,
+        "isGroom": false,
+        "party": null
       },
       {
         "id": "g-002",
-        "firstName": "David",
-        "lastName": "Williams",
-        "name": "David Williams",
-        "display": "David",
-        "side": "none",
-        "vip": true,
-        "rsvp": "yes",
-        "party": "p_bride_imm",
-        "meal": "Pan-Seared Salmon",
-        "categories": [],
+        "firstName": "Carter",
+        "lastName": "Okonkwo",
+        "name": "Carter Okonkwo",
+        "display": "Carter Okonkwo",
+        "side": "groom",
+        "categories": [
+          "cat-wedding-party"
+        ],
+        "meal": "Beef Tenderloin",
         "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": true,
+        "isChild": false,
         "plusOne": false,
-        "isChild": false
+        "isBride": false,
+        "isGroom": true,
+        "party": null
       },
       {
         "id": "g-003",
         "firstName": "Charlotte",
         "lastName": "Williams",
         "name": "Charlotte Williams",
-        "display": "Charlotte",
-        "side": "none",
-        "vip": true,
-        "rsvp": "yes",
-        "party": "p_bride_imm",
-        "meal": "Vegetarian Risotto",
-        "categories": [],
+        "display": "Charlotte Williams",
+        "side": "both",
+        "categories": [
+          "cat-wedding-party",
+          "cat-family"
+        ],
+        "meal": "Pan-Seared Salmon",
         "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": true,
+        "isChild": false,
         "plusOne": false,
-        "isChild": false
+        "isBride": false,
+        "isGroom": false,
+        "party": null
       },
       {
         "id": "g-004",
-        "firstName": "Owen",
-        "lastName": "Williams",
-        "name": "Owen Williams",
-        "display": "Owen",
-        "side": "none",
-        "vip": false,
+        "firstName": "Maya",
+        "lastName": "Patel",
+        "name": "Maya Patel",
+        "display": "Maya Patel",
+        "side": "both",
+        "categories": [
+          "cat-wedding-party",
+          "cat-friends"
+        ],
+        "meal": "Vegetarian Risotto",
+        "dietaryTags": [
+          "kosher"
+        ],
         "rsvp": "yes",
-        "party": "p_bride_imm",
-        "meal": "Vegan Tasting Plate",
-        "categories": [],
-        "dietaryTags": [],
+        "vip": true,
+        "isChild": false,
         "plusOne": false,
-        "isChild": false
+        "isBride": false,
+        "isGroom": false,
+        "party": null
       },
       {
         "id": "g-005",
-        "firstName": "Margaret",
-        "lastName": "Williams",
-        "name": "Margaret Williams",
-        "display": "Margaret",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_bride_imm",
-        "meal": "Kids Chicken Fingers",
-        "categories": [],
+        "firstName": "Yuki",
+        "lastName": "Tanaka",
+        "name": "Yuki Tanaka",
+        "display": "Yuki Tanaka",
+        "side": "both",
+        "categories": [
+          "cat-wedding-party",
+          "cat-friends"
+        ],
+        "meal": "Pan-Seared Salmon",
         "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": true,
+        "isChild": false,
         "plusOne": false,
-        "isChild": false
+        "isBride": false,
+        "isGroom": false,
+        "party": null
       },
       {
         "id": "g-006",
-        "firstName": "James",
-        "lastName": "Williams",
-        "name": "James Williams",
-        "display": "James",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_bride_imm",
+        "firstName": "Aisha",
+        "lastName": "Khan",
+        "name": "Aisha Khan",
+        "display": "Aisha Khan",
+        "side": "both",
+        "categories": [
+          "cat-wedding-party",
+          "cat-friends"
+        ],
         "meal": "Beef Tenderloin",
-        "categories": [],
-        "dietaryTags": [],
+        "dietaryTags": [
+          "halal"
+        ],
+        "rsvp": "yes",
+        "vip": true,
+        "isChild": false,
         "plusOne": false,
-        "isChild": false
+        "isBride": false,
+        "isGroom": false,
+        "party": null
       },
       {
         "id": "g-007",
-        "firstName": "Helen",
-        "lastName": "Park",
-        "name": "Helen Park",
-        "display": "Helen",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_bride_imm",
-        "meal": "Pan-Seared Salmon",
-        "categories": [],
+        "firstName": "David",
+        "lastName": "Williams",
+        "name": "David Williams",
+        "display": "David Williams",
+        "side": "both",
+        "categories": [
+          "cat-wedding-party",
+          "cat-family"
+        ],
+        "meal": "Beef Tenderloin",
         "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": true,
+        "isChild": false,
         "plusOne": false,
-        "isChild": false
+        "isBride": false,
+        "isGroom": false,
+        "party": null
       },
       {
         "id": "g-008",
-        "firstName": "Adaeze",
-        "lastName": "Okonkwo",
-        "name": "Adaeze Okonkwo",
-        "display": "Adaeze",
-        "side": "none",
-        "vip": true,
-        "rsvp": "yes",
-        "party": "p_groom_imm",
-        "meal": "Vegetarian Risotto",
-        "categories": [],
+        "firstName": "Patricia",
+        "lastName": "Williams",
+        "name": "Patricia Williams",
+        "display": "Patricia Williams",
+        "side": "both",
+        "categories": [
+          "cat-wedding-party",
+          "cat-family"
+        ],
+        "meal": "Pan-Seared Salmon",
         "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": true,
+        "isChild": false,
         "plusOne": false,
-        "isChild": false
+        "isBride": false,
+        "isGroom": false,
+        "party": null
       },
       {
         "id": "g-009",
         "firstName": "Chinedu",
         "lastName": "Okonkwo",
         "name": "Chinedu Okonkwo",
-        "display": "Chinedu",
-        "side": "none",
-        "vip": true,
-        "rsvp": "yes",
-        "party": "p_groom_imm",
-        "meal": "Vegan Tasting Plate",
-        "categories": [],
+        "display": "Chinedu Okonkwo",
+        "side": "both",
+        "categories": [
+          "cat-wedding-party",
+          "cat-family"
+        ],
+        "meal": "Beef Tenderloin",
         "dietaryTags": [
           "gluten-free"
         ],
+        "rsvp": "yes",
+        "vip": true,
+        "isChild": false,
         "plusOne": false,
-        "isChild": false
+        "isBride": false,
+        "isGroom": false,
+        "party": null
       },
       {
         "id": "g-010",
-        "firstName": "Tunde",
+        "firstName": "Adaeze",
         "lastName": "Okonkwo",
-        "name": "Tunde Okonkwo",
-        "display": "Tunde",
-        "side": "none",
-        "vip": true,
-        "rsvp": "yes",
-        "party": "p_groom_imm",
-        "meal": "Kids Chicken Fingers",
-        "categories": [],
+        "name": "Adaeze Okonkwo",
+        "display": "Adaeze Okonkwo",
+        "side": "both",
+        "categories": [
+          "cat-wedding-party",
+          "cat-family"
+        ],
+        "meal": "Vegetarian Risotto",
         "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": true,
+        "isChild": false,
         "plusOne": false,
-        "isChild": false
+        "isBride": false,
+        "isGroom": false,
+        "party": null
       },
       {
         "id": "g-011",
-        "firstName": "Ifeoma",
+        "firstName": "Tunde",
         "lastName": "Okonkwo",
-        "name": "Ifeoma Okonkwo",
-        "display": "Ifeoma",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_groom_imm",
+        "name": "Tunde Okonkwo",
+        "display": "Tunde Okonkwo",
+        "side": "both",
+        "categories": [
+          "cat-wedding-party",
+          "cat-family"
+        ],
         "meal": "Beef Tenderloin",
-        "categories": [],
         "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": true,
+        "isChild": false,
         "plusOne": false,
-        "isChild": false
+        "isBride": false,
+        "isGroom": false,
+        "party": null
       },
       {
         "id": "g-012",
-        "firstName": "Ngozi",
-        "lastName": "Okonkwo",
-        "name": "Ngozi Okonkwo",
-        "display": "Ngozi",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_groom_imm",
-        "meal": "Pan-Seared Salmon",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-013",
-        "firstName": "Obinna",
-        "lastName": "Okonkwo",
-        "name": "Obinna Okonkwo",
-        "display": "Obinna",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_groom_imm",
-        "meal": "Vegetarian Risotto",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-014",
-        "firstName": "Amara",
-        "lastName": "Carter",
-        "name": "Amara Carter",
-        "display": "Amara",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_groom_imm",
-        "meal": "Vegan Tasting Plate",
-        "categories": [],
-        "dietaryTags": [
-          "gluten-free"
-        ],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-015",
-        "firstName": "Sophie",
-        "lastName": "Williams",
-        "name": "Sophie Williams",
-        "display": "Sophie",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_bride_williams",
-        "meal": "Kids Chicken Fingers",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-016",
-        "firstName": "Emma",
-        "lastName": "Park",
-        "name": "Emma Park",
-        "display": "Emma",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_bride_williams",
-        "meal": "Beef Tenderloin",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-017",
-        "firstName": "Charlotte",
-        "lastName": "Park-Williams",
-        "name": "Charlotte Park-Williams",
-        "display": "Charlotte",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_bride_williams",
-        "meal": "Pan-Seared Salmon",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-018",
-        "firstName": "Olivia",
-        "lastName": "Williams-Patel",
-        "name": "Olivia Williams-Patel",
-        "display": "Olivia",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_bride_williams",
-        "meal": "Vegetarian Risotto",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-019",
-        "firstName": "Mia",
-        "lastName": "Patel",
-        "name": "Mia Patel",
-        "display": "Mia",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_bride_williams",
-        "meal": "Vegan Tasting Plate",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-020",
-        "firstName": "Hannah",
-        "lastName": "Singh",
-        "name": "Hannah Singh",
-        "display": "Hannah",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_bride_williams",
-        "meal": "Kids Chicken Fingers",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-021",
-        "firstName": "Grace",
-        "lastName": "Khan",
-        "name": "Grace Khan",
-        "display": "Grace",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_bride_williams",
-        "meal": "Beef Tenderloin",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-022",
-        "firstName": "Lily",
-        "lastName": "Tanaka",
-        "name": "Lily Tanaka",
-        "display": "Lily",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_bride_williams",
-        "meal": "Pan-Seared Salmon",
-        "categories": [],
-        "dietaryTags": [
-          "dairy-free"
-        ],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-023",
-        "firstName": "Maya",
-        "lastName": "Liu",
-        "name": "Maya Liu",
-        "display": "Maya",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_bride_williams",
-        "meal": "Vegetarian Risotto",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-024",
-        "firstName": "Priya",
-        "lastName": "Chen",
-        "name": "Priya Chen",
-        "display": "Priya",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_bride_williams",
-        "meal": "Vegan Tasting Plate",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-025",
-        "firstName": "Aisha",
-        "lastName": "Nakamura",
-        "name": "Aisha Nakamura",
-        "display": "Aisha",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_bride_williams",
-        "meal": "Kids Chicken Fingers",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-026",
-        "firstName": "Fatima",
-        "lastName": "Williams",
-        "name": "Fatima Williams",
-        "display": "Fatima",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_bride_williams",
-        "meal": "Beef Tenderloin",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-027",
-        "firstName": "Zara",
-        "lastName": "Park",
-        "name": "Zara Park",
-        "display": "Zara",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_bride_park",
-        "meal": "Pan-Seared Salmon",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-028",
-        "firstName": "Leila",
-        "lastName": "Park-Williams",
-        "name": "Leila Park-Williams",
-        "display": "Leila",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_bride_park",
-        "meal": "Vegetarian Risotto",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-029",
-        "firstName": "Yasmin",
-        "lastName": "Williams-Patel",
-        "name": "Yasmin Williams-Patel",
-        "display": "Yasmin",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_bride_park",
-        "meal": "Vegan Tasting Plate",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-030",
-        "firstName": "Noor",
-        "lastName": "Patel",
-        "name": "Noor Patel",
-        "display": "Noor",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_bride_park",
-        "meal": "Kids Chicken Fingers",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-031",
-        "firstName": "Mei",
-        "lastName": "Singh",
-        "name": "Mei Singh",
-        "display": "Mei",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_bride_park",
-        "meal": "Beef Tenderloin",
-        "categories": [],
-        "dietaryTags": [
-          "nut-allergy"
-        ],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-032",
-        "firstName": "Lin",
-        "lastName": "Khan",
-        "name": "Lin Khan",
-        "display": "Lin",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_bride_park",
-        "meal": "Pan-Seared Salmon",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-033",
-        "firstName": "Yuki",
-        "lastName": "Tanaka",
-        "name": "Yuki Tanaka",
-        "display": "Yuki",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_bride_park",
-        "meal": "Vegetarian Risotto",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-034",
-        "firstName": "Hana",
-        "lastName": "Liu",
-        "name": "Hana Liu",
-        "display": "Hana",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_bride_park",
-        "meal": "Vegan Tasting Plate",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-035",
-        "firstName": "Adaeze",
-        "lastName": "Carter",
-        "name": "Adaeze Carter",
-        "display": "Adaeze",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_groom_carter",
-        "meal": "Kids Chicken Fingers",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-036",
-        "firstName": "Chiamaka",
-        "lastName": "Okonkwo",
-        "name": "Chiamaka Okonkwo",
-        "display": "Chiamaka",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_groom_carter",
-        "meal": "Beef Tenderloin",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-037",
-        "firstName": "Ngozi",
-        "lastName": "Carter-Okonkwo",
-        "name": "Ngozi Carter-Okonkwo",
-        "display": "Ngozi",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_groom_carter",
-        "meal": "Pan-Seared Salmon",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-038",
-        "firstName": "Folake",
-        "lastName": "Hernández",
-        "name": "Folake Hernández",
-        "display": "Folake",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_groom_carter",
-        "meal": "Vegetarian Risotto",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-039",
-        "firstName": "Amara",
-        "lastName": "García",
-        "name": "Amara García",
-        "display": "Amara",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_groom_carter",
-        "meal": "Kids Chicken Fingers",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-040",
-        "firstName": "Ifeoma",
-        "lastName": "Goldberg",
-        "name": "Ifeoma Goldberg",
-        "display": "Ifeoma",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_groom_carter",
-        "meal": "Beef Tenderloin",
-        "categories": [],
-        "dietaryTags": [
-          "shellfish-allergy"
-        ],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-041",
-        "firstName": "Zuri",
-        "lastName": "Cohen",
-        "name": "Zuri Cohen",
-        "display": "Zuri",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_groom_carter",
-        "meal": "Pan-Seared Salmon",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-042",
-        "firstName": "Kehinde",
-        "lastName": "Adebayo",
-        "name": "Kehinde Adebayo",
-        "display": "Kehinde",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_groom_carter",
-        "meal": "Vegetarian Risotto",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-043",
-        "firstName": "Sofia",
-        "lastName": "Diallo",
-        "name": "Sofia Diallo",
-        "display": "Sofia",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_groom_carter",
-        "meal": "Beef Tenderloin",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-044",
-        "firstName": "Isabella",
-        "lastName": "Ramirez",
-        "name": "Isabella Ramirez",
-        "display": "Isabella",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_groom_carter",
-        "meal": "Pan-Seared Salmon",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-045",
-        "firstName": "Camila",
-        "lastName": "Carter",
-        "name": "Camila Carter",
-        "display": "Camila",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_groom_carter",
-        "meal": "Vegetarian Risotto",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-046",
-        "firstName": "Valentina",
-        "lastName": "Okonkwo",
-        "name": "Valentina Okonkwo",
-        "display": "Valentina",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_groom_carter",
-        "meal": "Beef Tenderloin",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-047",
-        "firstName": "Lucia",
-        "lastName": "Carter-Okonkwo",
-        "name": "Lucia Carter-Okonkwo",
-        "display": "Lucia",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_groom_okonkwo",
-        "meal": "Pan-Seared Salmon",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-048",
-        "firstName": "Elena",
-        "lastName": "Hernández",
-        "name": "Elena Hernández",
-        "display": "Elena",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_groom_okonkwo",
-        "meal": "Vegetarian Risotto",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-049",
-        "firstName": "Carmen",
-        "lastName": "García",
-        "name": "Carmen García",
-        "display": "Carmen",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_groom_okonkwo",
-        "meal": "Beef Tenderloin",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-050",
-        "firstName": "Rosa",
-        "lastName": "Goldberg",
-        "name": "Rosa Goldberg",
-        "display": "Rosa",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_groom_okonkwo",
-        "meal": "Pan-Seared Salmon",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-051",
-        "firstName": "Sarah",
-        "lastName": "Cohen",
-        "name": "Sarah Cohen",
-        "display": "Sarah",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_groom_okonkwo",
-        "meal": "Vegetarian Risotto",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-052",
-        "firstName": "Rachel",
-        "lastName": "Adebayo",
-        "name": "Rachel Adebayo",
-        "display": "Rachel",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_groom_okonkwo",
-        "meal": "Beef Tenderloin",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-053",
-        "firstName": "Hannah",
-        "lastName": "Diallo",
-        "name": "Hannah Diallo",
-        "display": "Hannah",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_groom_okonkwo",
-        "meal": "Pan-Seared Salmon",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-054",
-        "firstName": "Leah",
-        "lastName": "Ramirez",
-        "name": "Leah Ramirez",
-        "display": "Leah",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_groom_okonkwo",
-        "meal": "Vegetarian Risotto",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-055",
-        "firstName": "Maya",
-        "lastName": "Patel",
-        "name": "Maya Patel",
-        "display": "Maya",
-        "side": "none",
-        "vip": true,
-        "rsvp": "yes",
-        "party": "p_bride_college",
-        "meal": "Beef Tenderloin",
-        "categories": [],
-        "dietaryTags": [
-          "kosher"
-        ],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-056",
-        "firstName": "Yuki",
-        "lastName": "Tanaka",
-        "name": "Yuki Tanaka",
-        "display": "Yuki",
-        "side": "none",
-        "vip": true,
-        "rsvp": "yes",
-        "party": "p_bride_college",
-        "meal": "Pan-Seared Salmon",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-057",
-        "firstName": "Aisha",
-        "lastName": "Khan",
-        "name": "Aisha Khan",
-        "display": "Aisha",
-        "side": "none",
-        "vip": true,
-        "rsvp": "yes",
-        "party": "p_bride_college",
-        "meal": "Vegetarian Risotto",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-058",
-        "firstName": "Sora",
-        "lastName": "Chen",
-        "name": "Sora Chen",
-        "display": "Sora",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_bride_college",
-        "meal": "Beef Tenderloin",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-059",
-        "firstName": "Nina",
-        "lastName": "Nakamura",
-        "name": "Nina Nakamura",
-        "display": "Nina",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_bride_college",
-        "meal": "Pan-Seared Salmon",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-060",
-        "firstName": "Anya",
-        "lastName": "Williams",
-        "name": "Anya Williams",
-        "display": "Anya",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_bride_college",
-        "meal": "Vegetarian Risotto",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-061",
-        "firstName": "Tara",
-        "lastName": "Park",
-        "name": "Tara Park",
-        "display": "Tara",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_bride_college",
-        "meal": "Beef Tenderloin",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-062",
-        "firstName": "Daniel",
-        "lastName": "Park-Williams",
-        "name": "Daniel Park-Williams",
-        "display": "Daniel",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_bride_college",
-        "meal": "Pan-Seared Salmon",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-063",
-        "firstName": "Marcus",
-        "lastName": "Williams-Patel",
-        "name": "Marcus Williams-Patel",
-        "display": "Marcus",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_bride_college",
-        "meal": "Vegetarian Risotto",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-064",
-        "firstName": "Ethan",
-        "lastName": "Patel",
-        "name": "Ethan Patel",
-        "display": "Ethan",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_bride_college",
-        "meal": "Beef Tenderloin",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-065",
-        "firstName": "Jacob",
-        "lastName": "Singh",
-        "name": "Jacob Singh",
-        "display": "Jacob",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_bride_college",
-        "meal": "Pan-Seared Salmon",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-066",
-        "firstName": "Liam",
-        "lastName": "Khan",
-        "name": "Liam Khan",
-        "display": "Liam",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_bride_college",
-        "meal": "Vegetarian Risotto",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-067",
         "firstName": "Jelani",
         "lastName": "Adebayo",
         "name": "Jelani Adebayo",
-        "display": "Jelani",
-        "side": "none",
-        "vip": true,
-        "rsvp": "yes",
-        "party": "p_groom_college",
+        "display": "Jelani Adebayo",
+        "side": "both",
+        "categories": [
+          "cat-wedding-party",
+          "cat-friends"
+        ],
         "meal": "Beef Tenderloin",
-        "categories": [],
         "dietaryTags": [
           "halal"
         ],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-068",
-        "firstName": "Diego",
-        "lastName": "Hernández",
-        "name": "Diego Hernández",
-        "display": "Diego",
-        "side": "none",
+        "rsvp": "yes",
         "vip": true,
-        "rsvp": "yes",
-        "party": "p_groom_college",
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": null
+      },
+      {
+        "id": "g-013",
+        "firstName": "Margaret",
+        "lastName": "Williams",
+        "name": "Margaret Williams",
+        "display": "Margaret Williams",
+        "side": "none",
+        "categories": [
+          "cat-family"
+        ],
         "meal": "Pan-Seared Salmon",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-069",
-        "firstName": "Aaron",
-        "lastName": "Goldberg",
-        "name": "Aaron Goldberg",
-        "display": "Aaron",
-        "side": "none",
-        "vip": true,
-        "rsvp": "yes",
-        "party": "p_groom_college",
-        "meal": "Vegetarian Risotto",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-070",
-        "firstName": "Naomi",
-        "lastName": "Carter",
-        "name": "Naomi Carter",
-        "display": "Naomi",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_groom_college",
-        "meal": "Beef Tenderloin",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-071",
-        "firstName": "Esther",
-        "lastName": "Okonkwo",
-        "name": "Esther Okonkwo",
-        "display": "Esther",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_groom_college",
-        "meal": "Pan-Seared Salmon",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-072",
-        "firstName": "Miriam",
-        "lastName": "Carter-Okonkwo",
-        "name": "Miriam Carter-Okonkwo",
-        "display": "Miriam",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_groom_college",
-        "meal": "Vegetarian Risotto",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-073",
-        "firstName": "Tamar",
-        "lastName": "Hernández",
-        "name": "Tamar Hernández",
-        "display": "Tamar",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_groom_college",
-        "meal": "Beef Tenderloin",
-        "categories": [],
         "dietaryTags": [
           "gluten-free"
         ],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-074",
-        "firstName": "Chinedu",
-        "lastName": "García",
-        "name": "Chinedu García",
-        "display": "Chinedu",
-        "side": "none",
-        "vip": false,
         "rsvp": "yes",
-        "party": "p_groom_college",
-        "meal": "Pan-Seared Salmon",
-        "categories": [],
-        "dietaryTags": [],
+        "vip": true,
+        "isChild": false,
         "plusOne": false,
-        "isChild": false
+        "isBride": false,
+        "isGroom": false,
+        "party": null
       },
       {
-        "id": "g-075",
-        "firstName": "Tunde",
-        "lastName": "Goldberg",
-        "name": "Tunde Goldberg",
-        "display": "Tunde",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_groom_college",
-        "meal": "Vegetarian Risotto",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-076",
-        "firstName": "Obinna",
-        "lastName": "Cohen",
-        "name": "Obinna Cohen",
-        "display": "Obinna",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_groom_college",
-        "meal": "Beef Tenderloin",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-077",
-        "firstName": "Kwame",
-        "lastName": "Adebayo",
-        "name": "Kwame Adebayo",
-        "display": "Kwame",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_groom_college",
-        "meal": "Pan-Seared Salmon",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-078",
-        "firstName": "Jelani",
-        "lastName": "Diallo",
-        "name": "Jelani Diallo",
-        "display": "Jelani",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_groom_college",
-        "meal": "Vegetarian Risotto",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-079",
-        "firstName": "Owen",
-        "lastName": "Tanaka",
-        "name": "Owen Tanaka",
-        "display": "Owen",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_bride_work",
-        "meal": "Beef Tenderloin",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-080",
-        "firstName": "Cole",
-        "lastName": "Liu",
-        "name": "Cole Liu",
-        "display": "Cole",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_bride_work",
-        "meal": "Pan-Seared Salmon",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-081",
-        "firstName": "Ryan",
-        "lastName": "Chen",
-        "name": "Ryan Chen",
-        "display": "Ryan",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_bride_work",
-        "meal": "Vegetarian Risotto",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-082",
-        "firstName": "Aarav",
-        "lastName": "Nakamura",
-        "name": "Aarav Nakamura",
-        "display": "Aarav",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_bride_work",
-        "meal": "Beef Tenderloin",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-083",
-        "firstName": "Rohan",
+        "id": "g-014",
+        "firstName": "James",
         "lastName": "Williams",
-        "name": "Rohan Williams",
-        "display": "Rohan",
+        "name": "James Williams",
+        "display": "James Williams",
         "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_bride_work",
-        "meal": "Pan-Seared Salmon",
-        "categories": [],
+        "categories": [
+          "cat-family"
+        ],
+        "meal": "Beef Tenderloin",
         "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": true,
+        "isChild": false,
         "plusOne": false,
-        "isChild": false
+        "isBride": false,
+        "isGroom": false,
+        "party": null
       },
       {
-        "id": "g-084",
-        "firstName": "Vikram",
+        "id": "g-016",
+        "firstName": "Owen",
+        "lastName": "Williams",
+        "name": "Owen Williams",
+        "display": "Owen Williams",
+        "side": "none",
+        "categories": [
+          "cat-family"
+        ],
+        "meal": "Beef Tenderloin",
+        "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": "p-015"
+      },
+      {
+        "id": "g-017",
+        "firstName": "Sophie",
+        "lastName": "Williams-Cohen",
+        "name": "Sophie Williams-Cohen",
+        "display": "Sophie Williams-Cohen",
+        "side": "none",
+        "categories": [
+          "cat-family"
+        ],
+        "meal": "Pan-Seared Salmon",
+        "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": "p-015"
+      },
+      {
+        "id": "g-018",
+        "firstName": "Mia",
+        "lastName": "Williams-Cohen",
+        "name": "Mia Williams-Cohen",
+        "display": "Mia Williams-Cohen",
+        "side": "none",
+        "categories": [
+          "cat-family",
+          "cat-kids"
+        ],
+        "meal": "Kids Chicken Fingers",
+        "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": true,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": "p-015"
+      },
+      {
+        "id": "g-020",
+        "firstName": "Helen",
         "lastName": "Park",
-        "name": "Vikram Park",
-        "display": "Vikram",
+        "name": "Helen Park",
+        "display": "Helen Park",
         "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_bride_work",
+        "categories": [
+          "cat-family"
+        ],
         "meal": "Vegetarian Risotto",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-085",
-        "firstName": "Arjun",
-        "lastName": "Park-Williams",
-        "name": "Arjun Park-Williams",
-        "display": "Arjun",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_bride_work",
-        "meal": "Beef Tenderloin",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-086",
-        "firstName": "Kabir",
-        "lastName": "Williams-Patel",
-        "name": "Kabir Williams-Patel",
-        "display": "Kabir",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_bride_work",
-        "meal": "Pan-Seared Salmon",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-087",
-        "firstName": "Idris",
-        "lastName": "Ramirez",
-        "name": "Idris Ramirez",
-        "display": "Idris",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_groom_work",
-        "meal": "Vegetarian Risotto",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-088",
-        "firstName": "Femi",
-        "lastName": "Carter",
-        "name": "Femi Carter",
-        "display": "Femi",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_groom_work",
-        "meal": "Beef Tenderloin",
-        "categories": [],
         "dietaryTags": [
           "dairy-free"
         ],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
         "plusOne": false,
-        "isChild": false
+        "isBride": false,
+        "isGroom": false,
+        "party": "p-019"
+      },
+      {
+        "id": "g-021",
+        "firstName": "Robert",
+        "lastName": "Park",
+        "name": "Robert Park",
+        "display": "Robert Park",
+        "side": "none",
+        "categories": [
+          "cat-family"
+        ],
+        "meal": "Beef Tenderloin",
+        "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": "p-019"
+      },
+      {
+        "id": "g-023",
+        "firstName": "Linda",
+        "lastName": "Williams-Patel",
+        "name": "Linda Williams-Patel",
+        "display": "Linda Williams-Patel",
+        "side": "none",
+        "categories": [
+          "cat-family"
+        ],
+        "meal": "Pan-Seared Salmon",
+        "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": "p-022"
+      },
+      {
+        "id": "g-024",
+        "firstName": "Henry",
+        "lastName": "Williams-Patel",
+        "name": "Henry Williams-Patel",
+        "display": "Henry Williams-Patel",
+        "side": "none",
+        "categories": [
+          "cat-family"
+        ],
+        "meal": "Beef Tenderloin",
+        "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": "p-022"
+      },
+      {
+        "id": "g-026",
+        "firstName": "Susan",
+        "lastName": "Williams",
+        "name": "Susan Williams",
+        "display": "Susan Williams",
+        "side": "none",
+        "categories": [
+          "cat-family"
+        ],
+        "meal": "Vegetarian Risotto",
+        "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": "p-025"
+      },
+      {
+        "id": "g-027",
+        "firstName": "Walter",
+        "lastName": "Williams",
+        "name": "Walter Williams",
+        "display": "Walter Williams",
+        "side": "none",
+        "categories": [
+          "cat-family"
+        ],
+        "meal": "Beef Tenderloin",
+        "dietaryTags": [
+          "gluten-free"
+        ],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": "p-025"
+      },
+      {
+        "id": "g-029",
+        "firstName": "Carol",
+        "lastName": "Park-Williams",
+        "name": "Carol Park-Williams",
+        "display": "Carol Park-Williams",
+        "side": "none",
+        "categories": [
+          "cat-family"
+        ],
+        "meal": "Pan-Seared Salmon",
+        "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": "p-028"
+      },
+      {
+        "id": "g-030",
+        "firstName": "Edward",
+        "lastName": "Park-Williams",
+        "name": "Edward Park-Williams",
+        "display": "Edward Park-Williams",
+        "side": "none",
+        "categories": [
+          "cat-family"
+        ],
+        "meal": "Beef Tenderloin",
+        "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": "p-028"
+      },
+      {
+        "id": "g-032",
+        "firstName": "Barbara",
+        "lastName": "Patel",
+        "name": "Barbara Patel",
+        "display": "Barbara Patel",
+        "side": "none",
+        "categories": [
+          "cat-family"
+        ],
+        "meal": "Vegetarian Risotto",
+        "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": "p-031"
+      },
+      {
+        "id": "g-033",
+        "firstName": "Frank",
+        "lastName": "Patel",
+        "name": "Frank Patel",
+        "display": "Frank Patel",
+        "side": "none",
+        "categories": [
+          "cat-family"
+        ],
+        "meal": "Beef Tenderloin",
+        "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": "p-031"
+      },
+      {
+        "id": "g-035",
+        "firstName": "Sandra",
+        "lastName": "Singh",
+        "name": "Sandra Singh",
+        "display": "Sandra Singh",
+        "side": "none",
+        "categories": [
+          "cat-family"
+        ],
+        "meal": "Pan-Seared Salmon",
+        "dietaryTags": [
+          "shellfish-allergy"
+        ],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": "p-034"
+      },
+      {
+        "id": "g-036",
+        "firstName": "Albert",
+        "lastName": "Singh",
+        "name": "Albert Singh",
+        "display": "Albert Singh",
+        "side": "none",
+        "categories": [
+          "cat-family"
+        ],
+        "meal": "Beef Tenderloin",
+        "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": "p-034"
+      },
+      {
+        "id": "g-038",
+        "firstName": "Priya",
+        "lastName": "Patel",
+        "name": "Priya Patel",
+        "display": "Priya Patel",
+        "side": "none",
+        "categories": [
+          "cat-family"
+        ],
+        "meal": "Vegetarian Risotto",
+        "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": "p-037"
+      },
+      {
+        "id": "g-039",
+        "firstName": "Arjun",
+        "lastName": "Patel",
+        "name": "Arjun Patel",
+        "display": "Arjun Patel",
+        "side": "none",
+        "categories": [
+          "cat-family"
+        ],
+        "meal": "Beef Tenderloin",
+        "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": "p-037"
+      },
+      {
+        "id": "g-041",
+        "firstName": "Mei",
+        "lastName": "Tanaka",
+        "name": "Mei Tanaka",
+        "display": "Mei Tanaka",
+        "side": "none",
+        "categories": [
+          "cat-family"
+        ],
+        "meal": "Pan-Seared Salmon",
+        "dietaryTags": [
+          "nut-allergy"
+        ],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": "p-040"
+      },
+      {
+        "id": "g-042",
+        "firstName": "Daniel",
+        "lastName": "Tanaka",
+        "name": "Daniel Tanaka",
+        "display": "Daniel Tanaka",
+        "side": "none",
+        "categories": [
+          "cat-family"
+        ],
+        "meal": "Beef Tenderloin",
+        "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": "p-040"
+      },
+      {
+        "id": "g-044",
+        "firstName": "Hana",
+        "lastName": "Liu",
+        "name": "Hana Liu",
+        "display": "Hana Liu",
+        "side": "none",
+        "categories": [
+          "cat-family"
+        ],
+        "meal": "Vegetarian Risotto",
+        "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": "p-043"
+      },
+      {
+        "id": "g-045",
+        "firstName": "Marcus",
+        "lastName": "Liu",
+        "name": "Marcus Liu",
+        "display": "Marcus Liu",
+        "side": "none",
+        "categories": [
+          "cat-family"
+        ],
+        "meal": "Beef Tenderloin",
+        "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": "p-043"
+      },
+      {
+        "id": "g-046",
+        "firstName": "Aarav",
+        "lastName": "Singh",
+        "name": "Aarav Singh",
+        "display": "Aarav Singh",
+        "side": "none",
+        "categories": [
+          "cat-family"
+        ],
+        "meal": "Pan-Seared Salmon",
+        "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": null
+      },
+      {
+        "id": "g-047",
+        "firstName": "Anya",
+        "lastName": "Park",
+        "name": "Anya Park",
+        "display": "Anya Park",
+        "side": "none",
+        "categories": [
+          "cat-family"
+        ],
+        "meal": "Pan-Seared Salmon",
+        "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": null
+      },
+      {
+        "id": "g-048",
+        "firstName": "Tara",
+        "lastName": "Khan",
+        "name": "Tara Khan",
+        "display": "Tara Khan",
+        "side": "none",
+        "categories": [
+          "cat-family"
+        ],
+        "meal": "Vegetarian Risotto",
+        "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": null
+      },
+      {
+        "id": "g-049",
+        "firstName": "Ngozi",
+        "lastName": "Okonkwo",
+        "name": "Ngozi Okonkwo",
+        "display": "Ngozi Okonkwo",
+        "side": "none",
+        "categories": [
+          "cat-family"
+        ],
+        "meal": "Beef Tenderloin",
+        "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": true,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": null
+      },
+      {
+        "id": "g-050",
+        "firstName": "Obinna",
+        "lastName": "Okonkwo",
+        "name": "Obinna Okonkwo",
+        "display": "Obinna Okonkwo",
+        "side": "none",
+        "categories": [
+          "cat-family"
+        ],
+        "meal": "Pan-Seared Salmon",
+        "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": true,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": null
+      },
+      {
+        "id": "g-052",
+        "firstName": "Ifeoma",
+        "lastName": "Okonkwo-Hernández",
+        "name": "Ifeoma Okonkwo-Hernández",
+        "display": "Ifeoma Okonkwo-Hernández",
+        "side": "none",
+        "categories": [
+          "cat-family"
+        ],
+        "meal": "Vegetarian Risotto",
+        "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": "p-051"
+      },
+      {
+        "id": "g-053",
+        "firstName": "Diego",
+        "lastName": "Hernández",
+        "name": "Diego Hernández",
+        "display": "Diego Hernández",
+        "side": "none",
+        "categories": [
+          "cat-family"
+        ],
+        "meal": "Beef Tenderloin",
+        "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": "p-051"
+      },
+      {
+        "id": "g-055",
+        "firstName": "Amara",
+        "lastName": "Carter",
+        "name": "Amara Carter",
+        "display": "Amara Carter",
+        "side": "none",
+        "categories": [
+          "cat-family"
+        ],
+        "meal": "Pan-Seared Salmon",
+        "dietaryTags": [
+          "gluten-free"
+        ],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": "p-054"
+      },
+      {
+        "id": "g-056",
+        "firstName": "Aaron",
+        "lastName": "Carter",
+        "name": "Aaron Carter",
+        "display": "Aaron Carter",
+        "side": "none",
+        "categories": [
+          "cat-family"
+        ],
+        "meal": "Beef Tenderloin",
+        "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": "p-054"
+      },
+      {
+        "id": "g-058",
+        "firstName": "Folake",
+        "lastName": "Adebayo",
+        "name": "Folake Adebayo",
+        "display": "Folake Adebayo",
+        "side": "none",
+        "categories": [
+          "cat-family"
+        ],
+        "meal": "Vegetarian Risotto",
+        "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": "p-057"
+      },
+      {
+        "id": "g-059",
+        "firstName": "Idris",
+        "lastName": "Adebayo",
+        "name": "Idris Adebayo",
+        "display": "Idris Adebayo",
+        "side": "none",
+        "categories": [
+          "cat-family"
+        ],
+        "meal": "Beef Tenderloin",
+        "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": "p-057"
+      },
+      {
+        "id": "g-061",
+        "firstName": "Sarah",
+        "lastName": "Goldberg",
+        "name": "Sarah Goldberg",
+        "display": "Sarah Goldberg",
+        "side": "none",
+        "categories": [
+          "cat-family"
+        ],
+        "meal": "Pan-Seared Salmon",
+        "dietaryTags": [
+          "kosher"
+        ],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": "p-060"
+      },
+      {
+        "id": "g-062",
+        "firstName": "Eli",
+        "lastName": "Goldberg",
+        "name": "Eli Goldberg",
+        "display": "Eli Goldberg",
+        "side": "none",
+        "categories": [
+          "cat-family"
+        ],
+        "meal": "Beef Tenderloin",
+        "dietaryTags": [
+          "kosher"
+        ],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": "p-060"
+      },
+      {
+        "id": "g-064",
+        "firstName": "Naomi",
+        "lastName": "Cohen",
+        "name": "Naomi Cohen",
+        "display": "Naomi Cohen",
+        "side": "none",
+        "categories": [
+          "cat-family"
+        ],
+        "meal": "Vegetarian Risotto",
+        "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": "p-063"
+      },
+      {
+        "id": "g-065",
+        "firstName": "Asher",
+        "lastName": "Cohen",
+        "name": "Asher Cohen",
+        "display": "Asher Cohen",
+        "side": "none",
+        "categories": [
+          "cat-family"
+        ],
+        "meal": "Beef Tenderloin",
+        "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": "p-063"
+      },
+      {
+        "id": "g-067",
+        "firstName": "Sofia",
+        "lastName": "García",
+        "name": "Sofia García",
+        "display": "Sofia García",
+        "side": "none",
+        "categories": [
+          "cat-family"
+        ],
+        "meal": "Pan-Seared Salmon",
+        "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": "p-066"
+      },
+      {
+        "id": "g-068",
+        "firstName": "Mateo",
+        "lastName": "García",
+        "name": "Mateo García",
+        "display": "Mateo García",
+        "side": "none",
+        "categories": [
+          "cat-family"
+        ],
+        "meal": "Beef Tenderloin",
+        "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": "p-066"
+      },
+      {
+        "id": "g-070",
+        "firstName": "Camila",
+        "lastName": "Ramirez",
+        "name": "Camila Ramirez",
+        "display": "Camila Ramirez",
+        "side": "none",
+        "categories": [
+          "cat-family"
+        ],
+        "meal": "Vegetarian Risotto",
+        "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": "p-069"
+      },
+      {
+        "id": "g-071",
+        "firstName": "Carlos",
+        "lastName": "Ramirez",
+        "name": "Carlos Ramirez",
+        "display": "Carlos Ramirez",
+        "side": "none",
+        "categories": [
+          "cat-family"
+        ],
+        "meal": "Beef Tenderloin",
+        "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": "p-069"
+      },
+      {
+        "id": "g-073",
+        "firstName": "Chiamaka",
+        "lastName": "Okonkwo",
+        "name": "Chiamaka Okonkwo",
+        "display": "Chiamaka Okonkwo",
+        "side": "none",
+        "categories": [
+          "cat-family"
+        ],
+        "meal": "Pan-Seared Salmon",
+        "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": "p-072"
+      },
+      {
+        "id": "g-074",
+        "firstName": "Femi",
+        "lastName": "Okonkwo",
+        "name": "Femi Okonkwo",
+        "display": "Femi Okonkwo",
+        "side": "none",
+        "categories": [
+          "cat-family"
+        ],
+        "meal": "Beef Tenderloin",
+        "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": "p-072"
+      },
+      {
+        "id": "g-076",
+        "firstName": "Esther",
+        "lastName": "Adebayo",
+        "name": "Esther Adebayo",
+        "display": "Esther Adebayo",
+        "side": "none",
+        "categories": [
+          "cat-family"
+        ],
+        "meal": "Vegetarian Risotto",
+        "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": "p-075"
+      },
+      {
+        "id": "g-077",
+        "firstName": "Bayo",
+        "lastName": "Adebayo",
+        "name": "Bayo Adebayo",
+        "display": "Bayo Adebayo",
+        "side": "none",
+        "categories": [
+          "cat-family"
+        ],
+        "meal": "Beef Tenderloin",
+        "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": "p-075"
+      },
+      {
+        "id": "g-078",
+        "firstName": "Kehinde",
+        "lastName": "Okonkwo",
+        "name": "Kehinde Okonkwo",
+        "display": "Kehinde Okonkwo",
+        "side": "none",
+        "categories": [
+          "cat-family"
+        ],
+        "meal": "Pan-Seared Salmon",
+        "dietaryTags": [
+          "nut-allergy"
+        ],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": null
+      },
+      {
+        "id": "g-079",
+        "firstName": "Kwame",
+        "lastName": "Diallo",
+        "name": "Kwame Diallo",
+        "display": "Kwame Diallo",
+        "side": "none",
+        "categories": [
+          "cat-family"
+        ],
+        "meal": "Beef Tenderloin",
+        "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": null
+      },
+      {
+        "id": "g-080",
+        "firstName": "Zuri",
+        "lastName": "Carter",
+        "name": "Zuri Carter",
+        "display": "Zuri Carter",
+        "side": "none",
+        "categories": [
+          "cat-family"
+        ],
+        "meal": "Vegetarian Risotto",
+        "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": null
+      },
+      {
+        "id": "g-081",
+        "firstName": "Sora",
+        "lastName": "Chen",
+        "name": "Sora Chen",
+        "display": "Sora Chen",
+        "side": "none",
+        "categories": [
+          "cat-friends"
+        ],
+        "meal": "Pan-Seared Salmon",
+        "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": null
+      },
+      {
+        "id": "g-082",
+        "firstName": "Nina",
+        "lastName": "Nakamura",
+        "name": "Nina Nakamura",
+        "display": "Nina Nakamura",
+        "side": "none",
+        "categories": [
+          "cat-friends"
+        ],
+        "meal": "Vegetarian Risotto",
+        "dietaryTags": [
+          "dairy-free"
+        ],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": null
+      },
+      {
+        "id": "g-083",
+        "firstName": "Olivia",
+        "lastName": "Patel-Singh",
+        "name": "Olivia Patel-Singh",
+        "display": "Olivia Patel-Singh",
+        "side": "none",
+        "categories": [
+          "cat-friends"
+        ],
+        "meal": "Beef Tenderloin",
+        "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": null
+      },
+      {
+        "id": "g-084",
+        "firstName": "Hannah",
+        "lastName": "Chen-Williams",
+        "name": "Hannah Chen-Williams",
+        "display": "Hannah Chen-Williams",
+        "side": "none",
+        "categories": [
+          "cat-friends"
+        ],
+        "meal": "Pan-Seared Salmon",
+        "dietaryTags": [],
+        "rsvp": "no",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": null
+      },
+      {
+        "id": "g-085",
+        "firstName": "Lily",
+        "lastName": "Tanaka",
+        "name": "Lily Tanaka",
+        "display": "Lily Tanaka",
+        "side": "none",
+        "categories": [
+          "cat-friends"
+        ],
+        "meal": "Vegetarian Risotto",
+        "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": null
+      },
+      {
+        "id": "g-086",
+        "firstName": "Grace",
+        "lastName": "Nakamura",
+        "name": "Grace Nakamura",
+        "display": "Grace Nakamura",
+        "side": "none",
+        "categories": [
+          "cat-friends"
+        ],
+        "meal": "Beef Tenderloin",
+        "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": null
+      },
+      {
+        "id": "g-087",
+        "firstName": "Emma",
+        "lastName": "Williams-Patel",
+        "name": "Emma Williams-Patel",
+        "display": "Emma Williams-Patel",
+        "side": "none",
+        "categories": [
+          "cat-friends"
+        ],
+        "meal": "Pan-Seared Salmon",
+        "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": null
+      },
+      {
+        "id": "g-088",
+        "firstName": "Vikram",
+        "lastName": "Patel",
+        "name": "Vikram Patel",
+        "display": "Vikram Patel",
+        "side": "none",
+        "categories": [
+          "cat-friends"
+        ],
+        "meal": "Beef Tenderloin",
+        "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": null
       },
       {
         "id": "g-089",
-        "firstName": "Bayo",
-        "lastName": "Okonkwo",
-        "name": "Bayo Okonkwo",
-        "display": "Bayo",
+        "firstName": "Rohan",
+        "lastName": "Khan",
+        "name": "Rohan Khan",
+        "display": "Rohan Khan",
         "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_groom_work",
+        "categories": [
+          "cat-friends"
+        ],
         "meal": "Pan-Seared Salmon",
-        "categories": [],
         "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
         "plusOne": false,
-        "isChild": false
+        "isBride": false,
+        "isGroom": false,
+        "party": null
       },
       {
         "id": "g-090",
-        "firstName": "Diego",
-        "lastName": "Carter-Okonkwo",
-        "name": "Diego Carter-Okonkwo",
-        "display": "Diego",
+        "firstName": "Aaron",
+        "lastName": "Goldberg-Lin",
+        "name": "Aaron Goldberg-Lin",
+        "display": "Aaron Goldberg-Lin",
         "side": "none",
-        "vip": false,
+        "categories": [
+          "cat-friends"
+        ],
+        "meal": "Beef Tenderloin",
+        "dietaryTags": [
+          "kosher"
+        ],
         "rsvp": "yes",
-        "party": "p_groom_work",
-        "meal": "Vegetarian Risotto",
-        "categories": [],
-        "dietaryTags": [],
+        "vip": false,
+        "isChild": false,
         "plusOne": false,
-        "isChild": false
+        "isBride": false,
+        "isGroom": false,
+        "party": null
       },
       {
         "id": "g-091",
         "firstName": "Mateo",
         "lastName": "Hernández",
         "name": "Mateo Hernández",
-        "display": "Mateo",
+        "display": "Mateo Hernández",
         "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_groom_work",
-        "meal": "Beef Tenderloin",
-        "categories": [],
+        "categories": [
+          "cat-friends"
+        ],
+        "meal": "Pan-Seared Salmon",
         "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
         "plusOne": false,
-        "isChild": false
+        "isBride": false,
+        "isGroom": false,
+        "party": null
       },
       {
         "id": "g-092",
-        "firstName": "Carlos",
-        "lastName": "García",
-        "name": "Carlos García",
-        "display": "Carlos",
+        "firstName": "Levi",
+        "lastName": "Cohen",
+        "name": "Levi Cohen",
+        "display": "Levi Cohen",
         "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_groom_work",
-        "meal": "Pan-Seared Salmon",
-        "categories": [],
+        "categories": [
+          "cat-friends"
+        ],
+        "meal": "Beef Tenderloin",
         "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
         "plusOne": false,
-        "isChild": false
+        "isBride": false,
+        "isGroom": false,
+        "party": null
       },
       {
         "id": "g-093",
-        "firstName": "Javier",
-        "lastName": "Goldberg",
-        "name": "Javier Goldberg",
-        "display": "Javier",
+        "firstName": "Pablo",
+        "lastName": "Ramirez",
+        "name": "Pablo Ramirez",
+        "display": "Pablo Ramirez",
         "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_groom_work",
-        "meal": "Beef Tenderloin",
-        "categories": [],
+        "categories": [
+          "cat-friends"
+        ],
+        "meal": "Vegetarian Risotto",
         "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
         "plusOne": false,
-        "isChild": false
+        "isBride": false,
+        "isGroom": false,
+        "party": null
       },
       {
         "id": "g-094",
-        "firstName": "Andres",
-        "lastName": "Cohen",
-        "name": "Andres Cohen",
-        "display": "Andres",
+        "firstName": "Marco",
+        "lastName": "García-Adebayo",
+        "name": "Marco García-Adebayo",
+        "display": "Marco García-Adebayo",
         "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_groom_work",
-        "meal": "Pan-Seared Salmon",
-        "categories": [],
+        "categories": [
+          "cat-friends"
+        ],
+        "meal": "Beef Tenderloin",
         "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
         "plusOne": false,
-        "isChild": false
+        "isBride": false,
+        "isGroom": false,
+        "party": null
       },
       {
         "id": "g-095",
-        "firstName": "Pablo",
-        "lastName": "Adebayo",
-        "name": "Pablo Adebayo",
-        "display": "Pablo",
+        "firstName": "Caleb",
+        "lastName": "Goldberg",
+        "name": "Caleb Goldberg",
+        "display": "Caleb Goldberg",
         "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_brooks_friends",
-        "meal": "Beef Tenderloin",
-        "categories": [],
-        "dietaryTags": [
-          "nut-allergy"
+        "categories": [
+          "cat-friends"
         ],
+        "meal": "Pan-Seared Salmon",
+        "dietaryTags": [],
+        "rsvp": "no",
+        "vip": false,
+        "isChild": false,
         "plusOne": false,
-        "isChild": false
+        "isBride": false,
+        "isGroom": false,
+        "party": null
       },
       {
         "id": "g-096",
-        "firstName": "Luis",
-        "lastName": "Diallo",
-        "name": "Luis Diallo",
-        "display": "Luis",
+        "firstName": "Ezra",
+        "lastName": "Cohen-Diallo",
+        "name": "Ezra Cohen-Diallo",
+        "display": "Ezra Cohen-Diallo",
         "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_brooks_friends",
-        "meal": "Pan-Seared Salmon",
-        "categories": [],
+        "categories": [
+          "cat-friends"
+        ],
+        "meal": "Vegetarian Risotto",
         "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
         "plusOne": false,
-        "isChild": false
+        "isBride": false,
+        "isGroom": false,
+        "party": null
       },
       {
         "id": "g-097",
-        "firstName": "Marco",
-        "lastName": "Ramirez",
-        "name": "Marco Ramirez",
-        "display": "Marco",
+        "firstName": "Asher",
+        "lastName": "Goldberg-Lin",
+        "name": "Asher Goldberg-Lin",
+        "display": "Asher Goldberg-Lin",
         "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_brooks_friends",
+        "categories": [
+          "cat-friends"
+        ],
         "meal": "Beef Tenderloin",
-        "categories": [],
         "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
         "plusOne": false,
-        "isChild": false
+        "isBride": false,
+        "isGroom": false,
+        "party": null
       },
       {
         "id": "g-098",
-        "firstName": "Aaron",
-        "lastName": "Carter",
-        "name": "Aaron Carter",
-        "display": "Aaron",
+        "firstName": "Noah",
+        "lastName": "Carter-Okonkwo",
+        "name": "Noah Carter-Okonkwo",
+        "display": "Noah Carter-Okonkwo",
         "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_brooks_friends",
+        "categories": [
+          "cat-friends"
+        ],
         "meal": "Pan-Seared Salmon",
-        "categories": [],
         "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
         "plusOne": false,
-        "isChild": false
+        "isBride": false,
+        "isGroom": false,
+        "party": null
       },
       {
         "id": "g-099",
-        "firstName": "Ezra",
-        "lastName": "Okonkwo",
-        "name": "Ezra Okonkwo",
-        "display": "Ezra",
+        "firstName": "Cole",
+        "lastName": "Liu",
+        "name": "Cole Liu",
+        "display": "Cole Liu",
         "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_brooks_friends",
+        "categories": [
+          "cat-work"
+        ],
         "meal": "Beef Tenderloin",
-        "categories": [],
         "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
         "plusOne": false,
-        "isChild": false
+        "isBride": false,
+        "isGroom": false,
+        "party": null
       },
       {
         "id": "g-100",
-        "firstName": "Asher",
-        "lastName": "Carter-Okonkwo",
-        "name": "Asher Carter-Okonkwo",
-        "display": "Asher",
+        "firstName": "Ryan",
+        "lastName": "Chen",
+        "name": "Ryan Chen",
+        "display": "Ryan Chen",
         "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_brooks_friends",
+        "categories": [
+          "cat-work"
+        ],
         "meal": "Pan-Seared Salmon",
-        "categories": [],
         "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
         "plusOne": false,
-        "isChild": false
+        "isBride": false,
+        "isGroom": false,
+        "party": null
       },
       {
         "id": "g-101",
-        "firstName": "Eli",
-        "lastName": "Hernández",
-        "name": "Eli Hernández",
-        "display": "Eli",
+        "firstName": "Ethan",
+        "lastName": "Park",
+        "name": "Ethan Park",
+        "display": "Ethan Park",
         "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_brooks_friends",
+        "categories": [
+          "cat-work"
+        ],
         "meal": "Beef Tenderloin",
-        "categories": [],
         "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
         "plusOne": false,
-        "isChild": false
+        "isBride": false,
+        "isGroom": false,
+        "party": null
       },
       {
         "id": "g-102",
-        "firstName": "Noah",
-        "lastName": "García",
-        "name": "Noah García",
-        "display": "Noah",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_brooks_friends",
-        "meal": "Pan-Seared Salmon",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-103",
-        "firstName": "Levi",
-        "lastName": "Goldberg",
-        "name": "Levi Goldberg",
-        "display": "Levi",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_brooks_friends",
-        "meal": "Beef Tenderloin",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-104",
-        "firstName": "Jonah",
-        "lastName": "Cohen",
-        "name": "Jonah Cohen",
-        "display": "Jonah",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_brooks_friends",
-        "meal": "Pan-Seared Salmon",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-105",
         "firstName": "Devan",
         "lastName": "Patel",
         "name": "Devan Patel",
-        "display": "Devan",
+        "display": "Devan Patel",
         "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_carter_friends",
-        "meal": "Beef Tenderloin",
-        "categories": [],
+        "categories": [
+          "cat-work"
+        ],
+        "meal": "Vegetarian Risotto",
         "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
         "plusOne": false,
-        "isChild": false
+        "isBride": false,
+        "isGroom": false,
+        "party": null
       },
       {
-        "id": "g-106",
+        "id": "g-103",
         "firstName": "Ravi",
         "lastName": "Singh",
         "name": "Ravi Singh",
-        "display": "Ravi",
+        "display": "Ravi Singh",
         "side": "none",
-        "vip": false,
+        "categories": [
+          "cat-work"
+        ],
+        "meal": "Beef Tenderloin",
+        "dietaryTags": [
+          "shellfish-allergy"
+        ],
         "rsvp": "yes",
-        "party": "p_carter_friends",
-        "meal": "Pan-Seared Salmon",
-        "categories": [],
-        "dietaryTags": [],
+        "vip": false,
+        "isChild": false,
         "plusOne": false,
-        "isChild": false
+        "isBride": false,
+        "isGroom": false,
+        "party": null
       },
       {
-        "id": "g-107",
+        "id": "g-104",
         "firstName": "Sai",
         "lastName": "Khan",
         "name": "Sai Khan",
-        "display": "Sai",
+        "display": "Sai Khan",
         "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_carter_friends",
-        "meal": "Beef Tenderloin",
-        "categories": [],
+        "categories": [
+          "cat-work"
+        ],
+        "meal": "Pan-Seared Salmon",
         "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
         "plusOne": false,
-        "isChild": false
+        "isBride": false,
+        "isGroom": false,
+        "party": null
+      },
+      {
+        "id": "g-105",
+        "firstName": "Jacob",
+        "lastName": "Williams",
+        "name": "Jacob Williams",
+        "display": "Jacob Williams",
+        "side": "none",
+        "categories": [
+          "cat-work"
+        ],
+        "meal": "Beef Tenderloin",
+        "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": null
+      },
+      {
+        "id": "g-106",
+        "firstName": "Liam",
+        "lastName": "Park-Williams",
+        "name": "Liam Park-Williams",
+        "display": "Liam Park-Williams",
+        "side": "none",
+        "categories": [
+          "cat-work"
+        ],
+        "meal": "Vegetarian Risotto",
+        "dietaryTags": [],
+        "rsvp": "no",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": null
+      },
+      {
+        "id": "g-107",
+        "firstName": "Andres",
+        "lastName": "García",
+        "name": "Andres García",
+        "display": "Andres García",
+        "side": "none",
+        "categories": [
+          "cat-work"
+        ],
+        "meal": "Beef Tenderloin",
+        "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": null
       },
       {
         "id": "g-108",
-        "firstName": "Carol",
-        "lastName": "Tanaka",
-        "name": "Carol Tanaka",
-        "display": "Carol",
+        "firstName": "Javier",
+        "lastName": "Hernández",
+        "name": "Javier Hernández",
+        "display": "Javier Hernández",
         "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_carter_friends",
+        "categories": [
+          "cat-work"
+        ],
         "meal": "Pan-Seared Salmon",
-        "categories": [],
         "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
         "plusOne": false,
-        "isChild": false
+        "isBride": false,
+        "isGroom": false,
+        "party": null
       },
       {
         "id": "g-109",
-        "firstName": "Susan",
-        "lastName": "Liu",
-        "name": "Susan Liu",
-        "display": "Susan",
+        "firstName": "Luis",
+        "lastName": "Ramirez",
+        "name": "Luis Ramirez",
+        "display": "Luis Ramirez",
         "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_carter_friends",
+        "categories": [
+          "cat-work"
+        ],
         "meal": "Beef Tenderloin",
-        "categories": [],
         "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
         "plusOne": false,
-        "isChild": false
+        "isBride": false,
+        "isGroom": false,
+        "party": null
       },
       {
         "id": "g-110",
-        "firstName": "Linda",
-        "lastName": "Chen",
-        "name": "Linda Chen",
-        "display": "Linda",
+        "firstName": "Jonah",
+        "lastName": "Goldberg",
+        "name": "Jonah Goldberg",
+        "display": "Jonah Goldberg",
         "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_carter_friends",
-        "meal": "Pan-Seared Salmon",
-        "categories": [],
-        "dietaryTags": [
-          "kosher"
+        "categories": [
+          "cat-work"
         ],
+        "meal": "Vegetarian Risotto",
+        "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
         "plusOne": false,
-        "isChild": false
+        "isBride": false,
+        "isGroom": false,
+        "party": null
       },
       {
         "id": "g-111",
-        "firstName": "Patricia",
-        "lastName": "Nakamura",
-        "name": "Patricia Nakamura",
-        "display": "Patricia",
+        "firstName": "Tunde",
+        "lastName": "Adebayo",
+        "name": "Tunde Adebayo",
+        "display": "Tunde Adebayo",
         "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_carter_friends",
+        "categories": [
+          "cat-work"
+        ],
         "meal": "Beef Tenderloin",
-        "categories": [],
         "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
         "plusOne": false,
-        "isChild": false
+        "isBride": false,
+        "isGroom": false,
+        "party": null
       },
       {
         "id": "g-112",
-        "firstName": "Margaret",
-        "lastName": "Williams",
-        "name": "Margaret Williams",
-        "display": "Margaret",
+        "firstName": "Frank",
+        "lastName": "Diallo",
+        "name": "Frank Diallo",
+        "display": "Frank Diallo",
         "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_carter_friends",
+        "categories": [
+          "cat-work"
+        ],
         "meal": "Pan-Seared Salmon",
-        "categories": [],
         "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
         "plusOne": false,
-        "isChild": false
+        "isBride": false,
+        "isGroom": false,
+        "party": null
       },
       {
         "id": "g-113",
-        "firstName": "Barbara",
-        "lastName": "Park",
-        "name": "Barbara Park",
-        "display": "Barbara",
+        "firstName": "Albert",
+        "lastName": "Cohen-Diallo",
+        "name": "Albert Cohen-Diallo",
+        "display": "Albert Cohen-Diallo",
         "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_carter_friends",
+        "categories": [
+          "cat-work"
+        ],
         "meal": "Beef Tenderloin",
-        "categories": [],
-        "dietaryTags": [],
+        "dietaryTags": [
+          "gluten-free"
+        ],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
         "plusOne": false,
-        "isChild": false
+        "isBride": false,
+        "isGroom": false,
+        "party": null
       },
       {
         "id": "g-114",
-        "firstName": "Helen",
-        "lastName": "Park-Williams",
-        "name": "Helen Park-Williams",
-        "display": "Helen",
+        "firstName": "Henry",
+        "lastName": "Goldberg-Lin",
+        "name": "Henry Goldberg-Lin",
+        "display": "Henry Goldberg-Lin",
         "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_carter_friends",
-        "meal": "Pan-Seared Salmon",
-        "categories": [],
+        "categories": [
+          "cat-work"
+        ],
+        "meal": "Vegetarian Risotto",
         "dietaryTags": [],
-        "plusOne": false,
-        "isChild": false
-      },
-      {
-        "id": "g-115",
-        "firstName": "Sandra",
-        "lastName": "Williams-Patel",
-        "name": "Sandra Williams-Patel",
-        "display": "Sandra",
-        "side": "none",
-        "vip": false,
         "rsvp": "yes",
-        "party": "p_carter_friends",
-        "meal": "Beef Tenderloin",
-        "categories": [],
-        "dietaryTags": [],
+        "vip": false,
+        "isChild": false,
         "plusOne": false,
-        "isChild": false
+        "isBride": false,
+        "isGroom": false,
+        "party": null
       },
       {
         "id": "g-116",
-        "firstName": "Robert",
-        "lastName": "Patel",
-        "name": "Robert Patel",
-        "display": "Robert",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_carter_friends",
+        "firstName": "Beverly",
+        "lastName": "Park-Williams",
+        "name": "Beverly Park-Williams",
+        "display": "Beverly Park-Williams",
+        "side": "both",
+        "categories": [
+          "cat-friends"
+        ],
         "meal": "Pan-Seared Salmon",
-        "categories": [],
         "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
         "plusOne": false,
-        "isChild": false
+        "isBride": false,
+        "isGroom": false,
+        "party": "p-115"
       },
       {
         "id": "g-117",
-        "firstName": "Ezra",
-        "lastName": "Goldberg-Lin",
-        "name": "Ezra Goldberg-Lin",
-        "display": "Ezra",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_plus_ones",
-        "meal": "Kids Chicken Fingers",
-        "categories": [],
+        "firstName": "George",
+        "lastName": "Park-Williams",
+        "name": "George Park-Williams",
+        "display": "George Park-Williams",
+        "side": "both",
+        "categories": [
+          "cat-friends"
+        ],
+        "meal": "Beef Tenderloin",
         "dietaryTags": [],
-        "plusOne": false,
-        "isChild": true
-      },
-      {
-        "id": "g-118",
-        "firstName": "Lucia",
-        "lastName": "Hernández",
-        "name": "Lucia Hernández",
-        "display": "Lucia",
-        "side": "none",
-        "vip": false,
         "rsvp": "yes",
-        "party": "p_plus_ones",
-        "meal": "Kids Chicken Fingers",
-        "categories": [],
-        "dietaryTags": [],
+        "vip": false,
+        "isChild": false,
         "plusOne": false,
-        "isChild": true
+        "isBride": false,
+        "isGroom": false,
+        "party": "p-115"
       },
       {
         "id": "g-119",
-        "firstName": "Caleb",
-        "lastName": "Adebayo",
-        "name": "Caleb Adebayo",
-        "display": "Caleb",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_plus_ones",
-        "meal": "Beef Tenderloin",
-        "categories": [],
+        "firstName": "Eleanor",
+        "lastName": "Goldberg",
+        "name": "Eleanor Goldberg",
+        "display": "Eleanor Goldberg",
+        "side": "both",
+        "categories": [
+          "cat-friends"
+        ],
+        "meal": "Vegetarian Risotto",
         "dietaryTags": [],
-        "plusOne": true,
-        "isChild": false
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": "p-118"
       },
       {
         "id": "g-120",
-        "firstName": "Helen",
-        "lastName": "Diallo",
-        "name": "Helen Diallo",
-        "display": "Helen",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_plus_ones",
-        "meal": "Pan-Seared Salmon",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": true,
-        "isChild": false
-      },
-      {
-        "id": "g-121",
-        "firstName": "Gloria",
-        "lastName": "Ramirez",
-        "name": "Gloria Ramirez",
-        "display": "Gloria",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_plus_ones",
+        "firstName": "Arthur",
+        "lastName": "Goldberg",
+        "name": "Arthur Goldberg",
+        "display": "Arthur Goldberg",
+        "side": "both",
+        "categories": [
+          "cat-friends"
+        ],
         "meal": "Beef Tenderloin",
-        "categories": [],
         "dietaryTags": [],
-        "plusOne": true,
-        "isChild": false
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": "p-118"
       },
       {
         "id": "g-122",
-        "firstName": "James",
-        "lastName": "Singh",
-        "name": "James Singh",
-        "display": "James",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_plus_ones",
-        "meal": "Beef Tenderloin",
-        "categories": [],
-        "dietaryTags": [
-          "halal"
+        "firstName": "Catherine",
+        "lastName": "Carter",
+        "name": "Catherine Carter",
+        "display": "Catherine Carter",
+        "side": "both",
+        "categories": [
+          "cat-friends"
         ],
-        "plusOne": true,
-        "isChild": false
+        "meal": "Pan-Seared Salmon",
+        "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": "p-121"
       },
       {
         "id": "g-123",
-        "firstName": "Beverly",
+        "firstName": "Thomas",
         "lastName": "Carter",
-        "name": "Beverly Carter",
-        "display": "Beverly",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_plus_ones",
+        "name": "Thomas Carter",
+        "display": "Thomas Carter",
+        "side": "both",
+        "categories": [
+          "cat-friends"
+        ],
         "meal": "Beef Tenderloin",
-        "categories": [],
         "dietaryTags": [],
-        "plusOne": true,
-        "isChild": false
-      },
-      {
-        "id": "g-124",
-        "firstName": "Eleanor",
-        "lastName": "Okonkwo",
-        "name": "Eleanor Okonkwo",
-        "display": "Eleanor",
-        "side": "none",
-        "vip": false,
         "rsvp": "yes",
-        "party": "p_plus_ones",
-        "meal": "Beef Tenderloin",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": true,
-        "isChild": false
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": "p-121"
       },
       {
         "id": "g-125",
-        "firstName": "Catherine",
-        "lastName": "Carter-Okonkwo",
-        "name": "Catherine Carter-Okonkwo",
-        "display": "Catherine",
-        "side": "none",
-        "vip": false,
+        "firstName": "Gloria",
+        "lastName": "Williams",
+        "name": "Gloria Williams",
+        "display": "Gloria Williams",
+        "side": "both",
+        "categories": [
+          "cat-friends"
+        ],
+        "meal": "Vegetarian Risotto",
+        "dietaryTags": [
+          "dairy-free"
+        ],
         "rsvp": "yes",
-        "party": "p_plus_ones",
-        "meal": "Beef Tenderloin",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": true,
-        "isChild": false
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": "p-124"
       },
       {
         "id": "g-126",
-        "firstName": "Rose",
-        "lastName": "Hernández",
-        "name": "Rose Hernández",
-        "display": "Rose",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_plus_ones",
+        "firstName": "Charles",
+        "lastName": "Williams",
+        "name": "Charles Williams",
+        "display": "Charles Williams",
+        "side": "both",
+        "categories": [
+          "cat-friends"
+        ],
         "meal": "Beef Tenderloin",
-        "categories": [],
         "dietaryTags": [],
-        "plusOne": true,
-        "isChild": false
-      },
-      {
-        "id": "g-127",
-        "firstName": "Ruth",
-        "lastName": "García",
-        "name": "Ruth García",
-        "display": "Ruth",
-        "side": "none",
-        "vip": false,
         "rsvp": "yes",
-        "party": "p_plus_ones",
-        "meal": "Beef Tenderloin",
-        "categories": [],
-        "dietaryTags": [],
-        "plusOne": true,
-        "isChild": false
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": "p-124"
       },
       {
         "id": "g-128",
-        "firstName": "William",
-        "lastName": "Khan",
-        "name": "William Khan",
-        "display": "William",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_plus_ones",
-        "meal": "Beef Tenderloin",
-        "categories": [],
+        "firstName": "Ruth",
+        "lastName": "Park",
+        "name": "Ruth Park",
+        "display": "Ruth Park",
+        "side": "both",
+        "categories": [
+          "cat-friends"
+        ],
+        "meal": "Pan-Seared Salmon",
         "dietaryTags": [],
-        "plusOne": true,
-        "isChild": false
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": "p-127"
       },
       {
         "id": "g-129",
-        "firstName": "David",
-        "lastName": "Tanaka",
-        "name": "David Tanaka",
-        "display": "David",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_plus_ones",
+        "firstName": "Frederick",
+        "lastName": "Park",
+        "name": "Frederick Park",
+        "display": "Frederick Park",
+        "side": "both",
+        "categories": [
+          "cat-friends"
+        ],
         "meal": "Beef Tenderloin",
-        "categories": [],
         "dietaryTags": [],
-        "plusOne": true,
-        "isChild": false
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": "p-127"
       },
       {
-        "id": "g-130",
+        "id": "g-131",
         "firstName": "Edith",
-        "lastName": "Goldberg",
-        "name": "Edith Goldberg",
-        "display": "Edith",
-        "side": "none",
-        "vip": false,
-        "rsvp": "yes",
-        "party": "p_plus_ones",
-        "meal": "Beef Tenderloin",
-        "categories": [],
+        "lastName": "Carter-Okonkwo",
+        "name": "Edith Carter-Okonkwo",
+        "display": "Edith Carter-Okonkwo",
+        "side": "both",
+        "categories": [
+          "cat-friends"
+        ],
+        "meal": "Vegetarian Risotto",
         "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": "p-130"
+      },
+      {
+        "id": "g-132",
+        "firstName": "William",
+        "lastName": "Carter-Okonkwo",
+        "name": "William Carter-Okonkwo",
+        "display": "William Carter-Okonkwo",
+        "side": "both",
+        "categories": [
+          "cat-friends"
+        ],
+        "meal": "Beef Tenderloin",
+        "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": "p-130"
+      },
+      {
+        "id": "g-133",
+        "firstName": "Florence",
+        "lastName": "Diallo",
+        "name": "Florence Diallo",
+        "display": "Florence Diallo",
+        "side": "both",
+        "categories": [
+          "cat-friends"
+        ],
+        "meal": "Pan-Seared Salmon",
+        "dietaryTags": [],
+        "rsvp": "no",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": null
+      },
+      {
+        "id": "g-134",
+        "firstName": "Dorothy",
+        "lastName": "Carter-Okonkwo",
+        "name": "Dorothy Carter-Okonkwo",
+        "display": "Dorothy Carter-Okonkwo",
+        "side": "both",
+        "categories": [
+          "cat-friends"
+        ],
+        "meal": "Vegetarian Risotto",
+        "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": null
+      },
+      {
+        "id": "g-136",
+        "firstName": "Yasmin",
+        "lastName": "Khan-Cohen",
+        "name": "Yasmin Khan-Cohen",
+        "display": "Yasmin Khan-Cohen",
+        "side": "both",
+        "categories": [
+          "cat-friends"
+        ],
+        "meal": "Pan-Seared Salmon",
+        "dietaryTags": [
+          "halal"
+        ],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": "p-135"
+      },
+      {
+        "id": "g-137",
+        "firstName": "Plus",
+        "lastName": "One Khan-Cohen",
+        "name": "Plus One Khan-Cohen",
+        "display": "Plus One Khan-Cohen",
+        "side": "both",
+        "categories": [
+          "cat-friends"
+        ],
+        "meal": "Beef Tenderloin",
+        "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
         "plusOne": true,
-        "isChild": false
+        "isBride": false,
+        "isGroom": false,
+        "party": "p-135"
+      },
+      {
+        "id": "g-139",
+        "firstName": "Mei",
+        "lastName": "Lin",
+        "name": "Mei Lin",
+        "display": "Mei Lin",
+        "side": "both",
+        "categories": [
+          "cat-friends"
+        ],
+        "meal": "Vegetarian Risotto",
+        "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": "p-138"
+      },
+      {
+        "id": "g-140",
+        "firstName": "Kwame",
+        "lastName": "Lin",
+        "name": "Kwame Lin",
+        "display": "Kwame Lin",
+        "side": "both",
+        "categories": [
+          "cat-friends"
+        ],
+        "meal": "Beef Tenderloin",
+        "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": "p-138"
+      },
+      {
+        "id": "g-141",
+        "firstName": "Zara",
+        "lastName": "Lin",
+        "name": "Zara Lin",
+        "display": "Zara Lin",
+        "side": "both",
+        "categories": [
+          "cat-friends",
+          "cat-kids"
+        ],
+        "meal": "Kids Chicken Fingers",
+        "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": true,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": "p-138"
+      },
+      {
+        "id": "g-142",
+        "firstName": "Margaret",
+        "lastName": "Cohen-Diallo",
+        "name": "Margaret Cohen-Diallo",
+        "display": "Margaret Cohen-Diallo",
+        "side": "both",
+        "categories": [
+          "cat-friends"
+        ],
+        "meal": "Pan-Seared Salmon",
+        "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": null
+      },
+      {
+        "id": "g-143",
+        "firstName": "Edward",
+        "lastName": "Adebayo",
+        "name": "Edward Adebayo",
+        "display": "Edward Adebayo",
+        "side": "both",
+        "categories": [
+          "cat-friends"
+        ],
+        "meal": "Beef Tenderloin",
+        "dietaryTags": [],
+        "rsvp": "no",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": null
+      },
+      {
+        "id": "g-144",
+        "firstName": "Helen",
+        "lastName": "Williams-Cohen",
+        "name": "Helen Williams-Cohen",
+        "display": "Helen Williams-Cohen",
+        "side": "both",
+        "categories": [
+          "cat-friends"
+        ],
+        "meal": "Vegetarian Risotto",
+        "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": null
+      },
+      {
+        "id": "g-145",
+        "firstName": "Valentina",
+        "lastName": "García",
+        "name": "Valentina García",
+        "display": "Valentina García",
+        "side": "both",
+        "categories": [
+          "cat-friends"
+        ],
+        "meal": "Pan-Seared Salmon",
+        "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": null
       }
     ],
     "rules": [
       {
-        "id": "r-131",
-        "type": "must_together",
-        "guests": [
-          "g-004",
-          "g-005",
-          "g-006",
-          "g-007"
-        ],
-        "weight": 10,
-        "hard": true,
+        "id": "r-146",
         "enabled": true,
-        "desc": "Bride's family at one table",
-        "partyId": "p_bride_imm"
-      },
-      {
-        "id": "r-132",
-        "type": "must_together",
+        "weight": 30,
+        "hard": false,
+        "type": "prefer_together",
         "guests": [
-          "g-011",
-          "g-012",
-          "g-013",
-          "g-014"
-        ],
-        "weight": 10,
-        "hard": true,
-        "enabled": true,
-        "desc": "Groom's family at one table",
-        "partyId": "p_groom_imm"
-      },
-      {
-        "id": "r-133",
-        "type": "must_together",
-        "guests": [
-          "g-079",
-          "g-080",
           "g-081",
           "g-082",
           "g-083",
-          "g-084",
           "g-085",
-          "g-086"
-        ],
-        "weight": 10,
-        "hard": true,
-        "enabled": true,
-        "desc": "Bride's coworkers together",
-        "partyId": "p_bride_work"
-      },
-      {
-        "id": "r-134",
-        "type": "must_together",
-        "guests": [
+          "g-086",
           "g-087",
           "g-088",
-          "g-089",
+          "g-089"
+        ],
+        "desc": "Bride's college friends seated together"
+      },
+      {
+        "id": "r-147",
+        "enabled": true,
+        "weight": 30,
+        "hard": false,
+        "type": "prefer_together",
+        "guests": [
           "g-090",
           "g-091",
           "g-092",
           "g-093",
-          "g-094"
-        ],
-        "weight": 10,
-        "hard": true,
-        "enabled": true,
-        "desc": "Groom's coworkers together",
-        "partyId": "p_groom_work"
-      },
-      {
-        "id": "r-135",
-        "type": "must_together",
-        "guests": [
-          "g-027",
-          "g-028",
-          "g-029",
-          "g-030",
-          "g-031",
-          "g-032",
-          "g-033",
-          "g-034"
-        ],
-        "weight": 10,
-        "hard": true,
-        "enabled": true,
-        "desc": "Park family together",
-        "partyId": "p_bride_park"
-      },
-      {
-        "id": "r-136",
-        "type": "must_together",
-        "guests": [
-          "g-047",
-          "g-048",
-          "g-049",
-          "g-050",
-          "g-051",
-          "g-052",
-          "g-053",
-          "g-054"
-        ],
-        "weight": 10,
-        "hard": true,
-        "enabled": true,
-        "desc": "Okonkwo family together",
-        "partyId": "p_groom_okonkwo"
-      },
-      {
-        "id": "r-137",
-        "type": "must_not",
-        "guests": [
-          "g-015",
-          "g-095"
-        ],
-        "weight": 10,
-        "hard": true,
-        "enabled": true,
-        "desc": "Estranged in-laws keep apart"
-      },
-      {
-        "id": "r-138",
-        "type": "must_not",
-        "guests": [
-          "g-035",
-          "g-105"
-        ],
-        "weight": 10,
-        "hard": true,
-        "enabled": true,
-        "desc": "Old Carter feud apart"
-      },
-      {
-        "id": "r-139",
-        "type": "must_not",
-        "guests": [
-          "g-096",
-          "g-119"
-        ],
-        "weight": 10,
-        "hard": true,
-        "enabled": true,
-        "desc": "Old workplace drama apart"
-      },
-      {
-        "id": "r-140",
-        "type": "must_not",
-        "guests": [
-          "g-079",
-          "g-087"
-        ],
-        "weight": 10,
-        "hard": true,
-        "enabled": true,
-        "desc": "Ex-colleagues keep apart"
-      }
-    ],
-    "objects": [],
-    "categories": [],
-    "parties": [
-      {
-        "id": "p_bride_imm",
-        "name": "Bride's family",
-        "guestIds": [
-          "g_bride",
-          "g-001",
-          "g-002",
-          "g-003",
-          "g-004",
-          "g-005",
-          "g-006",
-          "g-007"
-        ]
-      },
-      {
-        "id": "p_groom_imm",
-        "name": "Groom's family",
-        "guestIds": [
-          "g_groom",
-          "g-008",
-          "g-009",
-          "g-010",
-          "g-011",
-          "g-012",
-          "g-013",
-          "g-014"
-        ]
-      },
-      {
-        "id": "p_bride_williams",
-        "name": "Bride's Williams family",
-        "guestIds": [
-          "g-015",
-          "g-016",
-          "g-017",
-          "g-018",
-          "g-019",
-          "g-020",
-          "g-021",
-          "g-022",
-          "g-023",
-          "g-024",
-          "g-025",
-          "g-026"
-        ]
-      },
-      {
-        "id": "p_bride_park",
-        "name": "Bride's Park family",
-        "guestIds": [
-          "g-027",
-          "g-028",
-          "g-029",
-          "g-030",
-          "g-031",
-          "g-032",
-          "g-033",
-          "g-034"
-        ]
-      },
-      {
-        "id": "p_groom_carter",
-        "name": "Groom's Carter family",
-        "guestIds": [
-          "g-035",
-          "g-036",
-          "g-037",
-          "g-038",
-          "g-039",
-          "g-040",
-          "g-041",
-          "g-042",
-          "g-043",
-          "g-044",
-          "g-045",
-          "g-046"
-        ]
-      },
-      {
-        "id": "p_groom_okonkwo",
-        "name": "Groom's Okonkwo family",
-        "guestIds": [
-          "g-047",
-          "g-048",
-          "g-049",
-          "g-050",
-          "g-051",
-          "g-052",
-          "g-053",
-          "g-054"
-        ]
-      },
-      {
-        "id": "p_bride_college",
-        "name": "Bride's college friends",
-        "guestIds": [
-          "g-055",
-          "g-056",
-          "g-057",
-          "g-058",
-          "g-059",
-          "g-060",
-          "g-061",
-          "g-062",
-          "g-063",
-          "g-064",
-          "g-065",
-          "g-066"
-        ]
-      },
-      {
-        "id": "p_groom_college",
-        "name": "Groom's college friends",
-        "guestIds": [
-          "g-067",
-          "g-068",
-          "g-069",
-          "g-070",
-          "g-071",
-          "g-072",
-          "g-073",
-          "g-074",
-          "g-075",
-          "g-076",
-          "g-077",
-          "g-078"
-        ]
-      },
-      {
-        "id": "p_bride_work",
-        "name": "Bride's coworkers",
-        "guestIds": [
-          "g-079",
-          "g-080",
-          "g-081",
-          "g-082",
-          "g-083",
-          "g-084",
-          "g-085",
-          "g-086"
-        ]
-      },
-      {
-        "id": "p_groom_work",
-        "name": "Groom's coworkers",
-        "guestIds": [
-          "g-087",
-          "g-088",
-          "g-089",
-          "g-090",
-          "g-091",
-          "g-092",
-          "g-093",
-          "g-094"
-        ]
-      },
-      {
-        "id": "p_brooks_friends",
-        "name": "Brooks family friends",
-        "guestIds": [
-          "g-095",
+          "g-094",
           "g-096",
           "g-097",
-          "g-098",
+          "g-098"
+        ],
+        "desc": "Groom's college friends seated together"
+      },
+      {
+        "id": "r-148",
+        "enabled": true,
+        "weight": 50,
+        "hard": true,
+        "type": "must_together",
+        "guests": [
           "g-099",
           "g-100",
           "g-101",
           "g-102",
           "g-103",
-          "g-104"
-        ]
+          "g-104",
+          "g-105"
+        ],
+        "desc": "Bride's coworkers seated together"
       },
       {
-        "id": "p_carter_friends",
-        "name": "Carter family friends",
-        "guestIds": [
-          "g-105",
-          "g-106",
+        "id": "r-149",
+        "enabled": true,
+        "weight": 50,
+        "hard": true,
+        "type": "must_together",
+        "guests": [
           "g-107",
           "g-108",
           "g-109",
@@ -2851,963 +2834,1239 @@
           "g-111",
           "g-112",
           "g-113",
-          "g-114",
-          "g-115",
-          "g-116"
+          "g-114"
+        ],
+        "desc": "Groom's coworkers seated together"
+      },
+      {
+        "id": "r-150",
+        "enabled": true,
+        "weight": 40,
+        "hard": false,
+        "type": "category_together",
+        "categoryId": "cat-wedding-party",
+        "guests": [
+          "g-001",
+          "g-002",
+          "g-003",
+          "g-004",
+          "g-005",
+          "g-006",
+          "g-007",
+          "g-008",
+          "g-009",
+          "g-010",
+          "g-011",
+          "g-012"
+        ],
+        "desc": "Wedding party seated together"
+      },
+      {
+        "id": "r-151",
+        "enabled": true,
+        "weight": 20,
+        "hard": false,
+        "type": "near_object",
+        "objectId": "obj_dance",
+        "guests": [
+          "g-081",
+          "g-082",
+          "g-083",
+          "g-085",
+          "g-086",
+          "g-087",
+          "g-088",
+          "g-089"
+        ],
+        "desc": "Bride's college friends near the dance floor"
+      },
+      {
+        "id": "r-152",
+        "enabled": true,
+        "weight": 20,
+        "hard": false,
+        "type": "near_object",
+        "objectId": "obj_dj",
+        "guests": [
+          "g-090",
+          "g-091",
+          "g-092",
+          "g-093",
+          "g-094",
+          "g-096",
+          "g-097",
+          "g-098"
+        ],
+        "desc": "Groom's college friends near the DJ booth"
+      },
+      {
+        "id": "r-153",
+        "enabled": true,
+        "weight": 50,
+        "hard": true,
+        "type": "must_not",
+        "guests": [
+          "g-013",
+          "g-014"
+        ],
+        "desc": "Divorced grandparents kept apart"
+      },
+      {
+        "id": "r-154",
+        "enabled": true,
+        "weight": 30,
+        "hard": true,
+        "type": "must_not",
+        "guests": [
+          "g-099",
+          "g-107"
+        ],
+        "desc": "Ex-colleagues from rival firms apart"
+      },
+      {
+        "id": "r-155",
+        "enabled": true,
+        "weight": 30,
+        "hard": true,
+        "type": "must_not",
+        "guests": [
+          "g-081",
+          "g-090"
+        ],
+        "desc": "Old roommates with bad history apart"
+      },
+      {
+        "id": "r-156",
+        "enabled": true,
+        "weight": 30,
+        "hard": true,
+        "type": "must_not",
+        "guests": [
+          "g-082",
+          "g-101"
+        ],
+        "desc": "Past workplace incident apart"
+      }
+    ],
+    "objects": [
+      {
+        "id": "obj_dance",
+        "type": "dance_floor",
+        "name": "Dance Floor",
+        "x": 520,
+        "y": 305,
+        "width": 160,
+        "height": 80,
+        "color": "#C9A961",
+        "category": "entertainment",
+        "isObstacle": false
+      },
+      {
+        "id": "obj_bar",
+        "type": "bar",
+        "name": "Bar",
+        "x": 40,
+        "y": 820,
+        "width": 120,
+        "height": 50,
+        "color": "#8B6F47",
+        "category": "food",
+        "isObstacle": false
+      },
+      {
+        "id": "obj_dj",
+        "type": "dj_booth",
+        "name": "DJ Booth",
+        "x": 1060,
+        "y": 820,
+        "width": 100,
+        "height": 50,
+        "color": "#5B7B9A",
+        "category": "entertainment",
+        "isObstacle": false
+      }
+    ],
+    "categories": [
+      {
+        "id": "cat-family",
+        "name": "Family",
+        "color": "#C9A961"
+      },
+      {
+        "id": "cat-wedding-party",
+        "name": "Wedding Party",
+        "color": "#8B6F47"
+      },
+      {
+        "id": "cat-friends",
+        "name": "Friends",
+        "color": "#7B9D7E"
+      },
+      {
+        "id": "cat-work",
+        "name": "Work",
+        "color": "#5B7B9A"
+      },
+      {
+        "id": "cat-kids",
+        "name": "Kids",
+        "color": "#D4956C"
+      }
+    ],
+    "parties": [
+      {
+        "id": "p-015",
+        "name": "Owen's Family",
+        "guestIds": [
+          "g-016",
+          "g-017",
+          "g-018"
         ]
       },
       {
-        "id": "p_plus_ones",
-        "name": "Plus-ones & misc",
+        "id": "p-019",
+        "name": "Helen & Robert (Park)",
         "guestIds": [
-          "g-117",
-          "g-118",
+          "g-020",
+          "g-021"
+        ]
+      },
+      {
+        "id": "p-022",
+        "name": "Linda & James (Williams)",
+        "guestIds": [
+          "g-023",
+          "g-024"
+        ]
+      },
+      {
+        "id": "p-025",
+        "name": "Susan & Walter (Williams)",
+        "guestIds": [
+          "g-026",
+          "g-027"
+        ]
+      },
+      {
+        "id": "p-028",
+        "name": "Carol & Edward (Park)",
+        "guestIds": [
+          "g-029",
+          "g-030"
+        ]
+      },
+      {
+        "id": "p-031",
+        "name": "Barbara & Frank (Patel)",
+        "guestIds": [
+          "g-032",
+          "g-033"
+        ]
+      },
+      {
+        "id": "p-034",
+        "name": "Sandra & Albert (Singh)",
+        "guestIds": [
+          "g-035",
+          "g-036"
+        ]
+      },
+      {
+        "id": "p-037",
+        "name": "Priya & Arjun",
+        "guestIds": [
+          "g-038",
+          "g-039"
+        ]
+      },
+      {
+        "id": "p-040",
+        "name": "Mei & Daniel",
+        "guestIds": [
+          "g-041",
+          "g-042"
+        ]
+      },
+      {
+        "id": "p-043",
+        "name": "Hana & Marcus",
+        "guestIds": [
+          "g-044",
+          "g-045"
+        ]
+      },
+      {
+        "id": "p-051",
+        "name": "Ifeoma & Diego",
+        "guestIds": [
+          "g-052",
+          "g-053"
+        ]
+      },
+      {
+        "id": "p-054",
+        "name": "Amara & Aaron (Carter)",
+        "guestIds": [
+          "g-055",
+          "g-056"
+        ]
+      },
+      {
+        "id": "p-057",
+        "name": "Folake & Idris",
+        "guestIds": [
+          "g-058",
+          "g-059"
+        ]
+      },
+      {
+        "id": "p-060",
+        "name": "Sarah & Eli (Goldberg)",
+        "guestIds": [
+          "g-061",
+          "g-062"
+        ]
+      },
+      {
+        "id": "p-063",
+        "name": "Naomi & Asher",
+        "guestIds": [
+          "g-064",
+          "g-065"
+        ]
+      },
+      {
+        "id": "p-066",
+        "name": "Sofia & Mateo",
+        "guestIds": [
+          "g-067",
+          "g-068"
+        ]
+      },
+      {
+        "id": "p-069",
+        "name": "Camila & Carlos",
+        "guestIds": [
+          "g-070",
+          "g-071"
+        ]
+      },
+      {
+        "id": "p-072",
+        "name": "Chiamaka & Femi",
+        "guestIds": [
+          "g-073",
+          "g-074"
+        ]
+      },
+      {
+        "id": "p-075",
+        "name": "Esther & Bayo",
+        "guestIds": [
+          "g-076",
+          "g-077"
+        ]
+      },
+      {
+        "id": "p-115",
+        "name": "Beverly & George",
+        "guestIds": [
+          "g-116",
+          "g-117"
+        ]
+      },
+      {
+        "id": "p-118",
+        "name": "Eleanor & Arthur",
+        "guestIds": [
           "g-119",
-          "g-120",
-          "g-121",
+          "g-120"
+        ]
+      },
+      {
+        "id": "p-121",
+        "name": "Catherine & Thomas",
+        "guestIds": [
           "g-122",
-          "g-123",
-          "g-124",
+          "g-123"
+        ]
+      },
+      {
+        "id": "p-124",
+        "name": "Gloria & Charles",
+        "guestIds": [
           "g-125",
-          "g-126",
-          "g-127",
+          "g-126"
+        ]
+      },
+      {
+        "id": "p-127",
+        "name": "Ruth & Frederick",
+        "guestIds": [
           "g-128",
-          "g-129",
-          "g-130"
+          "g-129"
+        ]
+      },
+      {
+        "id": "p-130",
+        "name": "Edith & William",
+        "guestIds": [
+          "g-131",
+          "g-132"
+        ]
+      },
+      {
+        "id": "p-135",
+        "name": "Yasmin + plus-one",
+        "guestIds": [
+          "g-136",
+          "g-137"
+        ]
+      },
+      {
+        "id": "p-138",
+        "name": "Lin Family",
+        "guestIds": [
+          "g-139",
+          "g-140",
+          "g-141"
         ]
       }
     ]
   },
   "preBakedAI": {
     "assignments": {
-      "g-079": "t_round_01",
-      "g-080": "t_round_01",
-      "g-081": "t_round_01",
-      "g-082": "t_round_01",
-      "g-083": "t_round_01",
-      "g-084": "t_round_01",
-      "g-085": "t_round_01",
-      "g-086": "t_round_01",
-      "g-087": "t_round_02",
-      "g-088": "t_round_02",
-      "g-089": "t_round_02",
-      "g-090": "t_round_02",
-      "g-091": "t_round_02",
-      "g-092": "t_round_02",
-      "g-093": "t_round_02",
-      "g-094": "t_round_02",
-      "g-027": "t_round_03",
-      "g-028": "t_round_03",
-      "g-029": "t_round_03",
-      "g-030": "t_round_03",
-      "g-031": "t_round_03",
-      "g-032": "t_round_03",
-      "g-033": "t_round_03",
-      "g-034": "t_round_03",
-      "g-047": "t_round_04",
-      "g-048": "t_round_04",
-      "g-049": "t_round_04",
-      "g-050": "t_round_04",
-      "g-051": "t_round_04",
-      "g-052": "t_round_04",
-      "g-053": "t_round_04",
-      "g-054": "t_round_04",
+      "g-107": "t_round_01",
+      "g-108": "t_round_01",
+      "g-109": "t_round_01",
+      "g-110": "t_round_01",
+      "g-111": "t_round_01",
+      "g-112": "t_round_01",
+      "g-113": "t_round_01",
+      "g-114": "t_round_01",
+      "g-099": "t_round_02",
+      "g-100": "t_round_02",
+      "g-101": "t_round_02",
+      "g-102": "t_round_02",
+      "g-103": "t_round_02",
+      "g-104": "t_round_02",
+      "g-105": "t_round_02",
+      "g-081": "t_round_03",
+      "g-082": "t_round_03",
+      "g-083": "t_round_03",
+      "g-085": "t_round_03",
+      "g-086": "t_round_03",
+      "g-087": "t_round_03",
+      "g-088": "t_round_03",
+      "g-089": "t_round_03",
+      "g-090": "t_round_04",
+      "g-091": "t_round_04",
+      "g-092": "t_round_04",
+      "g-093": "t_round_04",
+      "g-094": "t_round_04",
+      "g-096": "t_round_04",
+      "g-097": "t_round_04",
+      "g-098": "t_round_04",
+      "g-001": "t_round_05",
+      "g-002": "t_round_05",
+      "g-003": "t_round_05",
       "g-004": "t_round_05",
       "g-005": "t_round_05",
       "g-006": "t_round_05",
       "g-007": "t_round_05",
+      "g-008": "t_round_05",
+      "g-009": "t_round_06",
+      "g-010": "t_round_06",
       "g-011": "t_round_06",
       "g-012": "t_round_06",
-      "g-013": "t_round_06",
-      "g-014": "t_round_06",
-      "g_bride": "t_round_11",
-      "g_groom": "t_round_09",
-      "g-001": "t_round_15",
-      "g-002": "t_round_14",
-      "g-003": "t_round_09",
-      "g-008": "t_round_09",
-      "g-009": "t_round_05",
-      "g-010": "t_round_14",
-      "g-055": "t_round_09",
-      "g-056": "t_round_11",
-      "g-057": "t_round_09",
-      "g-067": "t_round_07",
-      "g-068": "t_round_08",
-      "g-069": "t_round_07",
-      "g-015": "t_round_10",
       "g-016": "t_head",
-      "g-017": "t_round_07",
-      "g-018": "t_round_12",
-      "g-019": "t_round_06",
-      "g-020": "t_round_16",
-      "g-021": "t_round_06",
-      "g-022": "t_round_05",
-      "g-023": "t_round_13",
-      "g-024": "t_round_12",
-      "g-025": "t_round_14",
+      "g-017": "t_head",
+      "g-018": "t_head",
+      "g-139": "t_round_14",
+      "g-140": "t_round_14",
+      "g-141": "t_round_14",
+      "g-020": "t_round_07",
+      "g-021": "t_round_07",
+      "g-023": "t_round_10",
+      "g-024": "t_round_10",
       "g-026": "t_head",
-      "g-035": "t_round_16",
-      "g-036": "t_head",
-      "g-037": "t_round_08",
+      "g-027": "t_head",
+      "g-029": "t_round_09",
+      "g-030": "t_round_09",
+      "g-032": "t_round_10",
+      "g-033": "t_round_10",
+      "g-035": "t_round_07",
+      "g-036": "t_round_07",
       "g-038": "t_round_07",
-      "g-039": "t_round_11",
-      "g-040": "t_round_15",
-      "g-041": "t_round_13",
-      "g-042": "t_round_13",
-      "g-043": "t_round_13",
-      "g-044": "t_round_14",
-      "g-045": "t_round_07",
-      "g-046": "t_round_15",
+      "g-039": "t_round_07",
+      "g-041": "t_round_09",
+      "g-042": "t_round_09",
+      "g-044": "t_round_08",
+      "g-045": "t_round_08",
+      "g-052": "t_head",
+      "g-053": "t_head",
+      "g-055": "t_head",
+      "g-056": "t_head",
       "g-058": "t_round_08",
       "g-059": "t_round_08",
-      "g-060": "t_round_15",
-      "g-061": "t_round_07",
-      "g-062": "t_head",
-      "g-063": "t_round_13",
-      "g-064": "t_round_14",
-      "g-065": "t_round_16",
-      "g-066": "t_head",
-      "g-070": "t_round_05",
-      "g-071": "t_sweet",
-      "g-072": "t_round_11",
-      "g-073": "t_round_16",
-      "g-074": "t_round_16",
-      "g-075": "t_round_15",
+      "g-061": "t_round_09",
+      "g-062": "t_round_09",
+      "g-064": "t_round_10",
+      "g-065": "t_round_10",
+      "g-067": "t_round_07",
+      "g-068": "t_round_07",
+      "g-070": "t_round_12",
+      "g-071": "t_round_12",
+      "g-073": "t_round_09",
+      "g-074": "t_round_09",
       "g-076": "t_round_10",
-      "g-077": "t_round_07",
-      "g-078": "t_round_12",
-      "g-095": "t_head",
-      "g-096": "t_head",
-      "g-097": "t_round_10",
-      "g-098": "t_round_12",
-      "g-099": "t_round_11",
-      "g-100": "t_round_07",
-      "g-101": "t_round_12",
-      "g-102": "t_round_13",
-      "g-103": "t_round_15",
-      "g-104": "t_round_06",
-      "g-105": "t_round_14",
-      "g-106": "t_round_08",
-      "g-107": "t_round_10",
-      "g-108": "t_head",
-      "g-109": "t_round_08",
-      "g-110": "t_round_10",
-      "g-111": "t_round_12",
-      "g-112": "t_round_06",
-      "g-113": "t_round_05",
-      "g-114": "t_round_09",
-      "g-115": "t_round_11",
-      "g-116": "t_round_08",
-      "g-117": "t_round_10",
-      "g-118": "t_round_14",
+      "g-077": "t_round_10",
+      "g-116": "t_round_11",
+      "g-117": "t_round_11",
       "g-119": "t_round_16",
-      "g-120": "t_head",
-      "g-121": "t_round_13",
-      "g-122": "t_round_16",
-      "g-123": "t_round_16",
-      "g-124": "t_round_09",
-      "g-125": "t_round_12",
-      "g-126": "t_head",
-      "g-127": "t_round_15",
+      "g-120": "t_round_16",
+      "g-122": "t_round_11",
+      "g-123": "t_round_11",
+      "g-125": "t_round_14",
+      "g-126": "t_round_14",
       "g-128": "t_round_11",
-      "g-129": "t_round_13",
-      "g-130": "t_round_15"
+      "g-129": "t_round_11",
+      "g-131": "t_round_14",
+      "g-132": "t_round_14",
+      "g-136": "t_round_11",
+      "g-137": "t_round_11",
+      "g-013": "t_sweet",
+      "g-014": "t_round_13",
+      "g-049": "t_round_12",
+      "g-050": "t_round_12",
+      "g-046": "t_round_08",
+      "g-047": "t_round_12",
+      "g-048": "t_round_12",
+      "g-078": "t_round_12",
+      "g-079": "t_round_12",
+      "g-080": "t_head",
+      "g-084": "t_round_13",
+      "g-095": "t_round_13",
+      "g-106": "t_round_16",
+      "g-133": "t_round_13",
+      "g-134": "t_round_14",
+      "g-142": "t_round_13",
+      "g-143": "t_round_13",
+      "g-144": "t_round_13",
+      "g-145": "t_round_13"
     },
     "seatOrders": {
       "t_round_01": [
-        "g-079",
-        "g-080",
+        "g-107",
+        "g-108",
+        "g-109",
+        "g-110",
+        "g-111",
+        "g-112",
+        "g-113",
+        "g-114"
+      ],
+      "t_round_02": [
+        "g-099",
+        "g-100",
+        "g-101",
+        "g-102",
+        "g-103",
+        "g-104",
+        "g-105",
+        null
+      ],
+      "t_round_03": [
         "g-081",
         "g-082",
         "g-083",
-        "g-084",
         "g-085",
-        "g-086"
-      ],
-      "t_round_02": [
+        "g-086",
         "g-087",
         "g-088",
-        "g-089",
+        "g-089"
+      ],
+      "t_round_04": [
         "g-090",
         "g-091",
         "g-092",
         "g-093",
-        "g-094"
-      ],
-      "t_round_03": [
-        "g-027",
-        "g-028",
-        "g-029",
-        "g-030",
-        "g-031",
-        "g-032",
-        "g-033",
-        "g-034"
-      ],
-      "t_round_04": [
-        "g-047",
-        "g-048",
-        "g-049",
-        "g-050",
-        "g-051",
-        "g-052",
-        "g-053",
-        "g-054"
+        "g-094",
+        "g-096",
+        "g-097",
+        "g-098"
       ],
       "t_round_05": [
+        "g-001",
+        "g-002",
+        "g-003",
         "g-004",
         "g-005",
         "g-006",
         "g-007",
-        "g-009",
-        "g-022",
-        "g-070",
-        "g-113"
+        "g-008"
       ],
       "t_round_06": [
+        "g-009",
+        "g-010",
         "g-011",
         "g-012",
-        "g-013",
-        "g-014",
-        "g-019",
-        "g-021",
-        "g-104",
-        "g-112"
-      ],
-      "t_round_11": [
-        "g_bride",
-        "g-056",
-        "g-039",
-        "g-072",
-        "g-099",
-        "g-115",
-        "g-128",
-        null
-      ],
-      "t_round_09": [
-        "g_groom",
-        "g-003",
-        "g-008",
-        "g-055",
-        "g-057",
-        "g-114",
-        "g-124",
-        null
-      ],
-      "t_round_15": [
-        "g-001",
-        "g-040",
-        "g-046",
-        "g-060",
-        "g-075",
-        "g-103",
-        "g-127",
-        "g-130"
-      ],
-      "t_round_14": [
-        "g-002",
-        "g-010",
-        "g-025",
-        "g-044",
-        "g-064",
-        "g-105",
-        "g-118",
-        null
-      ],
-      "t_round_07": [
-        "g-067",
-        "g-069",
-        "g-017",
-        "g-038",
-        "g-045",
-        "g-061",
-        "g-077",
-        "g-100"
-      ],
-      "t_round_08": [
-        "g-068",
-        "g-037",
-        "g-058",
-        "g-059",
-        "g-106",
-        "g-109",
-        "g-116",
-        null
-      ],
-      "t_round_10": [
-        "g-015",
-        "g-076",
-        "g-097",
-        "g-107",
-        "g-110",
-        "g-117",
+        null,
+        null,
         null,
         null
       ],
       "t_head": [
         "g-016",
-        "g-026",
-        "g-036",
-        "g-062",
-        "g-066",
-        "g-095",
-        "g-096",
-        "g-108",
-        "g-120",
-        "g-126"
-      ],
-      "t_round_12": [
+        "g-017",
         "g-018",
-        "g-024",
-        "g-078",
-        "g-098",
-        "g-101",
-        "g-111",
+        "g-026",
+        "g-027",
+        "g-052",
+        "g-053",
+        "g-055",
+        "g-056",
+        "g-080"
+      ],
+      "t_round_14": [
+        "g-139",
+        "g-140",
+        "g-141",
         "g-125",
-        null
+        "g-126",
+        "g-131",
+        "g-132",
+        "g-134"
       ],
-      "t_round_16": [
+      "t_round_07": [
         "g-020",
+        "g-021",
         "g-035",
-        "g-065",
-        "g-073",
-        "g-074",
-        "g-119",
-        "g-122",
-        "g-123"
+        "g-036",
+        "g-038",
+        "g-039",
+        "g-067",
+        "g-068"
       ],
-      "t_round_13": [
+      "t_round_10": [
         "g-023",
+        "g-024",
+        "g-032",
+        "g-033",
+        "g-064",
+        "g-065",
+        "g-076",
+        "g-077"
+      ],
+      "t_round_09": [
+        "g-029",
+        "g-030",
         "g-041",
         "g-042",
-        "g-043",
-        "g-063",
-        "g-102",
-        "g-121",
-        "g-129"
+        "g-061",
+        "g-062",
+        "g-073",
+        "g-074"
+      ],
+      "t_round_08": [
+        "g-044",
+        "g-045",
+        "g-058",
+        "g-059",
+        "g-046",
+        null,
+        null,
+        null
+      ],
+      "t_round_12": [
+        "g-070",
+        "g-071",
+        "g-049",
+        "g-050",
+        "g-047",
+        "g-048",
+        "g-078",
+        "g-079"
+      ],
+      "t_round_11": [
+        "g-116",
+        "g-117",
+        "g-122",
+        "g-123",
+        "g-128",
+        "g-129",
+        "g-136",
+        "g-137"
+      ],
+      "t_round_16": [
+        "g-119",
+        "g-120",
+        "g-106",
+        null,
+        null,
+        null,
+        null,
+        null
       ],
       "t_sweet": [
-        "g-071",
+        "g-013",
         null
+      ],
+      "t_round_13": [
+        "g-014",
+        "g-084",
+        "g-095",
+        "g-133",
+        "g-142",
+        "g-143",
+        "g-144",
+        "g-145"
       ]
     },
-    "score": 27.53251473735966,
+    "score": 26297.486098639885,
     "scorecard": {
-      "overallPercent": 100,
-      "overallLabel": "Perfect",
-      "totalRules": 10,
-      "totalSatisfied": 10,
+      "overallPercent": 97,
+      "overallLabel": "Excellent",
+      "totalRules": 38,
+      "totalSatisfied": 37,
       "partiesKept": {
-        "total": 0,
-        "satisfied": 0
+        "total": 27,
+        "satisfied": 27
       },
       "hardConstraints": {
-        "total": 10,
-        "satisfied": 10,
+        "total": 6,
+        "satisfied": 6,
         "partial": 0,
         "violated": 0,
         "rules": [
           {
-            "ruleId": "r-131",
+            "ruleId": "r-148",
             "type": "must_together",
             "hard": true,
             "guests": [
-              "g-004",
-              "g-005",
-              "g-006",
-              "g-007"
+              "g-099",
+              "g-100",
+              "g-101",
+              "g-102",
+              "g-103",
+              "g-104",
+              "g-105"
             ],
             "status": "satisfied",
-            "score": 10,
-            "description": "Owen Williams & Margaret Williams & James Williams & Helen Park together",
-            "details": "All at Table 5"
+            "score": 50,
+            "description": "Cole Liu & Ryan Chen & Ethan Park & Devan Patel & Ravi Singh & Sai Khan & Jacob Williams together",
+            "details": "All at Table 2"
           },
           {
-            "ruleId": "r-132",
+            "ruleId": "r-149",
             "type": "must_together",
             "hard": true,
             "guests": [
-              "g-011",
-              "g-012",
+              "g-107",
+              "g-108",
+              "g-109",
+              "g-110",
+              "g-111",
+              "g-112",
+              "g-113",
+              "g-114"
+            ],
+            "status": "satisfied",
+            "score": 50,
+            "description": "Andres García & Javier Hernández & Luis Ramirez & Jonah Goldberg & Tunde Adebayo & Frank Diallo & Albert Cohen-Diallo & Henry Goldberg-Lin together",
+            "details": "All at Table 1"
+          },
+          {
+            "ruleId": "r-153",
+            "type": "must_not",
+            "hard": true,
+            "guests": [
               "g-013",
               "g-014"
             ],
             "status": "satisfied",
-            "score": 10,
-            "description": "Ifeoma Okonkwo & Ngozi Okonkwo & Obinna Okonkwo & Amara Carter together",
-            "details": "All at Table 6"
+            "score": 50,
+            "description": "Keep Margaret Williams & James Williams apart",
+            "details": "Margaret Williams at Sweetheart, James Williams at Table 13"
           },
           {
-            "ruleId": "r-133",
-            "type": "must_together",
+            "ruleId": "r-154",
+            "type": "must_not",
             "hard": true,
             "guests": [
-              "g-079",
-              "g-080",
+              "g-099",
+              "g-107"
+            ],
+            "status": "satisfied",
+            "score": 14,
+            "description": "Keep Cole Liu & Andres García apart",
+            "details": "Cole Liu at Table 2, Andres García at Table 1"
+          },
+          {
+            "ruleId": "r-155",
+            "type": "must_not",
+            "hard": true,
+            "guests": [
               "g-081",
+              "g-090"
+            ],
+            "status": "satisfied",
+            "score": 14,
+            "description": "Keep Sora Chen & Aaron Goldberg-Lin apart",
+            "details": "Sora Chen at Table 3, Aaron Goldberg-Lin at Table 4"
+          },
+          {
+            "ruleId": "r-156",
+            "type": "must_not",
+            "hard": true,
+            "guests": [
               "g-082",
-              "g-083",
-              "g-084",
-              "g-085",
-              "g-086"
+              "g-101"
             ],
             "status": "satisfied",
-            "score": 10,
-            "description": "Owen Tanaka & Cole Liu & Ryan Chen & Aarav Nakamura & Rohan Williams & Vikram Park & Arjun Park-Williams & Kabir Williams-Patel together",
-            "details": "All at Table 1"
-          },
-          {
-            "ruleId": "r-134",
-            "type": "must_together",
-            "hard": true,
-            "guests": [
-              "g-087",
-              "g-088",
-              "g-089",
-              "g-090",
-              "g-091",
-              "g-092",
-              "g-093",
-              "g-094"
-            ],
-            "status": "satisfied",
-            "score": 10,
-            "description": "Idris Ramirez & Femi Carter & Bayo Okonkwo & Diego Carter-Okonkwo & Mateo Hernández & Carlos García & Javier Goldberg & Andres Cohen together",
-            "details": "All at Table 2"
-          },
-          {
-            "ruleId": "r-135",
-            "type": "must_together",
-            "hard": true,
-            "guests": [
-              "g-027",
-              "g-028",
-              "g-029",
-              "g-030",
-              "g-031",
-              "g-032",
-              "g-033",
-              "g-034"
-            ],
-            "status": "satisfied",
-            "score": 10,
-            "description": "Zara Park & Leila Park-Williams & Yasmin Williams-Patel & Noor Patel & Mei Singh & Lin Khan & Yuki Tanaka & Hana Liu together",
-            "details": "All at Table 3"
-          },
-          {
-            "ruleId": "r-136",
-            "type": "must_together",
-            "hard": true,
-            "guests": [
-              "g-047",
-              "g-048",
-              "g-049",
-              "g-050",
-              "g-051",
-              "g-052",
-              "g-053",
-              "g-054"
-            ],
-            "status": "satisfied",
-            "score": 10,
-            "description": "Lucia Carter-Okonkwo & Elena Hernández & Carmen García & Rosa Goldberg & Sarah Cohen & Rachel Adebayo & Hannah Diallo & Leah Ramirez together",
-            "details": "All at Table 4"
-          },
-          {
-            "ruleId": "r-137",
-            "type": "must_not",
-            "hard": true,
-            "guests": [
-              "g-015",
-              "g-095"
-            ],
-            "status": "satisfied",
-            "score": 7.775049124532197,
-            "description": "Keep Sophie Williams & Pablo Adebayo apart",
-            "details": "Sophie Williams at Table 10, Pablo Adebayo at Head Table"
-          },
-          {
-            "ruleId": "r-138",
-            "type": "must_not",
-            "hard": true,
-            "guests": [
-              "g-035",
-              "g-105"
-            ],
-            "status": "satisfied",
-            "score": 9.333333333333334,
-            "description": "Keep Adaeze Carter & Devan Patel apart",
-            "details": "Adaeze Carter at Table 16, Devan Patel at Table 14"
-          },
-          {
-            "ruleId": "r-139",
-            "type": "must_not",
-            "hard": true,
-            "guests": [
-              "g-096",
-              "g-119"
-            ],
-            "status": "satisfied",
-            "score": 10,
-            "description": "Keep Luis Diallo & Caleb Adebayo apart",
-            "details": "Luis Diallo at Head Table, Caleb Adebayo at Table 16"
-          },
-          {
-            "ruleId": "r-140",
-            "type": "must_not",
-            "hard": true,
-            "guests": [
-              "g-079",
-              "g-087"
-            ],
-            "status": "satisfied",
-            "score": 4.666666666666667,
-            "description": "Keep Owen Tanaka & Idris Ramirez apart",
-            "details": "Owen Tanaka at Table 1, Idris Ramirez at Table 2"
+            "score": 14,
+            "description": "Keep Nina Nakamura & Ethan Park apart",
+            "details": "Nina Nakamura at Table 3, Ethan Park at Table 2"
           }
         ]
       },
       "softPreferences": {
-        "total": 0,
-        "satisfied": 0,
-        "partial": 0,
+        "total": 5,
+        "satisfied": 4,
+        "partial": 1,
         "violated": 0,
-        "rules": []
+        "rules": [
+          {
+            "ruleId": "r-146",
+            "type": "prefer_together",
+            "hard": false,
+            "guests": [
+              "g-081",
+              "g-082",
+              "g-083",
+              "g-085",
+              "g-086",
+              "g-087",
+              "g-088",
+              "g-089"
+            ],
+            "status": "satisfied",
+            "score": 30,
+            "description": "Sora Chen & Nina Nakamura & Olivia Patel-Singh & Lily Tanaka & Grace Nakamura & Emma Williams-Patel & Vikram Patel & Rohan Khan together",
+            "details": "All at Table 3"
+          },
+          {
+            "ruleId": "r-147",
+            "type": "prefer_together",
+            "hard": false,
+            "guests": [
+              "g-090",
+              "g-091",
+              "g-092",
+              "g-093",
+              "g-094",
+              "g-096",
+              "g-097",
+              "g-098"
+            ],
+            "status": "satisfied",
+            "score": 30,
+            "description": "Aaron Goldberg-Lin & Mateo Hernández & Levi Cohen & Pablo Ramirez & Marco García-Adebayo & Ezra Cohen-Diallo & Asher Goldberg-Lin & Noah Carter-Okonkwo together",
+            "details": "All at Table 4"
+          },
+          {
+            "ruleId": "r-150",
+            "type": "category_together",
+            "hard": false,
+            "guests": [
+              "g-001",
+              "g-002",
+              "g-003",
+              "g-004",
+              "g-005",
+              "g-006",
+              "g-007",
+              "g-008",
+              "g-009",
+              "g-010",
+              "g-011",
+              "g-012"
+            ],
+            "status": "satisfied",
+            "score": 22.22222222222222,
+            "description": "Wedding Party guests together",
+            "details": "8 at Table 5, 4 at Table 6"
+          },
+          {
+            "ruleId": "r-151",
+            "type": "near_object",
+            "hard": false,
+            "guests": [
+              "g-081",
+              "g-082",
+              "g-083",
+              "g-085",
+              "g-086",
+              "g-087",
+              "g-088",
+              "g-089"
+            ],
+            "status": "satisfied",
+            "score": 127.85793562708102,
+            "description": "Sora Chen & Nina Nakamura & Olivia Patel-Singh & Lily Tanaka & Grace Nakamura & Emma Williams-Patel & Vikram Patel & Rohan Khan near Dance Floor",
+            "details": "Sora Chen: 15ft from Dance Floor, Nina Nakamura: 15ft from Dance Floor, Olivia Patel-Singh: 15ft from Dance Floor, Lily Tanaka: 15ft from Dance Floor, Grace Nakamura: 15ft from Dance Floor, Emma Williams-Patel: 15ft from Dance Floor, Vikram Patel: 15ft from Dance Floor, Rohan Khan: 15ft from Dance Floor"
+          },
+          {
+            "ruleId": "r-152",
+            "type": "near_object",
+            "hard": false,
+            "guests": [
+              "g-090",
+              "g-091",
+              "g-092",
+              "g-093",
+              "g-094",
+              "g-096",
+              "g-097",
+              "g-098"
+            ],
+            "status": "partial",
+            "score": 48.62811312790206,
+            "description": "Aaron Goldberg-Lin & Mateo Hernández & Levi Cohen & Pablo Ramirez & Marco García-Adebayo & Ezra Cohen-Diallo & Asher Goldberg-Lin & Noah Carter-Okonkwo near DJ Booth",
+            "details": "Aaron Goldberg-Lin: 45ft from DJ Booth, Mateo Hernández: 45ft from DJ Booth, Levi Cohen: 45ft from DJ Booth, Pablo Ramirez: 45ft from DJ Booth, Marco García-Adebayo: 45ft from DJ Booth, Ezra Cohen-Diallo: 45ft from DJ Booth, Asher Goldberg-Lin: 45ft from DJ Booth, Noah Carter-Okonkwo: 45ft from DJ Booth"
+          }
+        ]
       },
       "suggestions": [],
-      "lowConfidencePlacements": [
-        {
-          "id": "g_bride",
-          "name": "Brooks Williams",
-          "tableId": "t_round_11"
-        },
-        {
-          "id": "g_groom",
-          "name": "Carter Okonkwo",
-          "tableId": "t_round_09"
-        },
-        {
-          "id": "g-001",
-          "name": "Patricia Williams",
-          "tableId": "t_round_15"
-        },
-        {
-          "id": "g-002",
-          "name": "David Williams",
-          "tableId": "t_round_14"
-        },
-        {
-          "id": "g-003",
-          "name": "Charlotte Williams",
-          "tableId": "t_round_09"
-        },
-        {
-          "id": "g-008",
-          "name": "Adaeze Okonkwo",
-          "tableId": "t_round_09"
-        },
-        {
-          "id": "g-009",
-          "name": "Chinedu Okonkwo",
-          "tableId": "t_round_05"
-        },
-        {
-          "id": "g-010",
-          "name": "Tunde Okonkwo",
-          "tableId": "t_round_14"
-        },
-        {
-          "id": "g-016",
-          "name": "Emma Park",
-          "tableId": "t_head"
-        },
-        {
-          "id": "g-017",
-          "name": "Charlotte Park-Williams",
-          "tableId": "t_round_07"
-        },
-        {
-          "id": "g-018",
-          "name": "Olivia Williams-Patel",
-          "tableId": "t_round_12"
-        },
-        {
-          "id": "g-019",
-          "name": "Mia Patel",
-          "tableId": "t_round_06"
-        },
-        {
-          "id": "g-020",
-          "name": "Hannah Singh",
-          "tableId": "t_round_16"
-        },
-        {
-          "id": "g-021",
-          "name": "Grace Khan",
-          "tableId": "t_round_06"
-        },
-        {
-          "id": "g-022",
-          "name": "Lily Tanaka",
-          "tableId": "t_round_05"
-        },
-        {
-          "id": "g-023",
-          "name": "Maya Liu",
-          "tableId": "t_round_13"
-        },
-        {
-          "id": "g-024",
-          "name": "Priya Chen",
-          "tableId": "t_round_12"
-        },
-        {
-          "id": "g-025",
-          "name": "Aisha Nakamura",
-          "tableId": "t_round_14"
-        },
-        {
-          "id": "g-026",
-          "name": "Fatima Williams",
-          "tableId": "t_head"
-        },
-        {
-          "id": "g-036",
-          "name": "Chiamaka Okonkwo",
-          "tableId": "t_head"
-        },
-        {
-          "id": "g-037",
-          "name": "Ngozi Carter-Okonkwo",
-          "tableId": "t_round_08"
-        },
-        {
-          "id": "g-038",
-          "name": "Folake Hernández",
-          "tableId": "t_round_07"
-        },
-        {
-          "id": "g-039",
-          "name": "Amara García",
-          "tableId": "t_round_11"
-        },
-        {
-          "id": "g-040",
-          "name": "Ifeoma Goldberg",
-          "tableId": "t_round_15"
-        },
-        {
-          "id": "g-041",
-          "name": "Zuri Cohen",
-          "tableId": "t_round_13"
-        },
-        {
-          "id": "g-042",
-          "name": "Kehinde Adebayo",
-          "tableId": "t_round_13"
-        },
-        {
-          "id": "g-043",
-          "name": "Sofia Diallo",
-          "tableId": "t_round_13"
-        },
-        {
-          "id": "g-044",
-          "name": "Isabella Ramirez",
-          "tableId": "t_round_14"
-        },
-        {
-          "id": "g-045",
-          "name": "Camila Carter",
-          "tableId": "t_round_07"
-        },
-        {
-          "id": "g-046",
-          "name": "Valentina Okonkwo",
-          "tableId": "t_round_15"
-        },
-        {
-          "id": "g-055",
-          "name": "Maya Patel",
-          "tableId": "t_round_09"
-        },
-        {
-          "id": "g-056",
-          "name": "Yuki Tanaka",
-          "tableId": "t_round_11"
-        },
-        {
-          "id": "g-057",
-          "name": "Aisha Khan",
-          "tableId": "t_round_09"
-        },
-        {
-          "id": "g-058",
-          "name": "Sora Chen",
-          "tableId": "t_round_08"
-        },
-        {
-          "id": "g-059",
-          "name": "Nina Nakamura",
-          "tableId": "t_round_08"
-        },
-        {
-          "id": "g-060",
-          "name": "Anya Williams",
-          "tableId": "t_round_15"
-        },
-        {
-          "id": "g-061",
-          "name": "Tara Park",
-          "tableId": "t_round_07"
-        },
-        {
-          "id": "g-062",
-          "name": "Daniel Park-Williams",
-          "tableId": "t_head"
-        },
-        {
-          "id": "g-063",
-          "name": "Marcus Williams-Patel",
-          "tableId": "t_round_13"
-        },
-        {
-          "id": "g-064",
-          "name": "Ethan Patel",
-          "tableId": "t_round_14"
-        },
-        {
-          "id": "g-065",
-          "name": "Jacob Singh",
-          "tableId": "t_round_16"
-        },
-        {
-          "id": "g-066",
-          "name": "Liam Khan",
-          "tableId": "t_head"
-        },
-        {
-          "id": "g-067",
-          "name": "Jelani Adebayo",
-          "tableId": "t_round_07"
-        },
-        {
-          "id": "g-068",
-          "name": "Diego Hernández",
-          "tableId": "t_round_08"
-        },
-        {
-          "id": "g-069",
-          "name": "Aaron Goldberg",
-          "tableId": "t_round_07"
-        },
-        {
-          "id": "g-070",
-          "name": "Naomi Carter",
-          "tableId": "t_round_05"
-        },
-        {
-          "id": "g-071",
-          "name": "Esther Okonkwo",
-          "tableId": "t_sweet"
-        },
-        {
-          "id": "g-072",
-          "name": "Miriam Carter-Okonkwo",
-          "tableId": "t_round_11"
-        },
-        {
-          "id": "g-073",
-          "name": "Tamar Hernández",
-          "tableId": "t_round_16"
-        },
-        {
-          "id": "g-074",
-          "name": "Chinedu García",
-          "tableId": "t_round_16"
-        },
-        {
-          "id": "g-075",
-          "name": "Tunde Goldberg",
-          "tableId": "t_round_15"
-        },
-        {
-          "id": "g-076",
-          "name": "Obinna Cohen",
-          "tableId": "t_round_10"
-        },
-        {
-          "id": "g-077",
-          "name": "Kwame Adebayo",
-          "tableId": "t_round_07"
-        },
-        {
-          "id": "g-078",
-          "name": "Jelani Diallo",
-          "tableId": "t_round_12"
-        },
-        {
-          "id": "g-097",
-          "name": "Marco Ramirez",
-          "tableId": "t_round_10"
-        },
-        {
-          "id": "g-098",
-          "name": "Aaron Carter",
-          "tableId": "t_round_12"
-        },
-        {
-          "id": "g-099",
-          "name": "Ezra Okonkwo",
-          "tableId": "t_round_11"
-        },
-        {
-          "id": "g-100",
-          "name": "Asher Carter-Okonkwo",
-          "tableId": "t_round_07"
-        },
-        {
-          "id": "g-101",
-          "name": "Eli Hernández",
-          "tableId": "t_round_12"
-        },
-        {
-          "id": "g-102",
-          "name": "Noah García",
-          "tableId": "t_round_13"
-        },
-        {
-          "id": "g-103",
-          "name": "Levi Goldberg",
-          "tableId": "t_round_15"
-        },
-        {
-          "id": "g-104",
-          "name": "Jonah Cohen",
-          "tableId": "t_round_06"
-        },
-        {
-          "id": "g-106",
-          "name": "Ravi Singh",
-          "tableId": "t_round_08"
-        },
-        {
-          "id": "g-107",
-          "name": "Sai Khan",
-          "tableId": "t_round_10"
-        },
-        {
-          "id": "g-108",
-          "name": "Carol Tanaka",
-          "tableId": "t_head"
-        },
-        {
-          "id": "g-109",
-          "name": "Susan Liu",
-          "tableId": "t_round_08"
-        },
-        {
-          "id": "g-110",
-          "name": "Linda Chen",
-          "tableId": "t_round_10"
-        },
-        {
-          "id": "g-111",
-          "name": "Patricia Nakamura",
-          "tableId": "t_round_12"
-        },
-        {
-          "id": "g-112",
-          "name": "Margaret Williams",
-          "tableId": "t_round_06"
-        },
-        {
-          "id": "g-113",
-          "name": "Barbara Park",
-          "tableId": "t_round_05"
-        },
-        {
-          "id": "g-114",
-          "name": "Helen Park-Williams",
-          "tableId": "t_round_09"
-        },
-        {
-          "id": "g-115",
-          "name": "Sandra Williams-Patel",
-          "tableId": "t_round_11"
-        },
-        {
-          "id": "g-116",
-          "name": "Robert Patel",
-          "tableId": "t_round_08"
-        },
-        {
-          "id": "g-117",
-          "name": "Ezra Goldberg-Lin",
-          "tableId": "t_round_10"
-        },
-        {
-          "id": "g-118",
-          "name": "Lucia Hernández",
-          "tableId": "t_round_14"
-        },
-        {
-          "id": "g-120",
-          "name": "Helen Diallo",
-          "tableId": "t_head"
-        },
-        {
-          "id": "g-121",
-          "name": "Gloria Ramirez",
-          "tableId": "t_round_13"
-        },
-        {
-          "id": "g-122",
-          "name": "James Singh",
-          "tableId": "t_round_16"
-        },
-        {
-          "id": "g-123",
-          "name": "Beverly Carter",
-          "tableId": "t_round_16"
-        },
-        {
-          "id": "g-124",
-          "name": "Eleanor Okonkwo",
-          "tableId": "t_round_09"
-        },
-        {
-          "id": "g-125",
-          "name": "Catherine Carter-Okonkwo",
-          "tableId": "t_round_12"
-        },
-        {
-          "id": "g-126",
-          "name": "Rose Hernández",
-          "tableId": "t_head"
-        },
-        {
-          "id": "g-127",
-          "name": "Ruth García",
-          "tableId": "t_round_15"
-        },
-        {
-          "id": "g-128",
-          "name": "William Khan",
-          "tableId": "t_round_11"
-        },
-        {
-          "id": "g-129",
-          "name": "David Tanaka",
-          "tableId": "t_round_13"
-        },
-        {
-          "id": "g-130",
-          "name": "Edith Goldberg",
-          "tableId": "t_round_15"
+      "lowConfidencePlacements": [],
+      "partyPlacements": [
+        {
+          "id": "p-015",
+          "names": "Owen & Sophie & Mia",
+          "together": true,
+          "tableName": "Head Table",
+          "guestIds": [
+            "g-016",
+            "g-017",
+            "g-018"
+          ],
+          "seatedCount": 3,
+          "totalCount": 3
+        },
+        {
+          "id": "p-019",
+          "names": "Helen & Robert",
+          "together": true,
+          "tableName": "Table 7",
+          "guestIds": [
+            "g-020",
+            "g-021"
+          ],
+          "seatedCount": 2,
+          "totalCount": 2
+        },
+        {
+          "id": "p-022",
+          "names": "Linda & Henry",
+          "together": true,
+          "tableName": "Table 10",
+          "guestIds": [
+            "g-023",
+            "g-024"
+          ],
+          "seatedCount": 2,
+          "totalCount": 2
+        },
+        {
+          "id": "p-025",
+          "names": "Susan & Walter",
+          "together": true,
+          "tableName": "Head Table",
+          "guestIds": [
+            "g-026",
+            "g-027"
+          ],
+          "seatedCount": 2,
+          "totalCount": 2
+        },
+        {
+          "id": "p-028",
+          "names": "Carol & Edward",
+          "together": true,
+          "tableName": "Table 9",
+          "guestIds": [
+            "g-029",
+            "g-030"
+          ],
+          "seatedCount": 2,
+          "totalCount": 2
+        },
+        {
+          "id": "p-031",
+          "names": "Barbara & Frank",
+          "together": true,
+          "tableName": "Table 10",
+          "guestIds": [
+            "g-032",
+            "g-033"
+          ],
+          "seatedCount": 2,
+          "totalCount": 2
+        },
+        {
+          "id": "p-034",
+          "names": "Sandra & Albert",
+          "together": true,
+          "tableName": "Table 7",
+          "guestIds": [
+            "g-035",
+            "g-036"
+          ],
+          "seatedCount": 2,
+          "totalCount": 2
+        },
+        {
+          "id": "p-037",
+          "names": "Priya & Arjun",
+          "together": true,
+          "tableName": "Table 7",
+          "guestIds": [
+            "g-038",
+            "g-039"
+          ],
+          "seatedCount": 2,
+          "totalCount": 2
+        },
+        {
+          "id": "p-040",
+          "names": "Mei & Daniel",
+          "together": true,
+          "tableName": "Table 9",
+          "guestIds": [
+            "g-041",
+            "g-042"
+          ],
+          "seatedCount": 2,
+          "totalCount": 2
+        },
+        {
+          "id": "p-043",
+          "names": "Hana & Marcus",
+          "together": true,
+          "tableName": "Table 8",
+          "guestIds": [
+            "g-044",
+            "g-045"
+          ],
+          "seatedCount": 2,
+          "totalCount": 2
+        },
+        {
+          "id": "p-051",
+          "names": "Ifeoma & Diego",
+          "together": true,
+          "tableName": "Head Table",
+          "guestIds": [
+            "g-052",
+            "g-053"
+          ],
+          "seatedCount": 2,
+          "totalCount": 2
+        },
+        {
+          "id": "p-054",
+          "names": "Amara & Aaron",
+          "together": true,
+          "tableName": "Head Table",
+          "guestIds": [
+            "g-055",
+            "g-056"
+          ],
+          "seatedCount": 2,
+          "totalCount": 2
+        },
+        {
+          "id": "p-057",
+          "names": "Folake & Idris",
+          "together": true,
+          "tableName": "Table 8",
+          "guestIds": [
+            "g-058",
+            "g-059"
+          ],
+          "seatedCount": 2,
+          "totalCount": 2
+        },
+        {
+          "id": "p-060",
+          "names": "Sarah & Eli",
+          "together": true,
+          "tableName": "Table 9",
+          "guestIds": [
+            "g-061",
+            "g-062"
+          ],
+          "seatedCount": 2,
+          "totalCount": 2
+        },
+        {
+          "id": "p-063",
+          "names": "Naomi & Asher",
+          "together": true,
+          "tableName": "Table 10",
+          "guestIds": [
+            "g-064",
+            "g-065"
+          ],
+          "seatedCount": 2,
+          "totalCount": 2
+        },
+        {
+          "id": "p-066",
+          "names": "Sofia & Mateo",
+          "together": true,
+          "tableName": "Table 7",
+          "guestIds": [
+            "g-067",
+            "g-068"
+          ],
+          "seatedCount": 2,
+          "totalCount": 2
+        },
+        {
+          "id": "p-069",
+          "names": "Camila & Carlos",
+          "together": true,
+          "tableName": "Table 12",
+          "guestIds": [
+            "g-070",
+            "g-071"
+          ],
+          "seatedCount": 2,
+          "totalCount": 2
+        },
+        {
+          "id": "p-072",
+          "names": "Chiamaka & Femi",
+          "together": true,
+          "tableName": "Table 9",
+          "guestIds": [
+            "g-073",
+            "g-074"
+          ],
+          "seatedCount": 2,
+          "totalCount": 2
+        },
+        {
+          "id": "p-075",
+          "names": "Esther & Bayo",
+          "together": true,
+          "tableName": "Table 10",
+          "guestIds": [
+            "g-076",
+            "g-077"
+          ],
+          "seatedCount": 2,
+          "totalCount": 2
+        },
+        {
+          "id": "p-115",
+          "names": "Beverly & George",
+          "together": true,
+          "tableName": "Table 11",
+          "guestIds": [
+            "g-116",
+            "g-117"
+          ],
+          "seatedCount": 2,
+          "totalCount": 2
+        },
+        {
+          "id": "p-118",
+          "names": "Eleanor & Arthur",
+          "together": true,
+          "tableName": "Table 16",
+          "guestIds": [
+            "g-119",
+            "g-120"
+          ],
+          "seatedCount": 2,
+          "totalCount": 2
+        },
+        {
+          "id": "p-121",
+          "names": "Catherine & Thomas",
+          "together": true,
+          "tableName": "Table 11",
+          "guestIds": [
+            "g-122",
+            "g-123"
+          ],
+          "seatedCount": 2,
+          "totalCount": 2
+        },
+        {
+          "id": "p-124",
+          "names": "Gloria & Charles",
+          "together": true,
+          "tableName": "Table 14",
+          "guestIds": [
+            "g-125",
+            "g-126"
+          ],
+          "seatedCount": 2,
+          "totalCount": 2
+        },
+        {
+          "id": "p-127",
+          "names": "Ruth & Frederick",
+          "together": true,
+          "tableName": "Table 11",
+          "guestIds": [
+            "g-128",
+            "g-129"
+          ],
+          "seatedCount": 2,
+          "totalCount": 2
+        },
+        {
+          "id": "p-130",
+          "names": "Edith & William",
+          "together": true,
+          "tableName": "Table 14",
+          "guestIds": [
+            "g-131",
+            "g-132"
+          ],
+          "seatedCount": 2,
+          "totalCount": 2
+        },
+        {
+          "id": "p-135",
+          "names": "Yasmin & Plus",
+          "together": true,
+          "tableName": "Table 11",
+          "guestIds": [
+            "g-136",
+            "g-137"
+          ],
+          "seatedCount": 2,
+          "totalCount": 2
+        },
+        {
+          "id": "p-138",
+          "names": "Mei & Kwame & Zara",
+          "together": true,
+          "tableName": "Table 14",
+          "guestIds": [
+            "g-139",
+            "g-140",
+            "g-141"
+          ],
+          "seatedCount": 3,
+          "totalCount": 3
         }
-      ],
-      "partyPlacements": []
+      ]
     }
   }
 }
