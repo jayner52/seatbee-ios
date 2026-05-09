@@ -1087,6 +1087,11 @@ class CanvasTableView: UIView {
     private var seatLayers: [CAShapeLayer] = []
     private var seatInitialLayers: [CATextLayer] = [] // initials shown when zoom ≥ threshold
     private let lockBadge = UIImageView()
+    /// Stored reference to the pan recognizer so we can toggle it
+    /// off when the table is locked — disabling lets the parent
+    /// scrollView's pan take over and pan the canvas through the
+    /// locked table instead of trapping the touch.
+    private weak var panRecognizer: UIPanGestureRecognizer?
 
     /// Zoom-aware seat-label gating. Three tiers, matching what web
     /// shows when zoomed all the way in:
@@ -1273,6 +1278,10 @@ class CanvasTableView: UIView {
             width: badgeSize, height: badgeSize
         )
         lockBadge.isHidden = (table.locked != true)
+        // Disable pan when locked so the parent scrollView can pan
+        // through this table; tap recognizer stays on so the user can
+        // still select-then-unlock.
+        panRecognizer?.isEnabled = (table.locked != true)
 
         CATransaction.commit()
         applyTransform(animated: false)
@@ -1700,13 +1709,16 @@ class CanvasTableView: UIView {
 
     private func setupGestures() {
         let pan = UIPanGestureRecognizer(target: self, action: #selector(handlePan(_:)))
-
         addGestureRecognizer(pan)
+        panRecognizer = pan
 
         let tap = UITapGestureRecognizer(target: self, action: #selector(handleTap))
         addGestureRecognizer(tap)
 
         isUserInteractionEnabled = true
+        // Initial enabled state — update(table:) keeps it in sync after
+        // the user toggles lock from the detail sheet.
+        pan.isEnabled = (table.locked != true)
     }
 
     @objc private func handleTap() {
@@ -1740,19 +1752,6 @@ class CanvasTableView: UIView {
     }
 }
 
-extension CanvasTableView {
-    /// Refuse the table's pan gesture when the table is locked, so the
-    /// touch falls through to the parent scrollView's pan recognizer
-    /// and the canvas pans normally. Tap still works (selection is
-    /// preserved) — only the drag-to-move pathway gets disabled.
-    open override func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
-        if gestureRecognizer is UIPanGestureRecognizer {
-            return table.locked != true
-        }
-        return super.gestureRecognizerShouldBegin(gestureRecognizer)
-    }
-}
-
 // MARK: - Draggable Object View
 
 class CanvasObjectView: UIView {
@@ -1766,6 +1765,9 @@ class CanvasObjectView: UIView {
     private let iconView = UIImageView()
     private let nameLabel = UILabel()
     private let lockBadge = UIImageView()
+    /// Same trick as CanvasTableView — disable the pan when locked so
+    /// the parent scrollView can pan through this object.
+    private weak var panRecognizer: UIPanGestureRecognizer?
 
     init(object: RoomObject, isSelected: Bool) {
         self.object = object
@@ -1853,6 +1855,8 @@ class CanvasObjectView: UIView {
         let badgeSize: CGFloat = 16
         lockBadge.frame = CGRect(x: bounds.width - badgeSize - 4, y: 4, width: badgeSize, height: badgeSize)
         lockBadge.isHidden = (object.locked != true)
+        // Disable pan when locked so canvas pans through this object.
+        panRecognizer?.isEnabled = (object.locked != true)
 
         // Apply object.rotation as a CGAffineTransform — same way
         // CanvasTableView handles table rotation. Without this, the
@@ -1875,13 +1879,14 @@ class CanvasObjectView: UIView {
 
     private func setupGestures() {
         let pan = UIPanGestureRecognizer(target: self, action: #selector(handlePan(_:)))
-
         addGestureRecognizer(pan)
+        panRecognizer = pan
 
         let tap = UITapGestureRecognizer(target: self, action: #selector(handleTap))
         addGestureRecognizer(tap)
 
         isUserInteractionEnabled = true
+        pan.isEnabled = (object.locked != true)
     }
 
     @objc private func handleTap() {
@@ -1907,17 +1912,6 @@ class CanvasObjectView: UIView {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
         default: break
         }
-    }
-}
-
-extension CanvasObjectView {
-    /// Same as CanvasTableView — refuse the pan when locked so canvas
-    /// scrolling works through the object. Tap still selects.
-    open override func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
-        if gestureRecognizer is UIPanGestureRecognizer {
-            return object.locked != true
-        }
-        return super.gestureRecognizerShouldBegin(gestureRecognizer)
     }
 }
 
