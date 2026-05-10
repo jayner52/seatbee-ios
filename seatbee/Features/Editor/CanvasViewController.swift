@@ -650,17 +650,33 @@ class CanvasViewController: UIViewController, UIScrollViewDelegate {
         return true
     }
 
-    /// Compute the centre of the visible region in CANVAS (unscaled)
-    /// coordinates and stash it in the live in-memory cache. Cheap —
-    /// just a few divides; safe to call on every scroll frame.
+    /// Compute the centre of the visible region in ROOM (table-coordinate)
+    /// space and stash it in the live in-memory cache. Cheap — just a few
+    /// divides; safe to call on every scroll frame.
+    ///
+    /// Three coordinate systems collide here:
+    ///   1. Scroll-content coords — what scrollView.contentOffset and
+    ///      scrollView.bounds report. Already scaled by zoomScale.
+    ///   2. Canvas (unscaled) coords — divide scroll-content by zoom.
+    ///   3. Room coords — subtract canvasOrigin (typically the
+    ///      canvasPadding offset of 400). SeatTable.x / RoomObject.x
+    ///      live in *room* coords; the renderer at line ~949 does
+    ///      `canvasOrigin + table.x` to place the view.
+    /// AddTableSheet stores SeatTable.x in room coords, so we must
+    /// return room coords here. The earlier version dropped the
+    /// canvasOrigin subtraction, which placed every new table 400 px
+    /// down and 400 px right of where the user was looking — explaining
+    /// the off-screen-to-the-right reports.
     private func updateLiveViewportCentre() {
         guard let id = planId,
               scrollView.bounds.width > 0,
               scrollView.bounds.height > 0 else { return }
         let zoom = max(scrollView.zoomScale, 0.0001)
-        let cx = (scrollView.contentOffset.x + scrollView.bounds.width / 2) / zoom
-        let cy = (scrollView.contentOffset.y + scrollView.bounds.height / 2) / zoom
-        Self.liveViewportCentres[id] = CGPoint(x: cx, y: cy)
+        let canvasX = (scrollView.contentOffset.x + scrollView.bounds.width / 2) / zoom
+        let canvasY = (scrollView.contentOffset.y + scrollView.bounds.height / 2) / zoom
+        let roomX = canvasX - canvasOrigin.x
+        let roomY = canvasY - canvasOrigin.y
+        Self.liveViewportCentres[id] = CGPoint(x: roomX, y: roomY)
     }
 
     private func saveViewport() {

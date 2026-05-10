@@ -158,6 +158,13 @@ struct AIGenerateView: View {
                    let scorecard = gen.result.scorecard {
                     lastRunCard(scorecard)
                 }
+                // Capacity feedback — surfaces on the ready screen too,
+                // not just after a generate. Many-empty-seats / not-
+                // enough-seats warnings should fire as soon as the
+                // imbalance exists, so the user sees them while the
+                // plan is still in flight (e.g. "108 guests, 140 seats"
+                // is fine; "2 guests, 122 seats" is a flag).
+                capacityPanel
                 // AI Insight panel — also renders on the ready screen
                 // when there's a cached insight for the active plan.
                 // Without this, generating then leaving the tab and
