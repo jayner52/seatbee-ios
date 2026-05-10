@@ -1444,10 +1444,14 @@ class CanvasTableView: UIView {
             width: badgeSize, height: badgeSize
         )
         lockBadge.isHidden = (table.locked != true)
-        // Disable pan when locked so the parent scrollView can pan
-        // through this table; tap recognizer stays on so the user can
-        // still select-then-unlock.
-        panRecognizer?.isEnabled = (table.locked != true)
+        // Drag is gated on selection AND unlocked state. Selection-first
+        // is the primary interaction model (matches the guest-list
+        // tap-to-select pattern shipped in PR #173) — it eliminates
+        // accidental table moves while panning the canvas. Tap still
+        // works on every table; only the drag is gated. The lock half
+        // of the condition keeps the pre-existing "pan through a locked
+        // table" behaviour intact.
+        panRecognizer?.isEnabled = isItemSelected && (table.locked != true)
 
         CATransaction.commit()
         applyTransform(animated: false)
@@ -1680,6 +1684,10 @@ class CanvasTableView: UIView {
     func setSelected(_ selected: Bool) {
         isItemSelected = selected
         glowLayer.isHidden = !selected
+        // Drag requires selection — toggle the pan recognizer in lock-step
+        // with selection so the user can drag immediately after tapping
+        // (without waiting for a full update() cycle).
+        panRecognizer?.isEnabled = selected && (table.locked != true)
         // Dashed ring is only configured for shapes that use it (round /
         // oval / sweetheart); preserve hidden state when path is nil.
         if dashedRingLayer.path != nil {
@@ -1899,9 +1907,10 @@ class CanvasTableView: UIView {
         tap.require(toFail: doubleTap)
 
         isUserInteractionEnabled = true
-        // Initial enabled state — update(table:) keeps it in sync after
-        // the user toggles lock from the detail sheet.
-        pan.isEnabled = (table.locked != true)
+        // Initial enabled state — drag requires the table to be both
+        // selected AND unlocked. update(table:) and setSelected() keep
+        // it in sync from the two state-change paths.
+        pan.isEnabled = isItemSelected && (table.locked != true)
     }
 
     @objc private func handleTap() {
@@ -2044,8 +2053,8 @@ class CanvasObjectView: UIView {
         let badgeSize: CGFloat = 16
         lockBadge.frame = CGRect(x: bounds.width - badgeSize - 4, y: 4, width: badgeSize, height: badgeSize)
         lockBadge.isHidden = (object.locked != true)
-        // Disable pan when locked so canvas pans through this object.
-        panRecognizer?.isEnabled = (object.locked != true)
+        // Drag requires selection AND unlocked, mirroring CanvasTableView.
+        panRecognizer?.isEnabled = isItemSelected && (object.locked != true)
 
         // Apply object.rotation as a CGAffineTransform — same way
         // CanvasTableView handles table rotation. Without this, the
@@ -2060,6 +2069,7 @@ class CanvasObjectView: UIView {
 
     func setSelected(_ selected: Bool) {
         isItemSelected = selected
+        panRecognizer?.isEnabled = selected && (object.locked != true)
         UIView.animate(withDuration: 0.2) {
             self.layer.borderWidth = selected ? 2 : 0
             self.layer.shadowOpacity = selected ? 0.2 : 0.1
@@ -2075,7 +2085,8 @@ class CanvasObjectView: UIView {
         addGestureRecognizer(tap)
 
         isUserInteractionEnabled = true
-        pan.isEnabled = (object.locked != true)
+        // Same selection-and-lock gating as CanvasTableView.
+        pan.isEnabled = isItemSelected && (object.locked != true)
     }
 
     @objc private func handleTap() {
