@@ -812,7 +812,7 @@ struct OnboardingView: View {
                 Image(systemName: "lightbulb")
                     .font(.system(size: 11))
                     .foregroundStyle(Color.sbGoldDk)
-                Text("Tip: add a comma + dietary note (e.g. \"Sarah Chen, vegetarian\"). Add meals and parties after.")
+                Text("Tip: add a comma + dietary note (e.g. \"Sarah Chen, vegetarian\" or \"Sarah Chen, GF\"). Add meals and parties after.")
                     .font(SBFont.caption)
                     .foregroundStyle(Color.sbWarm)
                     .fixedSize(horizontal: false, vertical: true)

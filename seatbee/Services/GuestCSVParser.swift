@@ -353,21 +353,53 @@ enum GuestCSVParser {
         return ["yes", "y", "true", "1", "✓", "✔", "x", "star"].contains(raw)
     }
 
-    /// Web parity (src/lib/guestCsvParser.js inferDietaryTags): scan
-    /// the dietary free-text column for common restrictions.
+    /// Scan a dietary free-text string for known restrictions and emit
+    /// canonical tag IDs. Recognises both full words and the common
+    /// shorthand abbreviations planners drop into spreadsheets:
+    ///   GF / G/F  → gluten-free
+    ///   DF / D/F  → dairy-free
+    ///   NF        → nut-allergy
+    ///   SF        → shellfish-allergy
+    ///   V / VG    → vegetarian   (V is the canonical "vegetarian"
+    ///                             menu mark; VG is sometimes vegan,
+    ///                             but treating it as vegetarian
+    ///                             matches the more common usage and
+    ///                             "vegan" still wins when the full
+    ///                             word appears)
+    /// Word-boundary matched (\\b) so we don't tag "GIFT" as gluten-
+    /// free or "ANGUS BEEF" as nut-allergy. Web parity: same set of
+    /// abbreviations mirrors src/lib/guestCsvParser.js.
     private static func inferDietaryTags(from text: String?) -> [String] {
         guard let text, !text.isEmpty else { return [] }
         let dl = text.lowercased()
         var tags: [String] = []
+
+        // Word-boundary helper. Avoids "vegan" matching "veganistic"
+        // (false positive) but more importantly avoids short
+        // abbreviations matching arbitrary substrings.
+        func contains(_ pattern: String) -> Bool {
+            let escaped = NSRegularExpression.escapedPattern(for: pattern)
+            return dl.range(of: "\\b\(escaped)\\b", options: .regularExpression) != nil
+        }
+
         if dl.contains("vegan") { tags.append("vegan") }
-        else if dl.contains("vegetarian") { tags.append("vegetarian") }
+        else if dl.contains("vegetarian") || contains("v") || contains("vg") {
+            tags.append("vegetarian")
+        }
         if dl.contains("halal") { tags.append("halal") }
         if dl.contains("kosher") { tags.append("kosher") }
-        if dl.contains("gluten") { tags.append("gluten-free") }
-        if dl.contains("dairy") || dl.contains("lactose") { tags.append("dairy-free") }
-        if dl.contains("nut") || dl.contains("peanut") { tags.append("nut-allergy") }
+        if dl.contains("gluten") || contains("gf") || contains("g/f") {
+            tags.append("gluten-free")
+        }
+        if dl.contains("dairy") || dl.contains("lactose")
+            || contains("df") || contains("d/f") {
+            tags.append("dairy-free")
+        }
+        if dl.contains("nut") || dl.contains("peanut") || contains("nf") {
+            tags.append("nut-allergy")
+        }
         if dl.contains("shellfish") || dl.contains("shrimp") || dl.contains("prawn")
-            || dl.contains("lobster") || dl.contains("crab") {
+            || dl.contains("lobster") || dl.contains("crab") || contains("sf") {
             tags.append("shellfish-allergy")
         }
         return tags
