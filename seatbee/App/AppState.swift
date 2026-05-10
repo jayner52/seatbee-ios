@@ -3,7 +3,33 @@ import SwiftUI
 @Observable
 final class AppState {
     var selectedTab: SBTab = .plans
-    var activePlan: SeatingPlan?
+    /// The plan the rest of the app reads + mutates. didSet auto-pushes
+    /// the *previous* value to the undo stack on every change, so the
+    /// 70+ existing `appState.activePlan = …` mutation sites all become
+    /// undo-able for free. Two suppression escape hatches:
+    ///   - `suppressNextHistorySnapshot` — single-shot, used internally
+    ///     by undo() / redo() so the round-trip back doesn't itself
+    ///     push to the undo stack.
+    ///   - Plan-id mismatch — switching to a different plan (oldValue.id
+    ///     != newValue.id) is a load, not a mutation. Same for the
+    ///     initial nil → first-load.
+    var activePlan: SeatingPlan? {
+        didSet {
+            if suppressNextHistorySnapshot {
+                suppressNextHistorySnapshot = false
+                return
+            }
+            // Only mutations to the SAME plan generate undo entries.
+            // Plan-switch and initial-load are not user mutations.
+            if let old = oldValue, let new = activePlan, old.id == new.id {
+                undoManager.pushState(old)
+            }
+        }
+    }
+    /// Single-shot bypass — undo() / redo() / refreshActivePlan() set
+    /// this to true before assigning so the resulting didSet doesn't
+    /// double-record. Auto-clears on the next assignment.
+    var suppressNextHistorySnapshot: Bool = false
     var isOnline = true
     var showAuth = false
     var showOnboarding = false
@@ -57,6 +83,9 @@ final class AppState {
     func refreshActivePlan() async {
         guard let plan = activePlan else { return }
         do {
+            // Server refresh isn't a user mutation — don't pollute the
+            // undo stack with it.
+            suppressNextHistorySnapshot = true
             activePlan = try await database.fetchPlan(id: plan.id)
             print("[AppState] refreshActivePlan OK — tier: \(activePlan?.tier ?? "nil")")
         } catch {
@@ -189,7 +218,9 @@ final class AppState {
         return seatedGuestCount >= Int(Double(limit) * 0.8)
     }
 
-    // Push current state before a mutation
+    /// Manual snapshot — kept for backward compat / explicit-snapshot
+    /// flows. The didSet on activePlan now records every mutation
+    /// automatically, so most call sites no longer need to call this.
     func pushUndo() {
         if let plan = activePlan {
             undoManager.pushState(plan)
@@ -199,6 +230,10 @@ final class AppState {
     func undo() {
         guard let plan = activePlan,
               let previous = undoManager.undo(current: plan) else { return }
+        // Suppress the didSet on the next assignment so applying the
+        // undo doesn't itself push to the undo stack (which would loop
+        // the user back to the state they just escaped from).
+        suppressNextHistorySnapshot = true
         activePlan = previous
         Task { try? await database.savePlanData(plan: previous) }
     }
@@ -206,6 +241,7 @@ final class AppState {
     func redo() {
         guard let plan = activePlan,
               let next = undoManager.redo(current: plan) else { return }
+        suppressNextHistorySnapshot = true
         activePlan = next
         Task { try? await database.savePlanData(plan: next) }
     }
