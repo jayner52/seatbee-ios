@@ -1355,7 +1355,17 @@ class CanvasTableView: UIView {
             let dot = CAShapeLayer()
             let r = CGRect(x: pos.x - dotSize/2, y: pos.y - dotSize/2, width: dotSize, height: dotSize)
             dot.path = UIBezierPath(ovalIn: r).cgPath
-            if i < filled {
+            // Fill state must come from the SAME source as the initials
+            // label below: a seat is occupied iff seatGuestByIndex has a
+            // guest at that position. The previous `i < filled` predicate
+            // assumed seats fill contiguously 0..N-1, but seatOrders can
+            // be sparse (web parity, App.jsx:8197 — once a seatMap exists,
+            // empty seats stay empty even when later seats are taken).
+            // The mismatch caused the gold-dots-without-initials and
+            // outline-dots-with-initials inversion seen in the zoomed-out
+            // canvas.
+            let isOccupied = (seatGuestByIndex[i] != nil)
+            if isOccupied {
                 dot.fillColor = gold.cgColor
                 dot.strokeColor = gold.cgColor
                 dot.lineWidth = 1
