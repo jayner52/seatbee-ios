@@ -969,7 +969,9 @@ struct EditorView: View {
         // Hide rsvp == .no — they can't be seated (assignGuestToNextEmpty
         // rejects them), so showing them in the quick-assign column makes
         // taps look broken. Matches GuestPickerSheet.unseatedGuests.
-        return plan.guests.filter { !assignedIds.contains($0.id) && $0.rsvp != .no }
+        return plan.guests
+            .filter { !assignedIds.contains($0.id) && $0.rsvp != .no }
+            .sorted { ($0.name ?? "").localizedCaseInsensitiveCompare($1.name ?? "") == .orderedAscending }
     }
 
     private func assignGuestToNextEmpty(_ guest: Guest) {
