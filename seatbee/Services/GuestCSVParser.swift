@@ -140,6 +140,15 @@ enum GuestCSVParser {
             // Prefer explicit first/last from columns when present.
             let outFirst = resolvedFirst ?? String(parts.first ?? "")
             let outLast: String? = resolvedLast ?? (parts.count > 1 ? String(parts.last ?? "") : nil)
+            // Auto-derive display = first token (web parity, App.jsx
+            // CSV import line 10443: `display: r.display.trim() ||
+            // r.name.trim().split(' ')[0]`). Without this, canvas
+            // labels and place cards rendered the full name instead
+            // of the abbreviated form web users expect.
+            let outDisplay: String = {
+                if !outFirst.isEmpty { return outFirst }
+                return name.split(separator: " ").first.map(String.init) ?? name
+            }()
             guests.append(Guest(
                 id: UUID().uuidString,
                 name: name,
@@ -155,7 +164,7 @@ enum GuestCSVParser {
                 accessibility: nil,
                 plusOne: plusOneIdx == nil ? nil : boolColValue(plusOneIdx, cols),
                 party: colValue(partyIdx, cols),
-                display: nil,
+                display: outDisplay.isEmpty ? nil : outDisplay,
                 dietaryTags: inferredTags.isEmpty ? nil : inferredTags,
                 highChair: highChairIdx == nil ? nil : boolColValue(highChairIdx, cols),
                 isChild: childIdx == nil ? nil : boolColValue(childIdx, cols),
@@ -220,14 +229,20 @@ enum GuestCSVParser {
                 dietary = (dietary == nil ? extra : "\(dietary!), \(extra)")
             }
             let nameParts = name.split(separator: " ", maxSplits: 1)
+            let firstToken = String(nameParts.first ?? "")
+            let lastToken = nameParts.count > 1 ? String(nameParts.last ?? "") : nil
+            // Auto-derive display = first token so canvas / place cards
+            // show "Asher" while the form keeps the full "Asher Russell"
+            // (matches web's createGuest behaviour at App.jsx:10443).
             guests.append(Guest(
                 id: UUID().uuidString,
                 name: name,
-                firstName: String(nameParts.first ?? ""),
-                lastName: nameParts.count > 1 ? String(nameParts.last ?? "") : nil,
+                firstName: firstToken,
+                lastName: lastToken,
                 email: nil, categories: [], dietary: dietary, notes: nil,
                 rsvp: .unknown, side: .none, vip: false,
-                accessibility: nil, plusOne: nil, party: nil, display: nil,
+                accessibility: nil, plusOne: nil, party: nil,
+                display: firstToken.isEmpty ? nil : firstToken,
                 dietaryTags: nil, highChair: nil, isChild: nil, groupIds: nil,
                 isBride: nil, isGroom: nil, meal: nil, guestCreatedAt: nil
             ))
