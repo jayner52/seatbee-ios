@@ -387,7 +387,7 @@ struct SettingsSheet: View {
                             .foregroundStyle(Color.sbCharcoal)
                             .lineLimit(2)
                             .multilineTextAlignment(.leading)
-                        if isPaid, let daysLeft = daysRemaining(plan) {
+                        if isPaid, let daysLeft = appState.daysRemaining(for: plan) {
                             Text("\(tier.displayName) · \(daysLeft) days remaining")
                                 .font(SBFont.caption)
                                 .foregroundStyle(Color.sbGoldDk)
@@ -483,15 +483,6 @@ struct SettingsSheet: View {
                 .font(SBFont.caption)
                 .foregroundStyle(on ? Color.sbCharcoal2 : Color.sbWarm)
         }
-    }
-
-    /// Whole days between now and the plan's pass expiry. Nil for plans
-    /// with no expiry on file (e.g. free plans).
-    private func daysRemaining(_ plan: SeatingPlan) -> Int? {
-        guard let exp = plan.eventPassExpiresAt else { return nil }
-        let secs = exp.timeIntervalSince(Date())
-        guard secs > 0 else { return 0 }
-        return Int(secs / 86_400)
     }
 
     private func deletePlan() {
