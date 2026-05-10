@@ -267,6 +267,8 @@ final class AuthService {
                 return parts.isEmpty ? nil : parts.joined(separator: " ")
             }()
             await writeIOSSignupProfileIfNew(appleFullName: appleName)
+        } catch is CancellationError {
+            // Task cancelled — not a real error.
         } catch let e {
             self.error = e.localizedDescription
         }
@@ -294,6 +296,8 @@ final class AuthService {
             }
             currentUser = session.user
             await writeIOSSignupProfileIfNew()
+        } catch is CancellationError {
+            // Task cancelled — not a real error.
         } catch let e {
             self.error = e.localizedDescription
         }
@@ -314,6 +318,9 @@ final class AuthService {
             )
             isLoading = false
             return true
+        } catch is CancellationError {
+            isLoading = false
+            return false
         } catch let e {
             self.error = e.localizedDescription
             isLoading = false
