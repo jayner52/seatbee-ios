@@ -15,14 +15,35 @@ final class SeatService {
         case noTablesOrGuests
         case server(String)
         case network(Error)
+        case timedOut          // server hit /api/seat's 60s maxDuration, or our local timeout
+        case offline           // device is offline / cannot reach host
 
         var errorDescription: String? {
             switch self {
-            case .unauthorized:        return "Please sign in to generate seating."
-            case .noPlan:              return "No active plan."
-            case .noTablesOrGuests:    return "Add at least one table and one guest before generating."
-            case .server(let m):       return m
-            case .network(let e):      return e.localizedDescription
+            case .unauthorized:
+                return "Please sign in to generate seating."
+            case .noPlan:
+                return "No active plan."
+            case .noTablesOrGuests:
+                return "Add at least one table and one guest before generating."
+            case .server(let m):
+                return m
+            case .timedOut:
+                return "Generation took too long. Large plans with many rules can hit the limit — try again, or simplify a rule and re-generate."
+            case .offline:
+                return "Looks like you're offline. Check your connection and try again."
+            case .network(let e):
+                return e.localizedDescription
+            }
+        }
+
+        /// Whether retrying immediately is likely to help. Used by the
+        /// AI Generate screen to decide if its "Try again" button should
+        /// re-run the request or send the user back to the setup screen.
+        var isRetryable: Bool {
+            switch self {
+            case .timedOut, .offline, .network, .server: return true
+            case .unauthorized, .noPlan, .noTablesOrGuests: return false
             }
         }
     }
@@ -251,6 +272,23 @@ final class SeatService {
         let (data, response): (Data, URLResponse)
         do {
             (data, response) = try await URLSession.shared.data(for: request)
+        } catch let urlError as URLError {
+            // Translate the most common URLError codes into the
+            // friendly typed cases. Anything we don't specifically
+            // handle keeps the system message via .network(error).
+            switch urlError.code {
+            case .timedOut:
+                throw SeatError.timedOut
+            case .notConnectedToInternet, .networkConnectionLost,
+                 .dataNotAllowed, .internationalRoamingOff:
+                throw SeatError.offline
+            case .cannotFindHost, .cannotConnectToHost, .dnsLookupFailed:
+                // Server/DNS reachability — usually transient. Treat as
+                // offline-class for messaging purposes.
+                throw SeatError.offline
+            default:
+                throw SeatError.network(urlError)
+            }
         } catch {
             throw SeatError.network(error)
         }
@@ -265,6 +303,11 @@ final class SeatService {
             }
         case 401:
             throw SeatError.unauthorized
+        case 504, 408:
+            // Vercel returns 504 when /api/seat exceeds its 60s
+            // maxDuration. 408 is the formal client-timeout code; some
+            // proxies send it instead. Both map to the same UX.
+            throw SeatError.timedOut
         default:
             let msg = (try? JSONDecoder().decode(ErrorBody.self, from: data))?.error ?? "Server error (\(http.statusCode))"
             throw SeatError.server(msg)
