@@ -280,7 +280,7 @@ struct GuestDTO: Codable {
             categories: categories ?? [],
             dietary: dietary,
             notes: notes,
-            rsvp: Guest.RSVPStatus(rawValue: rsvp ?? "unknown") ?? .unknown,
+            rsvp: Guest.RSVPStatus.parse(rsvp),
             side: Guest.GuestSide(rawValue: side ?? "none") ?? .none,
             vip: vip ?? false,
             accessibility: accessibility,

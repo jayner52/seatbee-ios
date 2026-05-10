@@ -320,10 +320,39 @@ struct Guest: Identifiable, Codable {
     var guestCreatedAt: String?  // "createdAt" in web — renamed to avoid conflict with plan-level
 
     enum RSVPStatus: String, Codable {
-        case yes
-        case no
-        case pending
-        case unknown
+        // RawValue strings tuned for web wire-format parity:
+        // web's RSVP modal writes 'yes' / 'maybe' / 'no' (App.jsx:10715-
+        // 10717), and its "Maybe" button highlights iff
+        // `g.rsvp === 'maybe'`. Serialising .pending as "maybe" keeps
+        // the web button in sync when a guest is edited in iOS and
+        // re-opened on web. Legacy "pending" / "unknown" strings still
+        // decode (see `parse`) so older iOS-saved plans round-trip.
+        case yes      = "yes"
+        case no       = "no"
+        case pending  = "maybe"
+        case unknown  = "unknown"
+
+        /// Tolerant string → RSVPStatus mapping. Accepts every shape we
+        /// might see on the wire from either client (current web,
+        /// current iOS, legacy iOS, empty/null for fresh guests).
+        static func parse(_ raw: String?) -> RSVPStatus {
+            switch (raw ?? "").lowercased() {
+            case "yes", "attending":  return .yes
+            case "no", "declined":    return .no
+            case "maybe", "pending":  return .pending
+            case "unknown", "":       return .unknown
+            default:                  return .unknown
+            }
+        }
+
+        // Custom decode so the JSONDecoder path uses `parse` (web's
+        // 'maybe' decodes to .pending) without relying on the auto-
+        // generated init?(rawValue:), which only accepts the canonical
+        // strings declared above.
+        init(from decoder: Decoder) throws {
+            let raw = (try? decoder.singleValueContainer().decode(String.self)) ?? ""
+            self = Self.parse(raw)
+        }
     }
 
     enum GuestSide: String, Codable {
