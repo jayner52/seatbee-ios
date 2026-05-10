@@ -32,22 +32,7 @@ struct AppRouter: View {
             OnboardingView()
                 .environment(appState)
         }
-        .onChange(of: state.showUpgrade) { _, show in
-            guard show else { return }
-            if AppConfig.iapEnabled {
-                // Native paywall — handled by the sheet below
-            } else {
-                // IAP not QA'd yet — send to web pricing
-                state.showUpgrade = false
-                if let url = URL(string: "https://seatbee.app/pricing") {
-                    UIApplication.shared.open(url)
-                }
-            }
-        }
-        .sheet(isPresented: Binding(
-            get: { state.showUpgrade && AppConfig.iapEnabled },
-            set: { state.showUpgrade = $0 }
-        )) {
+        .sheet(isPresented: $state.showUpgrade) {
             UpgradeView()
                 .environment(appState)
         }

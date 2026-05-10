@@ -158,7 +158,7 @@ struct EventPassesView: View {
                         Text("No passes available")
                             .font(SBFont.bodySmallBold)
                             .foregroundStyle(Color.sbCharcoal)
-                        Text("Purchase a pass on seatbee.app to unlock larger events and AI seating.")
+                        Text("Purchase a pass to unlock larger events and AI seating.")
                             .font(SBFont.caption)
                             .foregroundStyle(Color.sbWarm)
                             .multilineTextAlignment(.center)
@@ -571,10 +571,8 @@ struct EventPassesView: View {
 
     // MARK: - Buy more
     //
-    // Routes through appState.showUpgrade — same plumbing the rest of
-    // the paywall surfaces use. Today (iapEnabled == false) it opens
-    // seatbee.app/pricing in Safari; when in-app purchases ship the
-    // same trigger flips to the native UpgradeView (AppRouter.swift).
+    // Routes through appState.showUpgrade which presents the native
+    // UpgradeView (StoreKit paywall) via AppRouter.swift.
 
     private var buyMoreSection: some View {
         Section {

@@ -435,7 +435,7 @@ struct UpgradeView: View {
             }
             .buttonStyle(.plain)
 
-            Text("Manage your account at seatbee.app")
+            Text("Manage your subscription in Settings")
                 .font(.system(size: 11))
                 .foregroundStyle(Color.sbWarm2)
         }
@@ -505,9 +505,7 @@ struct UpgradeView: View {
 
     private func purchase() {
         guard let product = storeKit.product(for: selectedProduct) else {
-            if let url = URL(string: "https://seatbee.app/pricing") {
-                UIApplication.shared.open(url)
-            }
+            storeKit.purchaseError = "Products are still loading. Please try again in a moment."
             return
         }
         isPurchasing = true
