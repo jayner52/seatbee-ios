@@ -1799,13 +1799,21 @@ struct OnboardingView: View {
         }
         var categories = [cat]
         if !seatTag.isEmpty { categories.append(seatTag) }
+        // Split the entered name so web's firstName / lastName columns
+        // are populated from the start. Without this the couple is
+        // born with name="Adam Williams" but firstName/lastName=nil,
+        // which web's contact-card UI treats as an unstructured name.
+        let trimmed = name.trimmingCharacters(in: .whitespaces)
+        let parts = trimmed.split(separator: " ", maxSplits: 1)
+        let first: String? = parts.first.map(String.init)
+        let last: String? = parts.count > 1 ? String(parts.last ?? "") : nil
         return Guest(
             id: "guest_\(cat)_\(UUID().uuidString.prefix(8))",
-            name: name, firstName: nil, lastName: nil, email: nil,
+            name: trimmed, firstName: first, lastName: last, email: nil,
             categories: categories,
             dietary: nil, notes: nil, rsvp: .yes,
             side: role == .bride ? .bride : .groom,
-            vip: true, accessibility: nil, plusOne: nil, party: nil, display: name,
+            vip: true, accessibility: nil, plusOne: nil, party: nil, display: trimmed,
             dietaryTags: nil, highChair: nil, isChild: nil, groupIds: nil,
             isBride: role == .bride ? true : nil,
             isGroom: role == .groom ? true : nil,
