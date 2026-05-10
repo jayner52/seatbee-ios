@@ -248,12 +248,27 @@ addGuest({
   meal: 'Beef Tenderloin', vip: true,
 })
 
-// Bride's brother Owen + spouse Sophie + child
-addFamilyParty("Owen's Family", [
+// Owen + Sophie as a couple (kids sit at Kids Table — see below).
+// Real-wedding-style: parents-and-children are listed as a household
+// on the guest sheet but seated apart so kids can cluster + parents
+// can socialise without supervising the table.
+addCouple("Owen & Sophie",
   { firstName: 'Owen',   lastName: 'Williams', side: 'none', categories: ['cat-family'], meal: 'Beef Tenderloin' },
   { firstName: 'Sophie', lastName: 'Williams-Cohen', side: 'none', categories: ['cat-family'], meal: 'Pan-Seared Salmon' },
-  { firstName: 'Mia',    lastName: 'Williams-Cohen', side: 'none', categories: ['cat-family','cat-kids'], meal: 'Kids Chicken Fingers', isChild: true },
-])
+)
+addGuest({ firstName: 'Mia', lastName: 'Williams-Cohen', side: 'none',
+  categories: ['cat-family','cat-kids'], meal: 'Kids Chicken Fingers', isChild: true })
+
+// Cousin Lily + Sam — same pattern. Their kids Ella + Noah join the
+// Kids Table.
+addCouple("Lily & Sam",
+  { firstName: 'Lily', lastName: 'Park', side: 'none', categories: ['cat-family'], meal: 'Pan-Seared Salmon' },
+  { firstName: 'Sam',  lastName: 'Park', side: 'none', categories: ['cat-family'], meal: 'Beef Tenderloin' },
+)
+addGuest({ firstName: 'Ella', lastName: 'Park', side: 'none',
+  categories: ['cat-family','cat-kids'], meal: 'Kids Chicken Fingers', isChild: true })
+addGuest({ firstName: 'Noah', lastName: 'Park', side: 'none',
+  categories: ['cat-family','cat-kids'], meal: 'Kids Chicken Fingers', isChild: true })
 
 // Bride's aunt + uncle — Park side
 addCouple("Helen & Robert (Park)",
@@ -499,7 +514,7 @@ console.log(`Generated ${guests.length} guests; declined: ${guests.filter(g => g
 // ── Tables (T-shape venue) ─────────────────────────────────────────────────
 
 const ROOM_W = 1200
-const ROOM_H = 1350  // 90 ft tall — gives the 4×4 grid breathing room between rows + headroom for the bar against the back wall
+const ROOM_H = 1350  // 90 ft tall — gives the 4×4 grid breathing room + bar against the back wall
 const tables = []
 
 // Sweetheart at top center
@@ -518,24 +533,52 @@ const head = {
 }
 tables.push(head)
 
-// 16 round tables in 4×4 grid below. Pushed down from the prior layout
-// so there's a real ~10ft gap between the head table and the first row
-// of guest tables — that's where the dance floor actually lives.
+// 15 themed adult tables (4×4 grid minus the bottom-right slot, which
+// is the Kids Table). Names come from the web app's "Travel & Cities"
+// theme (App.jsx::NG_THEMES) — demonstrates the table-name generator
+// feature without users needing to discover it first.
+//
+// The last grid slot (bottom-right) becomes the Kids Table — small (5
+// seats), pinned via a must_table rule below so the cat-kids guests
+// always cluster there regardless of solver run.
 const roundCols = [180, 460, 740, 1020]
-const roundRows = [560, 730, 900, 1070]  // 170 px (~11 ft) between centers — was 120 px, too tight
+const roundRows = [560, 730, 900, 1070]  // 170 px (~11 ft) between centers
+// 13 main 8-seat city tables + 2 smaller 4-seat "cocktail" rounds for
+// the bottom-row stragglers. A real reception almost always has a
+// couple of small accent tables for late RSVPs, kids' grandparents,
+// etc — keeping all tables at 8 seats was leaving Capri + Amalfi at
+// 3/8 and 2/8 which read as "broken" instead of "intentional".
+const cityNames = [
+  'Paris', 'Rome', 'Venice', 'Barcelona',
+  'Santorini', 'Bali', 'Tokyo', 'London',
+  'Vienna', 'Prague', 'Lisbon', 'Florence',
+  'Kyoto', 'Capri', 'Amalfi',
+]
 let roundIdx = 0
-for (const y of roundRows) {
-  for (const x of roundCols) {
-    roundIdx++
-    tables.push({
-      id: `t_round_${roundIdx.toString().padStart(2, '0')}`,
-      name: `Table ${roundIdx}`,
-      type: 'round', seats: 8,
-      x: x - 50, y: y - 50, diameter: 100,
-      color: '#C9A961', assignments: {},
-    })
-  }
+const gridSlots = []
+for (const y of roundRows) for (const x of roundCols) gridSlots.push({ x, y })
+const kidsSlot = gridSlots.pop()  // last slot (bottom-right) for kids table
+for (const slot of gridSlots) {
+  const isCocktail = roundIdx >= 13  // Capri + Amalfi
+  const seats = isCocktail ? 4 : 8
+  const diameter = isCocktail ? 75 : 100
+  tables.push({
+    id: `t_round_${(roundIdx + 1).toString().padStart(2, '0')}`,
+    name: cityNames[roundIdx],
+    type: 'round', seats,
+    x: slot.x - diameter / 2, y: slot.y - diameter / 2, diameter,
+    color: '#C9A961', assignments: {},
+  })
+  roundIdx++
 }
+const kidsTable = {
+  id: 't_kids', name: 'Kids Table',
+  type: 'round', seats: 5,
+  x: kidsSlot.x - 40, y: kidsSlot.y - 40, diameter: 80,  // smaller than adult tables
+  color: '#D4956C',  // matches cat-kids category colour
+  assignments: {},
+}
+tables.push(kidsTable)
 
 // ── Room objects ──────────────────────────────────────────────────────────
 
@@ -577,11 +620,38 @@ const objects = [
     color: '#2D2D2D', category: 'structure', isObstacle: false },
 
   // Emergency Exit — right wall mid-height. Pushed below the T-stem
-  // boundary (ROOM_H * 0.35 ≈ 472) so it lands on the wide bottom
+  // boundary (ROOM_H * 0.35 ≈ 490) so it lands on the wide bottom
   // section's right wall, not the top stem's narrower one.
   { id: 'obj_exit', type: 'exit', name: 'Emergency Exit',
-    x: ROOM_W - 50, y: 600, width: 40, height: 50,
+    x: ROOM_W - 50, y: 620, width: 40, height: 50,
     color: '#9CAF88', category: 'structure', isObstacle: false },
+
+  // Two speakers flanking the dance floor, opposite the DJ booth.
+  // Realistic placement — no real reception runs sound from one side
+  // only. Helps the demo show off small accent objects too.
+  { id: 'obj_speaker_l', type: 'speaker', name: 'Speaker',
+    x: 440, y: 350, width: 30, height: 30,
+    color: '#2D2D2D', category: 'entertainment', isObstacle: false },
+  { id: 'obj_speaker_r', type: 'speaker', name: 'Speaker',
+    x: 730, y: 350, width: 30, height: 30,
+    color: '#2D2D2D', category: 'entertainment', isObstacle: false },
+
+  // Floral arrangements at the entrance — an "entry display" pair.
+  // Common venue setup; gives the demo a softer touch beyond the
+  // structural items.
+  { id: 'obj_floral_l', type: 'floral', name: 'Entry Florals',
+    x: 80, y: 140, width: 50, height: 50,
+    color: '#9CAF88', category: 'ceremony', isObstacle: false },
+  { id: 'obj_floral_r', type: 'floral', name: 'Entry Florals',
+    x: 80, y: 210, width: 50, height: 50,
+    color: '#9CAF88', category: 'ceremony', isObstacle: false },
+
+  // Kitchen Entry — back wall of the bottom section, opposite the bar.
+  // Service door for catering; lets the demo show that "structure"
+  // category isn't just front-of-house entrance/exit.
+  { id: 'obj_kitchen', type: 'kitchen_entry', name: 'Kitchen Entry',
+    x: 900, y: ROOM_H - 30, width: 60, height: 30,
+    color: '#8B8680', category: 'structure', isObstacle: false },
 ]
 
 // ── Pre-pin head table + sweetheart ───────────────────────────────────────
@@ -635,6 +705,17 @@ addRule({
   guests: guests.filter(g => g.categories.includes('cat-wedding-party')).map(g => g.id),
   desc: 'Wedding party seated together',
   weight: 40, hard: false,
+})
+
+// 5b: must_table — pin the kids to the dedicated Kids Table.
+// cat-kids is a regular user category (not a solver-special), so we
+// need an explicit must_table rule to actually park them at t_kids.
+addRule({
+  type: 'must_table',
+  tableId: 't_kids',
+  guests: guests.filter(g => g.categories.includes('cat-kids')).map(g => g.id),
+  desc: 'Kids at the Kids Table',
+  weight: 50, hard: true,
 })
 
 // 6: near_object — bride's college friends near the dance floor (they're
