@@ -81,9 +81,16 @@ enum CanvasPDFRenderer {
         // each table and labels under objects.
         let seatPad: CGFloat = 22
 
+        // CRITICAL — web/iOS parity: a table's stored (x, y) is the
+        // TOP-LEFT corner of its bounding box, NOT the centre. The live
+        // canvas adds body.width/2 to position UIView.center; the
+        // exporter has to do the same conversion or every table renders
+        // shifted up-and-left by half its size (visible to the user as
+        // "tables and objects in the wrong place relative to floor plan").
         for t in plan.tables {
             let body = bodySize(for: t)
-            let cx = CGFloat(t.x), cy = CGFloat(t.y)
+            let cx = CGFloat(t.x) + body.width / 2
+            let cy = CGFloat(t.y) + body.height / 2
             // Use diagonal-half so rotated tables still fit.
             let half = max(body.width, body.height) / 2 + seatPad
             minX = min(minX, cx - half)
@@ -92,9 +99,11 @@ enum CanvasPDFRenderer {
             maxY = max(maxY, cy + half)
         }
         for o in plan.objects {
-            let cx = CGFloat(o.x), cy = CGFloat(o.y)
+            // Same top-left convention for room objects.
             let halfW = CGFloat(o.width) / 2
             let halfH = CGFloat(o.height) / 2
+            let cx = CGFloat(o.x) + halfW
+            let cy = CGFloat(o.y) + halfH
             minX = min(minX, cx - halfW)
             minY = min(minY, cy - halfH)
             maxX = max(maxX, cx + halfW)
@@ -199,8 +208,12 @@ enum CanvasPDFRenderer {
     // MARK: - Room objects
 
     private static func drawRoomObject(_ o: RoomObject, ctx: CGContext) {
-        let cx = CGFloat(o.x), cy = CGFloat(o.y)
+        // (x, y) is TOP-LEFT — see computeWorldBounds for the parity
+        // note. Convert to centre once here so the rest of the routine
+        // can treat (cx, cy) as the box centre.
         let w = CGFloat(o.width), h = CGFloat(o.height)
+        let cx = CGFloat(o.x) + w / 2
+        let cy = CGFloat(o.y) + h / 2
         let rect = CGRect(x: cx - w / 2, y: cy - h / 2, width: w, height: h)
 
         // Mirror the canvas's CanvasViewController styling: object colour
@@ -227,44 +240,44 @@ enum CanvasPDFRenderer {
         ctx.addPath(path.cgPath)
         ctx.drawPath(using: .fillStroke)
 
-        // Icon — SF Symbol centred above the name. Same VenueIconMap
-        // resolution the canvas uses, so an object's web-style icon name
-        // (e.g. "music", "utensils") renders the same glyph everywhere.
+        // Icon + name — pixel-for-pixel mirror of CanvasViewController's
+        // venue-object layout (line 1864-1879):
+        //   • Fixed 24pt icon frame (regardless of object size — even
+        //     tiny accent items use the same glyph size)
+        //   • Symbol glyph at 18pt
+        //   • Icon TOP at center.y - 24 - 2 (above centre by 26pt total)
+        //   • Name centred horizontally with 4pt side margins, y at
+        //     center.y + 4, height 14, tail-truncated
+        // Both icon and name may extend outside very small object boxes
+        // — that's the canvas behaviour too (no clipping). The label is
+        // never skipped: removing it would diverge from the canvas.
         let iconName = VenueIconMap.sfSymbol(for: o.icon)
-        let iconPt: CGFloat = min(w, h) * 0.32
-        let iconCfg = UIImage.SymbolConfiguration(pointSize: iconPt, weight: .regular)
+        let iconCfg = UIImage.SymbolConfiguration(pointSize: 18, weight: .regular)
+        let iconBoxSize: CGFloat = 24
         if let icon = UIImage(systemName: iconName, withConfiguration: iconCfg)?
-                .withTintColor(textColor.withAlphaComponent(0.85), renderingMode: .alwaysOriginal) {
+                .withTintColor(textColor, renderingMode: .alwaysOriginal) {
+            // Centre the (possibly non-square) glyph inside a 24×24 box.
             let iSize = icon.size
-            let iconRect = CGRect(x: cx - iSize.width / 2,
-                                   y: cy - iSize.height / 2 - 6,
+            let iconBoxOriginY = cy - iconBoxSize - 2
+            let drawRect = CGRect(x: cx - iSize.width / 2,
+                                   y: iconBoxOriginY + (iconBoxSize - iSize.height) / 2,
                                    width: iSize.width, height: iSize.height)
-            icon.draw(in: iconRect)
+            icon.draw(in: drawRect)
         }
 
-        // Label centred under the icon. Clipped to the object bounds and
-        // truncated with an ellipsis when it doesn't fit — small accent
-        // objects (40×60 entrance, 30×30 speaker) were rendering "Welcome
-        // Sign" / "Main Entrance" at full width and bleeding into their
-        // neighbours. Matches the canvas's UILabel-truncation behaviour.
         let labelPara = NSMutableParagraphStyle()
         labelPara.lineBreakMode = .byTruncatingTail
         labelPara.alignment = .center
         let attrs: [NSAttributedString.Key: Any] = [
-            .font: UIFont.systemFont(ofSize: 8, weight: .medium),
+            .font: UIFont.systemFont(ofSize: 9, weight: .medium),
             .foregroundColor: textColor,
             .paragraphStyle: labelPara,
         ]
-        // Tiny objects (< 28pt either dimension) — icon already conveys
-        // identity; the label would just be noise. Skip it entirely.
-        if min(w, h) >= 28 {
-            let labelW = w - 4
-            let labelRect = CGRect(x: cx - labelW / 2,
-                                    y: cy + iconPt / 2 - 2,
-                                    width: labelW,
-                                    height: 12)
-            (o.name as NSString).draw(in: labelRect, withAttributes: attrs)
-        }
+        let labelRect = CGRect(x: cx - (w - 8) / 2,
+                                y: cy + 4,
+                                width: w - 8,
+                                height: 14)
+        (o.name as NSString).draw(in: labelRect, withAttributes: attrs)
 
         ctx.restoreGState()
     }
@@ -273,7 +286,9 @@ enum CanvasPDFRenderer {
 
     private static func drawTable(_ t: SeatTable, plan: SeatingPlan, showGuestNames: Bool, ctx: CGContext) {
         let body = bodySize(for: t)
-        let center = CGPoint(x: t.x, y: t.y)
+        // Top-left → centre conversion (see computeWorldBounds parity note).
+        let center = CGPoint(x: CGFloat(t.x) + body.width / 2,
+                              y: CGFloat(t.y) + body.height / 2)
 
         ctx.saveGState()
         if let rot = t.rotation, rot != 0 {
