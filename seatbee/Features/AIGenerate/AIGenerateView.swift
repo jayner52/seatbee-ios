@@ -12,6 +12,11 @@ struct AIGenerateView: View {
     @State private var resultMessage: String?
     @State private var lastResult: SeatService.GenerateResult?
     @State private var fellBackToRoundRobin = false
+    /// Whether the most recent failure is something a fresh request
+    /// could fix (timeout, offline, transient server error). Drives
+    /// whether the error screen offers a one-tap "Try again" or sends
+    /// the user back to setup.
+    @State private var lastErrorRetryable = false
     @State private var tierGateAlert: TierGateAlert?
     @State private var clearConfirm: ClearAction?
     @State private var showResetSheet = false
@@ -729,8 +734,27 @@ struct AIGenerateView: View {
                     .padding(.horizontal, 32)
             }
             Spacer()
-            SBButton(title: "Try again", variant: .gold, fullWidth: true) {
-                phase = .ready
+            VStack(spacing: 10) {
+                if lastErrorRetryable {
+                    // Primary action: actually re-fire the request. The
+                    // old "Try again" button only sent the user back to
+                    // .ready (the setup screen), forcing a re-tap of
+                    // Generate — confusing for the timeout case where
+                    // nothing in the setup needs to change.
+                    SBButton(title: "Try again", variant: .gold, fullWidth: true) {
+                        Task { await runGenerate() }
+                    }
+                    Button("Back to setup") { phase = .ready }
+                        .font(SBFont.bodySmallBold)
+                        .foregroundStyle(Color.sbWarm)
+                } else {
+                    // Non-retryable (e.g. tier limit, missing tables/guests):
+                    // there's nothing to retry until the user changes
+                    // something. Just go back.
+                    SBButton(title: "Back to setup", variant: .gold, fullWidth: true) {
+                        phase = .ready
+                    }
+                }
             }
             .padding(.horizontal, SBSpacing.screenMargin)
             .padding(.bottom, 120)
@@ -1148,10 +1172,13 @@ struct AIGenerateView: View {
         } catch let error as SeatService.SeatError {
             HapticEngine.error()
             resultMessage = error.localizedDescription
+            lastErrorRetryable = error.isRetryable
             phase = .error
         } catch {
             HapticEngine.error()
             resultMessage = error.localizedDescription
+            // Unknown errors might be transient — let the user retry.
+            lastErrorRetryable = true
             phase = .error
         }
     }
