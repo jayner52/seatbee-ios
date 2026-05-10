@@ -562,6 +562,8 @@ struct DashboardView: View {
                 appState.activePlan = plans.first
             }
             print("[Dashboard] Loaded \(plans.count) real plans + sample, active: \(appState.activePlan?.name ?? "none")")
+        } catch is CancellationError {
+            // Task cancelled (e.g. view disappeared) — not a real error.
         } catch {
             print("[Dashboard] Error loading plans: \(error)")
             loadError = error.localizedDescription

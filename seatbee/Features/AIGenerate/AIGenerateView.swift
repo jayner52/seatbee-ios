@@ -1174,6 +1174,8 @@ struct AIGenerateView: View {
             resultMessage = error.localizedDescription
             lastErrorRetryable = error.isRetryable
             phase = .error
+        } catch is CancellationError {
+            // Task cancelled — not a real error.
         } catch {
             HapticEngine.error()
             resultMessage = error.localizedDescription

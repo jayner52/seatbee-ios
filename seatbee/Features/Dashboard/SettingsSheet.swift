@@ -354,6 +354,8 @@ struct SettingsSheet: View {
                 try await appState.auth.deleteAccount()
                 deletingAccount = false
                 dismiss()
+            } catch is CancellationError {
+                deletingAccount = false
             } catch {
                 deletingAccount = false
                 deleteAccountError = error.localizedDescription
