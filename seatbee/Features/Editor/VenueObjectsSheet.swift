@@ -281,9 +281,12 @@ struct VenueObjectsSheet: View {
                     RoundedRectangle(cornerRadius: 10)
                         .fill(Color(hex: obj.color).opacity(0.22))
                         .frame(width: 40, height: 40)
+                    // Ivory-on-ivory items (Chuppah, Aisle, Draping at #FBF7EC)
+                    // were rendering invisibly. Fall back to charcoal for any
+                    // colour too light to read against the pale tinted chip.
                     Image(systemName: VenueIconMap.sfSymbol(for: obj.icon))
                         .font(.system(size: 18))
-                        .foregroundStyle(Color(hex: obj.color))
+                        .foregroundStyle(isLightColor(obj.color) ? Color.sbCharcoal : Color(hex: obj.color))
                 }
                 Text(obj.name)
                     .font(SBFont.bodySmallBold)
@@ -301,6 +304,20 @@ struct VenueObjectsSheet: View {
             )
         }
         .buttonStyle(.plain)
+    }
+
+    /// True if a #RRGGBB hex is too light to read against the picker
+    /// chip's pale ivory background. Threshold tuned to catch the
+    /// near-white ceremony tones (#FBF7EC, #FAF6EC) while leaving
+    /// gold/sage/dusty-pink on their own colour.
+    private func isLightColor(_ hex: String) -> Bool {
+        let s = hex.trimmingCharacters(in: CharacterSet(charactersIn: "#"))
+        guard s.count == 6, let v = UInt32(s, radix: 16) else { return false }
+        let r = Double((v >> 16) & 0xFF) / 255
+        let g = Double((v >> 8) & 0xFF) / 255
+        let b = Double(v & 0xFF) / 255
+        // Rec. 601 luma — close enough for picker contrast.
+        return (0.299 * r + 0.587 * g + 0.114 * b) > 0.88
     }
 
     private func addObject(_ def: VenueObjectDef) {

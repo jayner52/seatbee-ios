@@ -1131,7 +1131,7 @@ struct AIGenerateView: View {
             aiInsight = .ready(AIService.ConflictResult(
                 conflicts: [],
                 score: pct,
-                summary: "Sample wedding seated at \(pct)%. Every must-sit family is together, every can't-sit pair is apart, and the head table holds the wedding party."
+                summary: "Sample wedding seated at \(pct)%. The couple is at the sweetheart, the wedding party is together at the head table, and the four children are clustered at the Kids Table with their meal pre-set. Both grandmothers landed within reach of the emergency exit, and the bride's college friends are next to the dance floor where they'll actually use it. Every must-sit family stayed at one table, and the divorced grandparents and rival ex-coworkers are seated apart."
             ))
             return
         }

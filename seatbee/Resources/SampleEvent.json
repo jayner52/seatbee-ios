@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-05-09T18:46:43.595Z",
-  "solverScore": 100,
+  "generatedAt": "2026-05-10T00:47:05.776Z",
+  "solverScore": 98,
   "plan": {
     "id": "demo-sample-event",
     "name": "Carter & Brooks Wedding",
@@ -10,7 +10,7 @@
     "eventType": "wedding",
     "isDemo": true,
     "roomWidth": 1200,
-    "roomHeight": 1000,
+    "roomHeight": 1350,
     "roomShape": "t",
     "measurementUnit": "imperial",
     "hasSweetheartTable": true,
@@ -28,7 +28,8 @@
         "sweetShape": "heart",
         "color": "#C9A961",
         "assignments": {
-          "g-014": 0
+          "g-001": 0,
+          "g-002": 1
         }
       },
       {
@@ -43,315 +44,300 @@
         "oneSide": true,
         "color": "#C9A961",
         "assignments": {
-          "g-036": 0,
-          "g-077": 1,
-          "g-042": 2,
-          "g-076": 3,
-          "g-041": 4,
-          "g-018": 5,
-          "g-016": 6,
-          "g-035": 7,
-          "g-017": 8,
-          "g-080": 9
+          "g-010": 0,
+          "g-006": 1,
+          "g-003": 2,
+          "g-009": 3,
+          "g-007": 4,
+          "g-012": 5,
+          "g-004": 6,
+          "g-008": 7,
+          "g-011": 8,
+          "g-005": 9
         }
       },
       {
         "id": "t_round_01",
-        "name": "Table 1",
+        "name": "Paris",
         "type": "round",
         "seats": 8,
         "x": 130,
-        "y": 450,
+        "y": 510,
         "diameter": 100,
         "color": "#C9A961",
         "assignments": {
-          "g-113": 0,
-          "g-107": 1,
-          "g-112": 2,
-          "g-114": 3,
-          "g-108": 4,
-          "g-110": 5,
-          "g-109": 6,
-          "g-111": 7
+          "g-118": 0,
+          "g-112": 1,
+          "g-117": 2,
+          "g-119": 3,
+          "g-113": 4,
+          "g-115": 5,
+          "g-114": 6,
+          "g-116": 7
         }
       },
       {
         "id": "t_round_02",
-        "name": "Table 2",
+        "name": "Rome",
         "type": "round",
         "seats": 8,
         "x": 410,
-        "y": 450,
+        "y": 510,
         "diameter": 100,
         "color": "#C9A961",
         "assignments": {
-          "g-099": 0,
-          "g-102": 1,
-          "g-101": 2,
-          "g-144": 3,
-          "g-105": 4,
-          "g-103": 5,
-          "g-100": 6,
-          "g-104": 7
+          "g-104": 0,
+          "g-107": 1,
+          "g-106": 2,
+          "g-110": 3,
+          "g-108": 4,
+          "g-105": 5,
+          "g-109": 6
         }
       },
       {
         "id": "t_round_03",
-        "name": "Table 3",
+        "name": "Venice",
         "type": "round",
         "seats": 8,
         "x": 690,
-        "y": 450,
+        "y": 510,
         "diameter": 100,
         "color": "#C9A961",
         "assignments": {
-          "g-087": 0,
-          "g-086": 1,
-          "g-085": 2,
-          "g-082": 3,
-          "g-083": 4,
-          "g-089": 5,
-          "g-081": 6,
-          "g-088": 7
-        }
-      },
-      {
-        "id": "t_round_04",
-        "name": "Table 4",
-        "type": "round",
-        "seats": 8,
-        "x": 970,
-        "y": 450,
-        "diameter": 100,
-        "color": "#C9A961",
-        "assignments": {
-          "g-090": 0,
-          "g-097": 1,
-          "g-096": 2,
-          "g-092": 3,
-          "g-094": 4,
-          "g-091": 5,
-          "g-098": 6,
+          "g-092": 0,
+          "g-091": 1,
+          "g-090": 2,
+          "g-087": 3,
+          "g-088": 4,
+          "g-094": 5,
+          "g-086": 6,
           "g-093": 7
         }
       },
       {
-        "id": "t_round_05",
-        "name": "Table 5",
-        "type": "round",
-        "seats": 8,
-        "x": 130,
-        "y": 570,
-        "diameter": 100,
-        "color": "#C9A961",
-        "assignments": {
-          "g-006": 0,
-          "g-001": 1,
-          "g-002": 2,
-          "g-003": 3,
-          "g-007": 4,
-          "g-004": 5,
-          "g-008": 6,
-          "g-005": 7
-        }
-      },
-      {
-        "id": "t_round_06",
-        "name": "Table 6",
-        "type": "round",
-        "seats": 8,
-        "x": 410,
-        "y": 570,
-        "diameter": 100,
-        "color": "#C9A961",
-        "assignments": {
-          "g-010": 0,
-          "g-009": 1,
-          "g-012": 2,
-          "g-011": 3
-        }
-      },
-      {
-        "id": "t_round_07",
-        "name": "Table 7",
-        "type": "round",
-        "seats": 8,
-        "x": 690,
-        "y": 570,
-        "diameter": 100,
-        "color": "#C9A961",
-        "assignments": {
-          "g-073": 0,
-          "g-074": 1,
-          "g-058": 2,
-          "g-044": 3,
-          "g-059": 4,
-          "g-045": 5,
-          "g-068": 6,
-          "g-067": 7
-        }
-      },
-      {
-        "id": "t_round_08",
-        "name": "Table 8",
+        "id": "t_round_04",
+        "name": "Barcelona",
         "type": "round",
         "seats": 8,
         "x": 970,
-        "y": 570,
-        "diameter": 100,
-        "color": "#C9A961",
-        "assignments": {
-          "g-013": 0,
-          "g-049": 1
-        }
-      },
-      {
-        "id": "t_round_09",
-        "name": "Table 9",
-        "type": "round",
-        "seats": 8,
-        "x": 130,
-        "y": 690,
-        "diameter": 100,
-        "color": "#C9A961",
-        "assignments": {
-          "g-039": 0,
-          "g-032": 1,
-          "g-070": 2,
-          "g-071": 3,
-          "g-029": 4,
-          "g-030": 5,
-          "g-033": 6,
-          "g-038": 7
-        }
-      },
-      {
-        "id": "t_round_10",
-        "name": "Table 10",
-        "type": "round",
-        "seats": 8,
-        "x": 410,
-        "y": 690,
-        "diameter": 100,
-        "color": "#C9A961",
-        "assignments": {
-          "g-053": 0,
-          "g-062": 1,
-          "g-020": 2,
-          "g-024": 3,
-          "g-052": 4,
-          "g-023": 5,
-          "g-021": 6,
-          "g-061": 7
-        }
-      },
-      {
-        "id": "t_round_11",
-        "name": "Table 11",
-        "type": "round",
-        "seats": 8,
-        "x": 690,
-        "y": 690,
-        "diameter": 100,
-        "color": "#C9A961",
-        "assignments": {
-          "g-120": 0,
-          "g-126": 1,
-          "g-131": 2,
-          "g-119": 3,
-          "g-129": 4,
-          "g-125": 5,
-          "g-128": 6,
-          "g-132": 7
-        }
-      },
-      {
-        "id": "t_round_12",
-        "name": "Table 12",
-        "type": "round",
-        "seats": 8,
-        "x": 970,
-        "y": 690,
+        "y": 510,
         "diameter": 100,
         "color": "#C9A961",
         "assignments": {
           "g-095": 0,
-          "g-134": 1,
-          "g-143": 2,
-          "g-084": 3,
-          "g-142": 4,
-          "g-137": 5,
-          "g-145": 6,
-          "g-136": 7
+          "g-102": 1,
+          "g-101": 2,
+          "g-097": 3,
+          "g-099": 4,
+          "g-096": 5,
+          "g-103": 6,
+          "g-098": 7
         }
       },
       {
-        "id": "t_round_13",
-        "name": "Table 13",
+        "id": "t_round_05",
+        "name": "Santorini",
         "type": "round",
         "seats": 8,
         "x": 130,
-        "y": 810,
+        "y": 680,
         "diameter": 100,
         "color": "#C9A961",
         "assignments": {
-          "g-046": 0,
-          "g-056": 1,
-          "g-055": 2,
-          "g-047": 3,
-          "g-078": 4,
-          "g-079": 5,
-          "g-050": 6,
-          "g-048": 7
+          "g-044": 0,
+          "g-034": 1,
+          "g-035": 2,
+          "g-029": 3,
+          "g-028": 4,
+          "g-073": 5,
+          "g-043": 6,
+          "g-072": 7
         }
       },
       {
-        "id": "t_round_14",
-        "name": "Table 14",
+        "id": "t_round_06",
+        "name": "Bali",
         "type": "round",
         "seats": 8,
         "x": 410,
-        "y": 810,
+        "y": 680,
         "diameter": 100,
         "color": "#C9A961",
         "assignments": {
-          "g-116": 0,
-          "g-122": 1,
-          "g-133": 2,
-          "g-117": 3,
-          "g-140": 4,
-          "g-139": 5,
-          "g-123": 6,
+          "g-075": 0,
+          "g-076": 1,
+          "g-078": 2,
+          "g-067": 3,
+          "g-079": 4,
+          "g-016": 5,
+          "g-066": 6,
+          "g-017": 7
+        }
+      },
+      {
+        "id": "t_round_07",
+        "name": "Tokyo",
+        "type": "round",
+        "seats": 8,
+        "x": 690,
+        "y": 680,
+        "diameter": 100,
+        "color": "#C9A961",
+        "assignments": {
+          "g-041": 0,
+          "g-070": 1,
+          "g-063": 2,
+          "g-049": 3,
+          "g-064": 4,
+          "g-050": 5,
+          "g-069": 6,
+          "g-040": 7
+        }
+      },
+      {
+        "id": "t_round_08",
+        "name": "London",
+        "type": "round",
+        "seats": 8,
+        "x": 970,
+        "y": 680,
+        "diameter": 100,
+        "color": "#C9A961",
+        "assignments": {
+          "g-145": 0,
+          "g-147": 1,
+          "g-013": 2,
+          "g-144": 3,
+          "g-054": 4,
+          "g-150": 5
+        }
+      },
+      {
+        "id": "t_round_09",
+        "name": "Vienna",
+        "type": "round",
+        "seats": 8,
+        "x": 130,
+        "y": 850,
+        "diameter": 100,
+        "color": "#C9A961",
+        "assignments": {
+          "g-037": 0,
+          "g-082": 1,
+          "g-081": 2,
+          "g-038": 3,
+          "g-025": 4,
+          "g-026": 5,
+          "g-031": 6,
+          "g-032": 7
+        }
+      },
+      {
+        "id": "t_round_10",
+        "name": "Prague",
+        "type": "round",
+        "seats": 8,
+        "x": 410,
+        "y": 850,
+        "diameter": 100,
+        "color": "#C9A961",
+        "assignments": {
+          "g-121": 0,
+          "g-139": 1,
+          "g-136": 2,
+          "g-122": 3,
+          "g-149": 4,
+          "g-142": 5,
+          "g-137": 6,
           "g-141": 7
         }
       },
       {
-        "id": "t_round_15",
-        "name": "Table 15",
+        "id": "t_round_11",
+        "name": "Lisbon",
         "type": "round",
         "seats": 8,
         "x": 690,
-        "y": 810,
+        "y": 850,
         "diameter": 100,
         "color": "#C9A961",
         "assignments": {
-          "g-065": 0,
-          "g-064": 1,
-          "g-026": 2,
-          "g-027": 3
+          "g-125": 0,
+          "g-127": 1,
+          "g-131": 2,
+          "g-124": 3,
+          "g-134": 4,
+          "g-130": 5,
+          "g-133": 6,
+          "g-128": 7
         }
       },
       {
-        "id": "t_round_16",
-        "name": "Table 16",
+        "id": "t_round_12",
+        "name": "Florence",
         "type": "round",
         "seats": 8,
         "x": 970,
-        "y": 810,
+        "y": 850,
         "diameter": 100,
         "color": "#C9A961",
         "assignments": {
-          "g-106": 0
+          "g-051": 0,
+          "g-061": 1,
+          "g-060": 2,
+          "g-052": 3,
+          "g-014": 4,
+          "g-083": 5,
+          "g-053": 6,
+          "g-085": 7
+        }
+      },
+      {
+        "id": "t_round_13",
+        "name": "Kyoto",
+        "type": "round",
+        "seats": 8,
+        "x": 130,
+        "y": 1020,
+        "diameter": 100,
+        "color": "#C9A961",
+        "assignments": {
+          "g-047": 0,
+          "g-058": 1,
+          "g-057": 2,
+          "g-084": 3,
+          "g-020": 4,
+          "g-046": 5,
+          "g-055": 6,
+          "g-021": 7
+        }
+      },
+      {
+        "id": "t_round_14",
+        "name": "Capri",
+        "type": "round",
+        "seats": 4,
+        "x": 703,
+        "y": 1033,
+        "diameter": 75,
+        "color": "#C9A961",
+        "assignments": {}
+      },
+      {
+        "id": "t_kids",
+        "name": "Kids Table",
+        "type": "round",
+        "seats": 5,
+        "x": 980,
+        "y": 1030,
+        "diameter": 80,
+        "color": "#D4956C",
+        "assignments": {
+          "g-022": 0,
+          "g-018": 1,
+          "g-023": 2,
+          "g-146": 3
         }
       }
     ],
@@ -364,7 +350,9 @@
         "display": "Brooks Williams",
         "side": "bride",
         "categories": [
-          "cat-wedding-party"
+          "bride",
+          "cat-wedding-party",
+          "sweetheart_table"
         ],
         "meal": "Pan-Seared Salmon",
         "dietaryTags": [],
@@ -384,7 +372,9 @@
         "display": "Carter Okonkwo",
         "side": "groom",
         "categories": [
-          "cat-wedding-party"
+          "groom",
+          "cat-wedding-party",
+          "sweetheart_table"
         ],
         "meal": "Beef Tenderloin",
         "dietaryTags": [],
@@ -405,7 +395,8 @@
         "side": "both",
         "categories": [
           "cat-wedding-party",
-          "cat-family"
+          "cat-family",
+          "head_table"
         ],
         "meal": "Pan-Seared Salmon",
         "dietaryTags": [],
@@ -426,7 +417,8 @@
         "side": "both",
         "categories": [
           "cat-wedding-party",
-          "cat-friends"
+          "cat-friends",
+          "head_table"
         ],
         "meal": "Vegetarian Risotto",
         "dietaryTags": [
@@ -449,7 +441,8 @@
         "side": "both",
         "categories": [
           "cat-wedding-party",
-          "cat-friends"
+          "cat-friends",
+          "head_table"
         ],
         "meal": "Pan-Seared Salmon",
         "dietaryTags": [],
@@ -470,7 +463,8 @@
         "side": "both",
         "categories": [
           "cat-wedding-party",
-          "cat-friends"
+          "cat-friends",
+          "head_table"
         ],
         "meal": "Beef Tenderloin",
         "dietaryTags": [
@@ -493,7 +487,8 @@
         "side": "both",
         "categories": [
           "cat-wedding-party",
-          "cat-family"
+          "cat-family",
+          "head_table"
         ],
         "meal": "Beef Tenderloin",
         "dietaryTags": [],
@@ -514,7 +509,8 @@
         "side": "both",
         "categories": [
           "cat-wedding-party",
-          "cat-family"
+          "cat-family",
+          "head_table"
         ],
         "meal": "Pan-Seared Salmon",
         "dietaryTags": [],
@@ -535,7 +531,8 @@
         "side": "both",
         "categories": [
           "cat-wedding-party",
-          "cat-family"
+          "cat-family",
+          "head_table"
         ],
         "meal": "Beef Tenderloin",
         "dietaryTags": [
@@ -558,7 +555,8 @@
         "side": "both",
         "categories": [
           "cat-wedding-party",
-          "cat-family"
+          "cat-family",
+          "head_table"
         ],
         "meal": "Vegetarian Risotto",
         "dietaryTags": [],
@@ -579,7 +577,8 @@
         "side": "both",
         "categories": [
           "cat-wedding-party",
-          "cat-family"
+          "cat-family",
+          "head_table"
         ],
         "meal": "Beef Tenderloin",
         "dietaryTags": [],
@@ -600,7 +599,8 @@
         "side": "both",
         "categories": [
           "cat-wedding-party",
-          "cat-friends"
+          "cat-friends",
+          "head_table"
         ],
         "meal": "Beef Tenderloin",
         "dietaryTags": [
@@ -715,10 +715,92 @@
         "plusOne": false,
         "isBride": false,
         "isGroom": false,
-        "party": "p-015"
+        "party": null
       },
       {
         "id": "g-020",
+        "firstName": "Lily",
+        "lastName": "Park",
+        "name": "Lily Park",
+        "display": "Lily Park",
+        "side": "none",
+        "categories": [
+          "cat-family"
+        ],
+        "meal": "Pan-Seared Salmon",
+        "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": "p-019"
+      },
+      {
+        "id": "g-021",
+        "firstName": "Sam",
+        "lastName": "Park",
+        "name": "Sam Park",
+        "display": "Sam Park",
+        "side": "none",
+        "categories": [
+          "cat-family"
+        ],
+        "meal": "Beef Tenderloin",
+        "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": false,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": "p-019"
+      },
+      {
+        "id": "g-022",
+        "firstName": "Ella",
+        "lastName": "Park",
+        "name": "Ella Park",
+        "display": "Ella Park",
+        "side": "none",
+        "categories": [
+          "cat-family",
+          "cat-kids"
+        ],
+        "meal": "Kids Chicken Fingers",
+        "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": true,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": null
+      },
+      {
+        "id": "g-023",
+        "firstName": "Noah",
+        "lastName": "Park",
+        "name": "Noah Park",
+        "display": "Noah Park",
+        "side": "none",
+        "categories": [
+          "cat-family",
+          "cat-kids"
+        ],
+        "meal": "Kids Chicken Fingers",
+        "dietaryTags": [],
+        "rsvp": "yes",
+        "vip": false,
+        "isChild": true,
+        "plusOne": false,
+        "isBride": false,
+        "isGroom": false,
+        "party": null
+      },
+      {
+        "id": "g-025",
         "firstName": "Helen",
         "lastName": "Park",
         "name": "Helen Park",
@@ -737,10 +819,10 @@
         "plusOne": false,
         "isBride": false,
         "isGroom": false,
-        "party": "p-019"
+        "party": "p-024"
       },
       {
-        "id": "g-021",
+        "id": "g-026",
         "firstName": "Robert",
         "lastName": "Park",
         "name": "Robert Park",
@@ -757,10 +839,10 @@
         "plusOne": false,
         "isBride": false,
         "isGroom": false,
-        "party": "p-019"
+        "party": "p-024"
       },
       {
-        "id": "g-023",
+        "id": "g-028",
         "firstName": "Linda",
         "lastName": "Williams-Patel",
         "name": "Linda Williams-Patel",
@@ -777,10 +859,10 @@
         "plusOne": false,
         "isBride": false,
         "isGroom": false,
-        "party": "p-022"
+        "party": "p-027"
       },
       {
-        "id": "g-024",
+        "id": "g-029",
         "firstName": "Henry",
         "lastName": "Williams-Patel",
         "name": "Henry Williams-Patel",
@@ -797,10 +879,10 @@
         "plusOne": false,
         "isBride": false,
         "isGroom": false,
-        "party": "p-022"
+        "party": "p-027"
       },
       {
-        "id": "g-026",
+        "id": "g-031",
         "firstName": "Susan",
         "lastName": "Williams",
         "name": "Susan Williams",
@@ -817,10 +899,10 @@
         "plusOne": false,
         "isBride": false,
         "isGroom": false,
-        "party": "p-025"
+        "party": "p-030"
       },
       {
-        "id": "g-027",
+        "id": "g-032",
         "firstName": "Walter",
         "lastName": "Williams",
         "name": "Walter Williams",
@@ -839,10 +921,10 @@
         "plusOne": false,
         "isBride": false,
         "isGroom": false,
-        "party": "p-025"
+        "party": "p-030"
       },
       {
-        "id": "g-029",
+        "id": "g-034",
         "firstName": "Carol",
         "lastName": "Park-Williams",
         "name": "Carol Park-Williams",
@@ -859,10 +941,10 @@
         "plusOne": false,
         "isBride": false,
         "isGroom": false,
-        "party": "p-028"
+        "party": "p-033"
       },
       {
-        "id": "g-030",
+        "id": "g-035",
         "firstName": "Edward",
         "lastName": "Park-Williams",
         "name": "Edward Park-Williams",
@@ -879,10 +961,10 @@
         "plusOne": false,
         "isBride": false,
         "isGroom": false,
-        "party": "p-028"
+        "party": "p-033"
       },
       {
-        "id": "g-032",
+        "id": "g-037",
         "firstName": "Barbara",
         "lastName": "Patel",
         "name": "Barbara Patel",
@@ -899,10 +981,10 @@
         "plusOne": false,
         "isBride": false,
         "isGroom": false,
-        "party": "p-031"
+        "party": "p-036"
       },
       {
-        "id": "g-033",
+        "id": "g-038",
         "firstName": "Frank",
         "lastName": "Patel",
         "name": "Frank Patel",
@@ -919,10 +1001,10 @@
         "plusOne": false,
         "isBride": false,
         "isGroom": false,
-        "party": "p-031"
+        "party": "p-036"
       },
       {
-        "id": "g-035",
+        "id": "g-040",
         "firstName": "Sandra",
         "lastName": "Singh",
         "name": "Sandra Singh",
@@ -941,10 +1023,10 @@
         "plusOne": false,
         "isBride": false,
         "isGroom": false,
-        "party": "p-034"
+        "party": "p-039"
       },
       {
-        "id": "g-036",
+        "id": "g-041",
         "firstName": "Albert",
         "lastName": "Singh",
         "name": "Albert Singh",
@@ -961,10 +1043,10 @@
         "plusOne": false,
         "isBride": false,
         "isGroom": false,
-        "party": "p-034"
+        "party": "p-039"
       },
       {
-        "id": "g-038",
+        "id": "g-043",
         "firstName": "Priya",
         "lastName": "Patel",
         "name": "Priya Patel",
@@ -981,10 +1063,10 @@
         "plusOne": false,
         "isBride": false,
         "isGroom": false,
-        "party": "p-037"
+        "party": "p-042"
       },
       {
-        "id": "g-039",
+        "id": "g-044",
         "firstName": "Arjun",
         "lastName": "Patel",
         "name": "Arjun Patel",
@@ -1001,10 +1083,10 @@
         "plusOne": false,
         "isBride": false,
         "isGroom": false,
-        "party": "p-037"
+        "party": "p-042"
       },
       {
-        "id": "g-041",
+        "id": "g-046",
         "firstName": "Mei",
         "lastName": "Tanaka",
         "name": "Mei Tanaka",
@@ -1023,10 +1105,10 @@
         "plusOne": false,
         "isBride": false,
         "isGroom": false,
-        "party": "p-040"
+        "party": "p-045"
       },
       {
-        "id": "g-042",
+        "id": "g-047",
         "firstName": "Daniel",
         "lastName": "Tanaka",
         "name": "Daniel Tanaka",
@@ -1043,10 +1125,10 @@
         "plusOne": false,
         "isBride": false,
         "isGroom": false,
-        "party": "p-040"
+        "party": "p-045"
       },
       {
-        "id": "g-044",
+        "id": "g-049",
         "firstName": "Hana",
         "lastName": "Liu",
         "name": "Hana Liu",
@@ -1063,10 +1145,10 @@
         "plusOne": false,
         "isBride": false,
         "isGroom": false,
-        "party": "p-043"
+        "party": "p-048"
       },
       {
-        "id": "g-045",
+        "id": "g-050",
         "firstName": "Marcus",
         "lastName": "Liu",
         "name": "Marcus Liu",
@@ -1083,10 +1165,10 @@
         "plusOne": false,
         "isBride": false,
         "isGroom": false,
-        "party": "p-043"
+        "party": "p-048"
       },
       {
-        "id": "g-046",
+        "id": "g-051",
         "firstName": "Aarav",
         "lastName": "Singh",
         "name": "Aarav Singh",
@@ -1106,7 +1188,7 @@
         "party": null
       },
       {
-        "id": "g-047",
+        "id": "g-052",
         "firstName": "Anya",
         "lastName": "Park",
         "name": "Anya Park",
@@ -1126,7 +1208,7 @@
         "party": null
       },
       {
-        "id": "g-048",
+        "id": "g-053",
         "firstName": "Tara",
         "lastName": "Khan",
         "name": "Tara Khan",
@@ -1146,7 +1228,7 @@
         "party": null
       },
       {
-        "id": "g-049",
+        "id": "g-054",
         "firstName": "Ngozi",
         "lastName": "Okonkwo",
         "name": "Ngozi Okonkwo",
@@ -1166,7 +1248,7 @@
         "party": null
       },
       {
-        "id": "g-050",
+        "id": "g-055",
         "firstName": "Obinna",
         "lastName": "Okonkwo",
         "name": "Obinna Okonkwo",
@@ -1186,7 +1268,7 @@
         "party": null
       },
       {
-        "id": "g-052",
+        "id": "g-057",
         "firstName": "Ifeoma",
         "lastName": "Okonkwo-Hernández",
         "name": "Ifeoma Okonkwo-Hernández",
@@ -1203,10 +1285,10 @@
         "plusOne": false,
         "isBride": false,
         "isGroom": false,
-        "party": "p-051"
+        "party": "p-056"
       },
       {
-        "id": "g-053",
+        "id": "g-058",
         "firstName": "Diego",
         "lastName": "Hernández",
         "name": "Diego Hernández",
@@ -1223,10 +1305,10 @@
         "plusOne": false,
         "isBride": false,
         "isGroom": false,
-        "party": "p-051"
+        "party": "p-056"
       },
       {
-        "id": "g-055",
+        "id": "g-060",
         "firstName": "Amara",
         "lastName": "Carter",
         "name": "Amara Carter",
@@ -1245,10 +1327,10 @@
         "plusOne": false,
         "isBride": false,
         "isGroom": false,
-        "party": "p-054"
+        "party": "p-059"
       },
       {
-        "id": "g-056",
+        "id": "g-061",
         "firstName": "Aaron",
         "lastName": "Carter",
         "name": "Aaron Carter",
@@ -1265,10 +1347,10 @@
         "plusOne": false,
         "isBride": false,
         "isGroom": false,
-        "party": "p-054"
+        "party": "p-059"
       },
       {
-        "id": "g-058",
+        "id": "g-063",
         "firstName": "Folake",
         "lastName": "Adebayo",
         "name": "Folake Adebayo",
@@ -1285,10 +1367,10 @@
         "plusOne": false,
         "isBride": false,
         "isGroom": false,
-        "party": "p-057"
+        "party": "p-062"
       },
       {
-        "id": "g-059",
+        "id": "g-064",
         "firstName": "Idris",
         "lastName": "Adebayo",
         "name": "Idris Adebayo",
@@ -1305,10 +1387,10 @@
         "plusOne": false,
         "isBride": false,
         "isGroom": false,
-        "party": "p-057"
+        "party": "p-062"
       },
       {
-        "id": "g-061",
+        "id": "g-066",
         "firstName": "Sarah",
         "lastName": "Goldberg",
         "name": "Sarah Goldberg",
@@ -1327,10 +1409,10 @@
         "plusOne": false,
         "isBride": false,
         "isGroom": false,
-        "party": "p-060"
+        "party": "p-065"
       },
       {
-        "id": "g-062",
+        "id": "g-067",
         "firstName": "Eli",
         "lastName": "Goldberg",
         "name": "Eli Goldberg",
@@ -1349,10 +1431,10 @@
         "plusOne": false,
         "isBride": false,
         "isGroom": false,
-        "party": "p-060"
+        "party": "p-065"
       },
       {
-        "id": "g-064",
+        "id": "g-069",
         "firstName": "Naomi",
         "lastName": "Cohen",
         "name": "Naomi Cohen",
@@ -1369,10 +1451,10 @@
         "plusOne": false,
         "isBride": false,
         "isGroom": false,
-        "party": "p-063"
+        "party": "p-068"
       },
       {
-        "id": "g-065",
+        "id": "g-070",
         "firstName": "Asher",
         "lastName": "Cohen",
         "name": "Asher Cohen",
@@ -1389,10 +1471,10 @@
         "plusOne": false,
         "isBride": false,
         "isGroom": false,
-        "party": "p-063"
+        "party": "p-068"
       },
       {
-        "id": "g-067",
+        "id": "g-072",
         "firstName": "Sofia",
         "lastName": "García",
         "name": "Sofia García",
@@ -1409,10 +1491,10 @@
         "plusOne": false,
         "isBride": false,
         "isGroom": false,
-        "party": "p-066"
+        "party": "p-071"
       },
       {
-        "id": "g-068",
+        "id": "g-073",
         "firstName": "Mateo",
         "lastName": "García",
         "name": "Mateo García",
@@ -1429,10 +1511,10 @@
         "plusOne": false,
         "isBride": false,
         "isGroom": false,
-        "party": "p-066"
+        "party": "p-071"
       },
       {
-        "id": "g-070",
+        "id": "g-075",
         "firstName": "Camila",
         "lastName": "Ramirez",
         "name": "Camila Ramirez",
@@ -1449,10 +1531,10 @@
         "plusOne": false,
         "isBride": false,
         "isGroom": false,
-        "party": "p-069"
+        "party": "p-074"
       },
       {
-        "id": "g-071",
+        "id": "g-076",
         "firstName": "Carlos",
         "lastName": "Ramirez",
         "name": "Carlos Ramirez",
@@ -1469,10 +1551,10 @@
         "plusOne": false,
         "isBride": false,
         "isGroom": false,
-        "party": "p-069"
+        "party": "p-074"
       },
       {
-        "id": "g-073",
+        "id": "g-078",
         "firstName": "Chiamaka",
         "lastName": "Okonkwo",
         "name": "Chiamaka Okonkwo",
@@ -1489,10 +1571,10 @@
         "plusOne": false,
         "isBride": false,
         "isGroom": false,
-        "party": "p-072"
+        "party": "p-077"
       },
       {
-        "id": "g-074",
+        "id": "g-079",
         "firstName": "Femi",
         "lastName": "Okonkwo",
         "name": "Femi Okonkwo",
@@ -1509,10 +1591,10 @@
         "plusOne": false,
         "isBride": false,
         "isGroom": false,
-        "party": "p-072"
+        "party": "p-077"
       },
       {
-        "id": "g-076",
+        "id": "g-081",
         "firstName": "Esther",
         "lastName": "Adebayo",
         "name": "Esther Adebayo",
@@ -1529,10 +1611,10 @@
         "plusOne": false,
         "isBride": false,
         "isGroom": false,
-        "party": "p-075"
+        "party": "p-080"
       },
       {
-        "id": "g-077",
+        "id": "g-082",
         "firstName": "Bayo",
         "lastName": "Adebayo",
         "name": "Bayo Adebayo",
@@ -1549,10 +1631,10 @@
         "plusOne": false,
         "isBride": false,
         "isGroom": false,
-        "party": "p-075"
+        "party": "p-080"
       },
       {
-        "id": "g-078",
+        "id": "g-083",
         "firstName": "Kehinde",
         "lastName": "Okonkwo",
         "name": "Kehinde Okonkwo",
@@ -1574,7 +1656,7 @@
         "party": null
       },
       {
-        "id": "g-079",
+        "id": "g-084",
         "firstName": "Kwame",
         "lastName": "Diallo",
         "name": "Kwame Diallo",
@@ -1594,7 +1676,7 @@
         "party": null
       },
       {
-        "id": "g-080",
+        "id": "g-085",
         "firstName": "Zuri",
         "lastName": "Carter",
         "name": "Zuri Carter",
@@ -1614,7 +1696,7 @@
         "party": null
       },
       {
-        "id": "g-081",
+        "id": "g-086",
         "firstName": "Sora",
         "lastName": "Chen",
         "name": "Sora Chen",
@@ -1634,7 +1716,7 @@
         "party": null
       },
       {
-        "id": "g-082",
+        "id": "g-087",
         "firstName": "Nina",
         "lastName": "Nakamura",
         "name": "Nina Nakamura",
@@ -1656,7 +1738,7 @@
         "party": null
       },
       {
-        "id": "g-083",
+        "id": "g-088",
         "firstName": "Olivia",
         "lastName": "Patel-Singh",
         "name": "Olivia Patel-Singh",
@@ -1676,7 +1758,7 @@
         "party": null
       },
       {
-        "id": "g-084",
+        "id": "g-089",
         "firstName": "Hannah",
         "lastName": "Chen-Williams",
         "name": "Hannah Chen-Williams",
@@ -1696,7 +1778,7 @@
         "party": null
       },
       {
-        "id": "g-085",
+        "id": "g-090",
         "firstName": "Lily",
         "lastName": "Tanaka",
         "name": "Lily Tanaka",
@@ -1716,7 +1798,7 @@
         "party": null
       },
       {
-        "id": "g-086",
+        "id": "g-091",
         "firstName": "Grace",
         "lastName": "Nakamura",
         "name": "Grace Nakamura",
@@ -1736,7 +1818,7 @@
         "party": null
       },
       {
-        "id": "g-087",
+        "id": "g-092",
         "firstName": "Emma",
         "lastName": "Williams-Patel",
         "name": "Emma Williams-Patel",
@@ -1756,7 +1838,7 @@
         "party": null
       },
       {
-        "id": "g-088",
+        "id": "g-093",
         "firstName": "Vikram",
         "lastName": "Patel",
         "name": "Vikram Patel",
@@ -1776,7 +1858,7 @@
         "party": null
       },
       {
-        "id": "g-089",
+        "id": "g-094",
         "firstName": "Rohan",
         "lastName": "Khan",
         "name": "Rohan Khan",
@@ -1796,7 +1878,7 @@
         "party": null
       },
       {
-        "id": "g-090",
+        "id": "g-095",
         "firstName": "Aaron",
         "lastName": "Goldberg-Lin",
         "name": "Aaron Goldberg-Lin",
@@ -1818,7 +1900,7 @@
         "party": null
       },
       {
-        "id": "g-091",
+        "id": "g-096",
         "firstName": "Mateo",
         "lastName": "Hernández",
         "name": "Mateo Hernández",
@@ -1838,7 +1920,7 @@
         "party": null
       },
       {
-        "id": "g-092",
+        "id": "g-097",
         "firstName": "Levi",
         "lastName": "Cohen",
         "name": "Levi Cohen",
@@ -1858,7 +1940,7 @@
         "party": null
       },
       {
-        "id": "g-093",
+        "id": "g-098",
         "firstName": "Pablo",
         "lastName": "Ramirez",
         "name": "Pablo Ramirez",
@@ -1878,7 +1960,7 @@
         "party": null
       },
       {
-        "id": "g-094",
+        "id": "g-099",
         "firstName": "Marco",
         "lastName": "García-Adebayo",
         "name": "Marco García-Adebayo",
@@ -1898,7 +1980,7 @@
         "party": null
       },
       {
-        "id": "g-095",
+        "id": "g-100",
         "firstName": "Caleb",
         "lastName": "Goldberg",
         "name": "Caleb Goldberg",
@@ -1918,7 +2000,7 @@
         "party": null
       },
       {
-        "id": "g-096",
+        "id": "g-101",
         "firstName": "Ezra",
         "lastName": "Cohen-Diallo",
         "name": "Ezra Cohen-Diallo",
@@ -1938,7 +2020,7 @@
         "party": null
       },
       {
-        "id": "g-097",
+        "id": "g-102",
         "firstName": "Asher",
         "lastName": "Goldberg-Lin",
         "name": "Asher Goldberg-Lin",
@@ -1958,7 +2040,7 @@
         "party": null
       },
       {
-        "id": "g-098",
+        "id": "g-103",
         "firstName": "Noah",
         "lastName": "Carter-Okonkwo",
         "name": "Noah Carter-Okonkwo",
@@ -1978,7 +2060,7 @@
         "party": null
       },
       {
-        "id": "g-099",
+        "id": "g-104",
         "firstName": "Cole",
         "lastName": "Liu",
         "name": "Cole Liu",
@@ -1998,7 +2080,7 @@
         "party": null
       },
       {
-        "id": "g-100",
+        "id": "g-105",
         "firstName": "Ryan",
         "lastName": "Chen",
         "name": "Ryan Chen",
@@ -2018,7 +2100,7 @@
         "party": null
       },
       {
-        "id": "g-101",
+        "id": "g-106",
         "firstName": "Ethan",
         "lastName": "Park",
         "name": "Ethan Park",
@@ -2038,7 +2120,7 @@
         "party": null
       },
       {
-        "id": "g-102",
+        "id": "g-107",
         "firstName": "Devan",
         "lastName": "Patel",
         "name": "Devan Patel",
@@ -2058,7 +2140,7 @@
         "party": null
       },
       {
-        "id": "g-103",
+        "id": "g-108",
         "firstName": "Ravi",
         "lastName": "Singh",
         "name": "Ravi Singh",
@@ -2080,7 +2162,7 @@
         "party": null
       },
       {
-        "id": "g-104",
+        "id": "g-109",
         "firstName": "Sai",
         "lastName": "Khan",
         "name": "Sai Khan",
@@ -2100,7 +2182,7 @@
         "party": null
       },
       {
-        "id": "g-105",
+        "id": "g-110",
         "firstName": "Jacob",
         "lastName": "Williams",
         "name": "Jacob Williams",
@@ -2120,7 +2202,7 @@
         "party": null
       },
       {
-        "id": "g-106",
+        "id": "g-111",
         "firstName": "Liam",
         "lastName": "Park-Williams",
         "name": "Liam Park-Williams",
@@ -2140,7 +2222,7 @@
         "party": null
       },
       {
-        "id": "g-107",
+        "id": "g-112",
         "firstName": "Andres",
         "lastName": "García",
         "name": "Andres García",
@@ -2160,7 +2242,7 @@
         "party": null
       },
       {
-        "id": "g-108",
+        "id": "g-113",
         "firstName": "Javier",
         "lastName": "Hernández",
         "name": "Javier Hernández",
@@ -2180,7 +2262,7 @@
         "party": null
       },
       {
-        "id": "g-109",
+        "id": "g-114",
         "firstName": "Luis",
         "lastName": "Ramirez",
         "name": "Luis Ramirez",
@@ -2200,7 +2282,7 @@
         "party": null
       },
       {
-        "id": "g-110",
+        "id": "g-115",
         "firstName": "Jonah",
         "lastName": "Goldberg",
         "name": "Jonah Goldberg",
@@ -2220,7 +2302,7 @@
         "party": null
       },
       {
-        "id": "g-111",
+        "id": "g-116",
         "firstName": "Tunde",
         "lastName": "Adebayo",
         "name": "Tunde Adebayo",
@@ -2240,7 +2322,7 @@
         "party": null
       },
       {
-        "id": "g-112",
+        "id": "g-117",
         "firstName": "Frank",
         "lastName": "Diallo",
         "name": "Frank Diallo",
@@ -2260,7 +2342,7 @@
         "party": null
       },
       {
-        "id": "g-113",
+        "id": "g-118",
         "firstName": "Albert",
         "lastName": "Cohen-Diallo",
         "name": "Albert Cohen-Diallo",
@@ -2282,7 +2364,7 @@
         "party": null
       },
       {
-        "id": "g-114",
+        "id": "g-119",
         "firstName": "Henry",
         "lastName": "Goldberg-Lin",
         "name": "Henry Goldberg-Lin",
@@ -2302,7 +2384,7 @@
         "party": null
       },
       {
-        "id": "g-116",
+        "id": "g-121",
         "firstName": "Beverly",
         "lastName": "Park-Williams",
         "name": "Beverly Park-Williams",
@@ -2319,10 +2401,10 @@
         "plusOne": false,
         "isBride": false,
         "isGroom": false,
-        "party": "p-115"
+        "party": "p-120"
       },
       {
-        "id": "g-117",
+        "id": "g-122",
         "firstName": "George",
         "lastName": "Park-Williams",
         "name": "George Park-Williams",
@@ -2339,10 +2421,10 @@
         "plusOne": false,
         "isBride": false,
         "isGroom": false,
-        "party": "p-115"
+        "party": "p-120"
       },
       {
-        "id": "g-119",
+        "id": "g-124",
         "firstName": "Eleanor",
         "lastName": "Goldberg",
         "name": "Eleanor Goldberg",
@@ -2359,10 +2441,10 @@
         "plusOne": false,
         "isBride": false,
         "isGroom": false,
-        "party": "p-118"
+        "party": "p-123"
       },
       {
-        "id": "g-120",
+        "id": "g-125",
         "firstName": "Arthur",
         "lastName": "Goldberg",
         "name": "Arthur Goldberg",
@@ -2379,10 +2461,10 @@
         "plusOne": false,
         "isBride": false,
         "isGroom": false,
-        "party": "p-118"
+        "party": "p-123"
       },
       {
-        "id": "g-122",
+        "id": "g-127",
         "firstName": "Catherine",
         "lastName": "Carter",
         "name": "Catherine Carter",
@@ -2399,10 +2481,10 @@
         "plusOne": false,
         "isBride": false,
         "isGroom": false,
-        "party": "p-121"
+        "party": "p-126"
       },
       {
-        "id": "g-123",
+        "id": "g-128",
         "firstName": "Thomas",
         "lastName": "Carter",
         "name": "Thomas Carter",
@@ -2419,10 +2501,10 @@
         "plusOne": false,
         "isBride": false,
         "isGroom": false,
-        "party": "p-121"
+        "party": "p-126"
       },
       {
-        "id": "g-125",
+        "id": "g-130",
         "firstName": "Gloria",
         "lastName": "Williams",
         "name": "Gloria Williams",
@@ -2441,10 +2523,10 @@
         "plusOne": false,
         "isBride": false,
         "isGroom": false,
-        "party": "p-124"
+        "party": "p-129"
       },
       {
-        "id": "g-126",
+        "id": "g-131",
         "firstName": "Charles",
         "lastName": "Williams",
         "name": "Charles Williams",
@@ -2461,10 +2543,10 @@
         "plusOne": false,
         "isBride": false,
         "isGroom": false,
-        "party": "p-124"
+        "party": "p-129"
       },
       {
-        "id": "g-128",
+        "id": "g-133",
         "firstName": "Ruth",
         "lastName": "Park",
         "name": "Ruth Park",
@@ -2481,10 +2563,10 @@
         "plusOne": false,
         "isBride": false,
         "isGroom": false,
-        "party": "p-127"
+        "party": "p-132"
       },
       {
-        "id": "g-129",
+        "id": "g-134",
         "firstName": "Frederick",
         "lastName": "Park",
         "name": "Frederick Park",
@@ -2501,10 +2583,10 @@
         "plusOne": false,
         "isBride": false,
         "isGroom": false,
-        "party": "p-127"
+        "party": "p-132"
       },
       {
-        "id": "g-131",
+        "id": "g-136",
         "firstName": "Edith",
         "lastName": "Carter-Okonkwo",
         "name": "Edith Carter-Okonkwo",
@@ -2521,10 +2603,10 @@
         "plusOne": false,
         "isBride": false,
         "isGroom": false,
-        "party": "p-130"
+        "party": "p-135"
       },
       {
-        "id": "g-132",
+        "id": "g-137",
         "firstName": "William",
         "lastName": "Carter-Okonkwo",
         "name": "William Carter-Okonkwo",
@@ -2541,10 +2623,10 @@
         "plusOne": false,
         "isBride": false,
         "isGroom": false,
-        "party": "p-130"
+        "party": "p-135"
       },
       {
-        "id": "g-133",
+        "id": "g-138",
         "firstName": "Florence",
         "lastName": "Diallo",
         "name": "Florence Diallo",
@@ -2564,7 +2646,7 @@
         "party": null
       },
       {
-        "id": "g-134",
+        "id": "g-139",
         "firstName": "Dorothy",
         "lastName": "Carter-Okonkwo",
         "name": "Dorothy Carter-Okonkwo",
@@ -2584,7 +2666,7 @@
         "party": null
       },
       {
-        "id": "g-136",
+        "id": "g-141",
         "firstName": "Yasmin",
         "lastName": "Khan-Cohen",
         "name": "Yasmin Khan-Cohen",
@@ -2603,10 +2685,10 @@
         "plusOne": false,
         "isBride": false,
         "isGroom": false,
-        "party": "p-135"
+        "party": "p-140"
       },
       {
-        "id": "g-137",
+        "id": "g-142",
         "firstName": "Plus",
         "lastName": "One Khan-Cohen",
         "name": "Plus One Khan-Cohen",
@@ -2623,10 +2705,10 @@
         "plusOne": true,
         "isBride": false,
         "isGroom": false,
-        "party": "p-135"
+        "party": "p-140"
       },
       {
-        "id": "g-139",
+        "id": "g-144",
         "firstName": "Mei",
         "lastName": "Lin",
         "name": "Mei Lin",
@@ -2643,10 +2725,10 @@
         "plusOne": false,
         "isBride": false,
         "isGroom": false,
-        "party": "p-138"
+        "party": "p-143"
       },
       {
-        "id": "g-140",
+        "id": "g-145",
         "firstName": "Kwame",
         "lastName": "Lin",
         "name": "Kwame Lin",
@@ -2663,10 +2745,10 @@
         "plusOne": false,
         "isBride": false,
         "isGroom": false,
-        "party": "p-138"
+        "party": "p-143"
       },
       {
-        "id": "g-141",
+        "id": "g-146",
         "firstName": "Zara",
         "lastName": "Lin",
         "name": "Zara Lin",
@@ -2684,10 +2766,10 @@
         "plusOne": false,
         "isBride": false,
         "isGroom": false,
-        "party": "p-138"
+        "party": "p-143"
       },
       {
-        "id": "g-142",
+        "id": "g-147",
         "firstName": "Margaret",
         "lastName": "Cohen-Diallo",
         "name": "Margaret Cohen-Diallo",
@@ -2707,7 +2789,7 @@
         "party": null
       },
       {
-        "id": "g-143",
+        "id": "g-148",
         "firstName": "Edward",
         "lastName": "Adebayo",
         "name": "Edward Adebayo",
@@ -2727,7 +2809,7 @@
         "party": null
       },
       {
-        "id": "g-144",
+        "id": "g-149",
         "firstName": "Helen",
         "lastName": "Williams-Cohen",
         "name": "Helen Williams-Cohen",
@@ -2747,7 +2829,7 @@
         "party": null
       },
       {
-        "id": "g-145",
+        "id": "g-150",
         "firstName": "Valentina",
         "lastName": "García",
         "name": "Valentina García",
@@ -2769,78 +2851,78 @@
     ],
     "rules": [
       {
-        "id": "r-146",
+        "id": "r-151",
         "enabled": true,
         "weight": 30,
         "hard": false,
         "type": "prefer_together",
         "guests": [
-          "g-081",
-          "g-082",
-          "g-083",
-          "g-085",
           "g-086",
           "g-087",
           "g-088",
-          "g-089"
-        ],
-        "desc": "Bride's college friends seated together"
-      },
-      {
-        "id": "r-147",
-        "enabled": true,
-        "weight": 30,
-        "hard": false,
-        "type": "prefer_together",
-        "guests": [
           "g-090",
           "g-091",
           "g-092",
           "g-093",
-          "g-094",
+          "g-094"
+        ],
+        "desc": "Bride's college friends seated together"
+      },
+      {
+        "id": "r-152",
+        "enabled": true,
+        "weight": 30,
+        "hard": false,
+        "type": "prefer_together",
+        "guests": [
+          "g-095",
           "g-096",
           "g-097",
-          "g-098"
+          "g-098",
+          "g-099",
+          "g-101",
+          "g-102",
+          "g-103"
         ],
         "desc": "Groom's college friends seated together"
       },
       {
-        "id": "r-148",
+        "id": "r-153",
         "enabled": true,
         "weight": 50,
         "hard": true,
         "type": "must_together",
         "guests": [
-          "g-099",
-          "g-100",
-          "g-101",
-          "g-102",
-          "g-103",
           "g-104",
-          "g-105"
+          "g-105",
+          "g-106",
+          "g-107",
+          "g-108",
+          "g-109",
+          "g-110"
         ],
         "desc": "Bride's coworkers seated together"
       },
       {
-        "id": "r-149",
+        "id": "r-154",
         "enabled": true,
         "weight": 50,
         "hard": true,
         "type": "must_together",
         "guests": [
-          "g-107",
-          "g-108",
-          "g-109",
-          "g-110",
-          "g-111",
           "g-112",
           "g-113",
-          "g-114"
+          "g-114",
+          "g-115",
+          "g-116",
+          "g-117",
+          "g-118",
+          "g-119"
         ],
         "desc": "Groom's coworkers seated together"
       },
       {
-        "id": "r-150",
+        "id": "r-155",
         "enabled": true,
         "weight": 40,
         "hard": false,
@@ -2863,26 +2945,41 @@
         "desc": "Wedding party seated together"
       },
       {
-        "id": "r-151",
+        "id": "r-156",
+        "enabled": true,
+        "weight": 50,
+        "hard": true,
+        "type": "must_table",
+        "tableId": "t_kids",
+        "guests": [
+          "g-018",
+          "g-022",
+          "g-023",
+          "g-146"
+        ],
+        "desc": "Kids at the Kids Table"
+      },
+      {
+        "id": "r-157",
         "enabled": true,
         "weight": 20,
         "hard": false,
         "type": "near_object",
         "objectId": "obj_dance",
         "guests": [
-          "g-081",
-          "g-082",
-          "g-083",
-          "g-085",
           "g-086",
           "g-087",
           "g-088",
-          "g-089"
+          "g-090",
+          "g-091",
+          "g-092",
+          "g-093",
+          "g-094"
         ],
         "desc": "Bride's college friends near the dance floor"
       },
       {
-        "id": "r-152",
+        "id": "r-158",
         "enabled": true,
         "weight": 20,
         "hard": false,
@@ -2890,12 +2987,12 @@
         "objectId": "obj_exit",
         "guests": [
           "g-013",
-          "g-049"
+          "g-054"
         ],
         "desc": "Grandmothers near the emergency exit"
       },
       {
-        "id": "r-153",
+        "id": "r-159",
         "enabled": true,
         "weight": 50,
         "hard": true,
@@ -2913,56 +3010,56 @@
         "desc": "Divorced grandparents kept apart"
       },
       {
-        "id": "r-154",
+        "id": "r-160",
         "enabled": true,
         "weight": 30,
         "hard": true,
         "type": "must_not",
         "guests": [
-          "g-099",
-          "g-107"
+          "g-104",
+          "g-112"
         ],
         "sideA": [
-          "g-099"
+          "g-104"
         ],
         "sideB": [
-          "g-107"
+          "g-112"
         ],
         "desc": "Ex-colleagues from rival firms apart"
       },
       {
-        "id": "r-155",
+        "id": "r-161",
         "enabled": true,
         "weight": 30,
         "hard": true,
         "type": "must_not",
         "guests": [
-          "g-081",
-          "g-090"
+          "g-086",
+          "g-095"
         ],
         "sideA": [
-          "g-081"
+          "g-086"
         ],
         "sideB": [
-          "g-090"
+          "g-095"
         ],
         "desc": "Old roommates with bad history apart"
       },
       {
-        "id": "r-156",
+        "id": "r-162",
         "enabled": true,
         "weight": 30,
         "hard": true,
         "type": "must_not",
         "guests": [
-          "g-082",
-          "g-101"
+          "g-087",
+          "g-106"
         ],
         "sideA": [
-          "g-082"
+          "g-087"
         ],
         "sideB": [
-          "g-101"
+          "g-106"
         ],
         "desc": "Past workplace incident apart"
       }
@@ -2984,7 +3081,7 @@
         "id": "obj_cake",
         "type": "cake",
         "name": "Cake Table",
-        "x": 940,
+        "x": 870,
         "y": 200,
         "width": 70,
         "height": 70,
@@ -3009,11 +3106,35 @@
         "type": "bar",
         "name": "Bar",
         "x": 40,
-        "y": 930,
-        "width": 160,
-        "height": 60,
+        "y": 1250,
+        "width": 240,
+        "height": 80,
         "color": "#8B8680",
         "category": "food",
+        "isObstacle": false
+      },
+      {
+        "id": "obj_gift",
+        "type": "gift",
+        "name": "Gift Table",
+        "x": 320,
+        "y": 1270,
+        "width": 120,
+        "height": 60,
+        "color": "#9CAF88",
+        "category": "ceremony",
+        "isObstacle": false
+      },
+      {
+        "id": "obj_guestbook",
+        "type": "guestbook",
+        "name": "Guest Book",
+        "x": 470,
+        "y": 1270,
+        "width": 80,
+        "height": 50,
+        "color": "#C9A961",
+        "category": "services",
         "isObstacle": false
       },
       {
@@ -3029,14 +3150,86 @@
         "isObstacle": false
       },
       {
+        "id": "obj_welcome",
+        "type": "welcome",
+        "name": "Welcome Sign",
+        "x": 140,
+        "y": 150,
+        "width": 60,
+        "height": 80,
+        "color": "#C9A961",
+        "category": "services",
+        "isObstacle": false
+      },
+      {
         "id": "obj_exit",
         "type": "exit",
         "name": "Emergency Exit",
         "x": 1150,
-        "y": 470,
+        "y": 620,
         "width": 40,
         "height": 50,
         "color": "#9CAF88",
+        "category": "structure",
+        "isObstacle": false
+      },
+      {
+        "id": "obj_speaker_l",
+        "type": "speaker",
+        "name": "Speaker",
+        "x": 440,
+        "y": 350,
+        "width": 30,
+        "height": 30,
+        "color": "#2D2D2D",
+        "category": "entertainment",
+        "isObstacle": false
+      },
+      {
+        "id": "obj_speaker_r",
+        "type": "speaker",
+        "name": "Speaker",
+        "x": 730,
+        "y": 350,
+        "width": 30,
+        "height": 30,
+        "color": "#2D2D2D",
+        "category": "entertainment",
+        "isObstacle": false
+      },
+      {
+        "id": "obj_floral_l",
+        "type": "floral",
+        "name": "Entry Florals",
+        "x": 80,
+        "y": 140,
+        "width": 50,
+        "height": 50,
+        "color": "#9CAF88",
+        "category": "ceremony",
+        "isObstacle": false
+      },
+      {
+        "id": "obj_floral_r",
+        "type": "floral",
+        "name": "Entry Florals",
+        "x": 80,
+        "y": 210,
+        "width": 50,
+        "height": 50,
+        "color": "#9CAF88",
+        "category": "ceremony",
+        "isObstacle": false
+      },
+      {
+        "id": "obj_kitchen",
+        "type": "kitchen_entry",
+        "name": "Kitchen Entry",
+        "x": 860,
+        "y": 1300,
+        "width": 140,
+        "height": 50,
+        "color": "#8B8680",
         "category": "structure",
         "isObstacle": false
       }
@@ -3071,578 +3264,576 @@
     "parties": [
       {
         "id": "p-015",
-        "name": "Owen's Family",
+        "name": "Owen & Sophie",
         "guestIds": [
           "g-016",
-          "g-017",
-          "g-018"
+          "g-017"
         ]
       },
       {
         "id": "p-019",
-        "name": "Helen & Robert (Park)",
+        "name": "Lily & Sam",
         "guestIds": [
           "g-020",
           "g-021"
         ]
       },
       {
-        "id": "p-022",
+        "id": "p-024",
+        "name": "Helen & Robert (Park)",
+        "guestIds": [
+          "g-025",
+          "g-026"
+        ]
+      },
+      {
+        "id": "p-027",
         "name": "Linda & James (Williams)",
         "guestIds": [
-          "g-023",
-          "g-024"
+          "g-028",
+          "g-029"
         ]
       },
       {
-        "id": "p-025",
+        "id": "p-030",
         "name": "Susan & Walter (Williams)",
         "guestIds": [
-          "g-026",
-          "g-027"
+          "g-031",
+          "g-032"
         ]
       },
       {
-        "id": "p-028",
+        "id": "p-033",
         "name": "Carol & Edward (Park)",
         "guestIds": [
-          "g-029",
-          "g-030"
+          "g-034",
+          "g-035"
         ]
       },
       {
-        "id": "p-031",
+        "id": "p-036",
         "name": "Barbara & Frank (Patel)",
         "guestIds": [
-          "g-032",
-          "g-033"
+          "g-037",
+          "g-038"
         ]
       },
       {
-        "id": "p-034",
+        "id": "p-039",
         "name": "Sandra & Albert (Singh)",
         "guestIds": [
-          "g-035",
-          "g-036"
+          "g-040",
+          "g-041"
         ]
       },
       {
-        "id": "p-037",
+        "id": "p-042",
         "name": "Priya & Arjun",
         "guestIds": [
-          "g-038",
-          "g-039"
+          "g-043",
+          "g-044"
         ]
       },
       {
-        "id": "p-040",
+        "id": "p-045",
         "name": "Mei & Daniel",
         "guestIds": [
-          "g-041",
-          "g-042"
+          "g-046",
+          "g-047"
         ]
       },
       {
-        "id": "p-043",
+        "id": "p-048",
         "name": "Hana & Marcus",
         "guestIds": [
-          "g-044",
-          "g-045"
+          "g-049",
+          "g-050"
         ]
       },
       {
-        "id": "p-051",
+        "id": "p-056",
         "name": "Ifeoma & Diego",
         "guestIds": [
-          "g-052",
-          "g-053"
+          "g-057",
+          "g-058"
         ]
       },
       {
-        "id": "p-054",
+        "id": "p-059",
         "name": "Amara & Aaron (Carter)",
         "guestIds": [
-          "g-055",
-          "g-056"
+          "g-060",
+          "g-061"
         ]
       },
       {
-        "id": "p-057",
+        "id": "p-062",
         "name": "Folake & Idris",
         "guestIds": [
-          "g-058",
-          "g-059"
+          "g-063",
+          "g-064"
         ]
       },
       {
-        "id": "p-060",
+        "id": "p-065",
         "name": "Sarah & Eli (Goldberg)",
         "guestIds": [
-          "g-061",
-          "g-062"
+          "g-066",
+          "g-067"
         ]
       },
       {
-        "id": "p-063",
+        "id": "p-068",
         "name": "Naomi & Asher",
         "guestIds": [
-          "g-064",
-          "g-065"
+          "g-069",
+          "g-070"
         ]
       },
       {
-        "id": "p-066",
+        "id": "p-071",
         "name": "Sofia & Mateo",
         "guestIds": [
-          "g-067",
-          "g-068"
+          "g-072",
+          "g-073"
         ]
       },
       {
-        "id": "p-069",
+        "id": "p-074",
         "name": "Camila & Carlos",
         "guestIds": [
-          "g-070",
-          "g-071"
+          "g-075",
+          "g-076"
         ]
       },
       {
-        "id": "p-072",
+        "id": "p-077",
         "name": "Chiamaka & Femi",
         "guestIds": [
-          "g-073",
-          "g-074"
+          "g-078",
+          "g-079"
         ]
       },
       {
-        "id": "p-075",
+        "id": "p-080",
         "name": "Esther & Bayo",
         "guestIds": [
-          "g-076",
-          "g-077"
+          "g-081",
+          "g-082"
         ]
       },
       {
-        "id": "p-115",
+        "id": "p-120",
         "name": "Beverly & George",
         "guestIds": [
-          "g-116",
-          "g-117"
+          "g-121",
+          "g-122"
         ]
       },
       {
-        "id": "p-118",
+        "id": "p-123",
         "name": "Eleanor & Arthur",
         "guestIds": [
-          "g-119",
-          "g-120"
+          "g-124",
+          "g-125"
         ]
       },
       {
-        "id": "p-121",
+        "id": "p-126",
         "name": "Catherine & Thomas",
         "guestIds": [
-          "g-122",
-          "g-123"
+          "g-127",
+          "g-128"
         ]
       },
       {
-        "id": "p-124",
+        "id": "p-129",
         "name": "Gloria & Charles",
         "guestIds": [
-          "g-125",
-          "g-126"
+          "g-130",
+          "g-131"
         ]
       },
       {
-        "id": "p-127",
+        "id": "p-132",
         "name": "Ruth & Frederick",
         "guestIds": [
-          "g-128",
-          "g-129"
-        ]
-      },
-      {
-        "id": "p-130",
-        "name": "Edith & William",
-        "guestIds": [
-          "g-131",
-          "g-132"
+          "g-133",
+          "g-134"
         ]
       },
       {
         "id": "p-135",
-        "name": "Yasmin + plus-one",
+        "name": "Edith & William",
         "guestIds": [
           "g-136",
           "g-137"
         ]
       },
       {
-        "id": "p-138",
+        "id": "p-140",
+        "name": "Yasmin + plus-one",
+        "guestIds": [
+          "g-141",
+          "g-142"
+        ]
+      },
+      {
+        "id": "p-143",
         "name": "Lin Family",
         "guestIds": [
-          "g-139",
-          "g-140",
-          "g-141"
+          "g-144",
+          "g-145",
+          "g-146"
         ]
       }
     ]
   },
   "preBakedAI": {
     "assignments": {
-      "g-107": "t_round_01",
-      "g-108": "t_round_01",
-      "g-109": "t_round_01",
-      "g-110": "t_round_01",
-      "g-111": "t_round_01",
+      "g-018": "t_kids",
+      "g-022": "t_kids",
+      "g-023": "t_kids",
+      "g-146": "t_kids",
+      "g-001": "t_sweet",
+      "g-002": "t_sweet",
+      "g-003": "t_head",
+      "g-004": "t_head",
+      "g-005": "t_head",
+      "g-006": "t_head",
+      "g-007": "t_head",
+      "g-008": "t_head",
+      "g-009": "t_head",
+      "g-010": "t_head",
+      "g-011": "t_head",
+      "g-012": "t_head",
       "g-112": "t_round_01",
       "g-113": "t_round_01",
       "g-114": "t_round_01",
-      "g-099": "t_round_02",
-      "g-100": "t_round_02",
-      "g-101": "t_round_02",
-      "g-102": "t_round_02",
-      "g-103": "t_round_02",
+      "g-115": "t_round_01",
+      "g-116": "t_round_01",
+      "g-117": "t_round_01",
+      "g-118": "t_round_01",
+      "g-119": "t_round_01",
       "g-104": "t_round_02",
       "g-105": "t_round_02",
-      "g-081": "t_round_03",
-      "g-082": "t_round_03",
-      "g-083": "t_round_03",
-      "g-085": "t_round_03",
+      "g-106": "t_round_02",
+      "g-107": "t_round_02",
+      "g-108": "t_round_02",
+      "g-109": "t_round_02",
+      "g-110": "t_round_02",
       "g-086": "t_round_03",
       "g-087": "t_round_03",
       "g-088": "t_round_03",
-      "g-089": "t_round_03",
-      "g-090": "t_round_04",
-      "g-091": "t_round_04",
-      "g-092": "t_round_04",
-      "g-093": "t_round_04",
-      "g-094": "t_round_04",
+      "g-090": "t_round_03",
+      "g-091": "t_round_03",
+      "g-092": "t_round_03",
+      "g-093": "t_round_03",
+      "g-094": "t_round_03",
+      "g-095": "t_round_04",
       "g-096": "t_round_04",
       "g-097": "t_round_04",
       "g-098": "t_round_04",
-      "g-001": "t_round_05",
-      "g-002": "t_round_05",
-      "g-003": "t_round_05",
-      "g-004": "t_round_05",
-      "g-005": "t_round_05",
-      "g-006": "t_round_05",
-      "g-007": "t_round_05",
-      "g-008": "t_round_05",
-      "g-009": "t_round_06",
-      "g-010": "t_round_06",
-      "g-011": "t_round_06",
-      "g-012": "t_round_06",
+      "g-099": "t_round_04",
+      "g-101": "t_round_04",
+      "g-102": "t_round_04",
+      "g-103": "t_round_04",
       "g-013": "t_round_08",
-      "g-049": "t_round_08",
-      "g-016": "t_head",
-      "g-017": "t_head",
-      "g-018": "t_head",
-      "g-139": "t_round_14",
-      "g-140": "t_round_14",
-      "g-141": "t_round_14",
-      "g-020": "t_round_10",
-      "g-021": "t_round_10",
-      "g-023": "t_round_10",
-      "g-024": "t_round_10",
-      "g-026": "t_round_15",
-      "g-027": "t_round_15",
-      "g-029": "t_round_09",
-      "g-030": "t_round_09",
+      "g-054": "t_round_08",
+      "g-016": "t_round_06",
+      "g-017": "t_round_06",
+      "g-020": "t_round_13",
+      "g-021": "t_round_13",
+      "g-025": "t_round_09",
+      "g-026": "t_round_09",
+      "g-028": "t_round_05",
+      "g-029": "t_round_05",
+      "g-031": "t_round_09",
       "g-032": "t_round_09",
-      "g-033": "t_round_09",
-      "g-035": "t_head",
-      "g-036": "t_head",
+      "g-034": "t_round_05",
+      "g-035": "t_round_05",
+      "g-037": "t_round_09",
       "g-038": "t_round_09",
-      "g-039": "t_round_09",
-      "g-041": "t_head",
-      "g-042": "t_head",
-      "g-044": "t_round_07",
-      "g-045": "t_round_07",
-      "g-052": "t_round_10",
-      "g-053": "t_round_10",
-      "g-055": "t_round_13",
-      "g-056": "t_round_13",
-      "g-058": "t_round_07",
-      "g-059": "t_round_07",
-      "g-061": "t_round_10",
-      "g-062": "t_round_10",
-      "g-064": "t_round_15",
-      "g-065": "t_round_15",
-      "g-067": "t_round_07",
-      "g-068": "t_round_07",
-      "g-070": "t_round_09",
-      "g-071": "t_round_09",
-      "g-073": "t_round_07",
-      "g-074": "t_round_07",
-      "g-076": "t_head",
-      "g-077": "t_head",
-      "g-116": "t_round_14",
-      "g-117": "t_round_14",
-      "g-119": "t_round_11",
-      "g-120": "t_round_11",
-      "g-122": "t_round_14",
-      "g-123": "t_round_14",
-      "g-125": "t_round_11",
-      "g-126": "t_round_11",
-      "g-128": "t_round_11",
-      "g-129": "t_round_11",
-      "g-131": "t_round_11",
-      "g-132": "t_round_11",
-      "g-136": "t_round_12",
-      "g-137": "t_round_12",
-      "g-014": "t_sweet",
-      "g-050": "t_round_13",
+      "g-040": "t_round_07",
+      "g-041": "t_round_07",
+      "g-043": "t_round_05",
+      "g-044": "t_round_05",
       "g-046": "t_round_13",
       "g-047": "t_round_13",
-      "g-048": "t_round_13",
-      "g-078": "t_round_13",
-      "g-079": "t_round_13",
-      "g-080": "t_head",
-      "g-084": "t_round_12",
-      "g-095": "t_round_12",
-      "g-106": "t_round_16",
-      "g-133": "t_round_14",
-      "g-134": "t_round_12",
-      "g-142": "t_round_12",
-      "g-143": "t_round_12",
-      "g-144": "t_round_02",
-      "g-145": "t_round_12"
+      "g-049": "t_round_07",
+      "g-050": "t_round_07",
+      "g-057": "t_round_13",
+      "g-058": "t_round_13",
+      "g-060": "t_round_12",
+      "g-061": "t_round_12",
+      "g-063": "t_round_07",
+      "g-064": "t_round_07",
+      "g-066": "t_round_06",
+      "g-067": "t_round_06",
+      "g-069": "t_round_07",
+      "g-070": "t_round_07",
+      "g-072": "t_round_05",
+      "g-073": "t_round_05",
+      "g-075": "t_round_06",
+      "g-076": "t_round_06",
+      "g-078": "t_round_06",
+      "g-079": "t_round_06",
+      "g-081": "t_round_09",
+      "g-082": "t_round_09",
+      "g-121": "t_round_10",
+      "g-122": "t_round_10",
+      "g-124": "t_round_11",
+      "g-125": "t_round_11",
+      "g-127": "t_round_11",
+      "g-128": "t_round_11",
+      "g-130": "t_round_11",
+      "g-131": "t_round_11",
+      "g-133": "t_round_11",
+      "g-134": "t_round_11",
+      "g-136": "t_round_10",
+      "g-137": "t_round_10",
+      "g-141": "t_round_10",
+      "g-142": "t_round_10",
+      "g-014": "t_round_12",
+      "g-055": "t_round_13",
+      "g-051": "t_round_12",
+      "g-052": "t_round_12",
+      "g-053": "t_round_12",
+      "g-083": "t_round_12",
+      "g-084": "t_round_13",
+      "g-085": "t_round_12",
+      "g-139": "t_round_10",
+      "g-147": "t_round_08",
+      "g-149": "t_round_10",
+      "g-150": "t_round_08",
+      "g-144": "t_round_08",
+      "g-145": "t_round_08"
     },
     "seatOrders": {
-      "t_round_01": [
-        "g-107",
-        "g-108",
-        "g-109",
-        "g-110",
-        "g-111",
-        "g-112",
-        "g-113",
-        "g-114"
+      "t_kids": [
+        "g-018",
+        "g-022",
+        "g-023",
+        "g-146",
+        null
       ],
-      "t_round_02": [
-        "g-099",
-        "g-100",
-        "g-101",
-        "g-102",
-        "g-103",
-        "g-104",
-        "g-105",
-        "g-144"
-      ],
-      "t_round_03": [
-        "g-081",
-        "g-082",
-        "g-083",
-        "g-085",
-        "g-086",
-        "g-087",
-        "g-088",
-        "g-089"
-      ],
-      "t_round_04": [
-        "g-090",
-        "g-091",
-        "g-092",
-        "g-093",
-        "g-094",
-        "g-096",
-        "g-097",
-        "g-098"
-      ],
-      "t_round_05": [
+      "t_sweet": [
         "g-001",
-        "g-002",
+        "g-002"
+      ],
+      "t_head": [
         "g-003",
         "g-004",
         "g-005",
         "g-006",
         "g-007",
-        "g-008"
-      ],
-      "t_round_06": [
+        "g-008",
         "g-009",
         "g-010",
         "g-011",
-        "g-012",
-        null,
-        null,
-        null,
+        "g-012"
+      ],
+      "t_round_01": [
+        "g-112",
+        "g-113",
+        "g-114",
+        "g-115",
+        "g-116",
+        "g-117",
+        "g-118",
+        "g-119"
+      ],
+      "t_round_02": [
+        "g-104",
+        "g-105",
+        "g-106",
+        "g-107",
+        "g-108",
+        "g-109",
+        "g-110",
         null
+      ],
+      "t_round_03": [
+        "g-086",
+        "g-087",
+        "g-088",
+        "g-090",
+        "g-091",
+        "g-092",
+        "g-093",
+        "g-094"
+      ],
+      "t_round_04": [
+        "g-095",
+        "g-096",
+        "g-097",
+        "g-098",
+        "g-099",
+        "g-101",
+        "g-102",
+        "g-103"
       ],
       "t_round_08": [
         "g-013",
-        "g-049",
-        null,
-        null,
-        null,
-        null,
+        "g-054",
+        "g-147",
+        "g-150",
+        "g-144",
+        "g-145",
         null,
         null
       ],
-      "t_head": [
+      "t_round_06": [
         "g-016",
         "g-017",
-        "g-018",
-        "g-035",
-        "g-036",
-        "g-041",
-        "g-042",
-        "g-076",
-        "g-077",
-        "g-080"
-      ],
-      "t_round_14": [
-        "g-139",
-        "g-140",
-        "g-141",
-        "g-116",
-        "g-117",
-        "g-122",
-        "g-123",
-        "g-133"
-      ],
-      "t_round_10": [
-        "g-020",
-        "g-021",
-        "g-023",
-        "g-024",
-        "g-052",
-        "g-053",
-        "g-061",
-        "g-062"
-      ],
-      "t_round_15": [
-        "g-026",
-        "g-027",
-        "g-064",
-        "g-065",
-        null,
-        null,
-        null,
-        null
-      ],
-      "t_round_09": [
-        "g-029",
-        "g-030",
-        "g-032",
-        "g-033",
-        "g-038",
-        "g-039",
-        "g-070",
-        "g-071"
-      ],
-      "t_round_07": [
-        "g-044",
-        "g-045",
-        "g-058",
-        "g-059",
+        "g-066",
         "g-067",
-        "g-068",
-        "g-073",
-        "g-074"
-      ],
-      "t_round_13": [
-        "g-055",
-        "g-056",
-        "g-050",
-        "g-046",
-        "g-047",
-        "g-048",
+        "g-075",
+        "g-076",
         "g-078",
         "g-079"
       ],
-      "t_round_11": [
-        "g-119",
-        "g-120",
-        "g-125",
-        "g-126",
-        "g-128",
-        "g-129",
-        "g-131",
-        "g-132"
+      "t_round_13": [
+        "g-020",
+        "g-021",
+        "g-046",
+        "g-047",
+        "g-057",
+        "g-058",
+        "g-055",
+        "g-084"
+      ],
+      "t_round_09": [
+        "g-025",
+        "g-026",
+        "g-031",
+        "g-032",
+        "g-037",
+        "g-038",
+        "g-081",
+        "g-082"
+      ],
+      "t_round_05": [
+        "g-028",
+        "g-029",
+        "g-034",
+        "g-035",
+        "g-043",
+        "g-044",
+        "g-072",
+        "g-073"
+      ],
+      "t_round_07": [
+        "g-040",
+        "g-041",
+        "g-049",
+        "g-050",
+        "g-063",
+        "g-064",
+        "g-069",
+        "g-070"
       ],
       "t_round_12": [
+        "g-060",
+        "g-061",
+        "g-014",
+        "g-051",
+        "g-052",
+        "g-053",
+        "g-083",
+        "g-085"
+      ],
+      "t_round_10": [
+        "g-121",
+        "g-122",
         "g-136",
         "g-137",
-        "g-084",
-        "g-095",
-        "g-134",
+        "g-141",
         "g-142",
-        "g-143",
-        "g-145"
+        "g-139",
+        "g-149"
       ],
-      "t_sweet": [
-        "g-014",
-        null
-      ],
-      "t_round_16": [
-        "g-106",
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null
+      "t_round_11": [
+        "g-124",
+        "g-125",
+        "g-127",
+        "g-128",
+        "g-130",
+        "g-131",
+        "g-133",
+        "g-134"
       ]
     },
-    "score": 26138.17311053982,
+    "score": 24336.191269235023,
     "scorecard": {
-      "overallPercent": 100,
-      "overallLabel": "Perfect",
-      "totalRules": 38,
-      "totalSatisfied": 38,
+      "overallPercent": 98,
+      "overallLabel": "Excellent",
+      "totalRules": 40,
+      "totalSatisfied": 39,
       "partiesKept": {
-        "total": 27,
+        "total": 28,
         "satisfied": 27
       },
       "hardConstraints": {
-        "total": 6,
-        "satisfied": 6,
+        "total": 7,
+        "satisfied": 7,
         "partial": 0,
         "violated": 0,
         "rules": [
           {
-            "ruleId": "r-148",
+            "ruleId": "r-153",
             "type": "must_together",
             "hard": true,
             "guests": [
-              "g-099",
-              "g-100",
-              "g-101",
-              "g-102",
-              "g-103",
               "g-104",
-              "g-105"
+              "g-105",
+              "g-106",
+              "g-107",
+              "g-108",
+              "g-109",
+              "g-110"
             ],
             "status": "satisfied",
             "score": 50,
             "description": "Cole Liu & Ryan Chen & Ethan Park & Devan Patel & Ravi Singh & Sai Khan & Jacob Williams together",
-            "details": "All at Table 2"
+            "details": "All at Rome"
           },
           {
-            "ruleId": "r-149",
+            "ruleId": "r-154",
             "type": "must_together",
             "hard": true,
             "guests": [
-              "g-107",
-              "g-108",
-              "g-109",
-              "g-110",
-              "g-111",
               "g-112",
               "g-113",
-              "g-114"
+              "g-114",
+              "g-115",
+              "g-116",
+              "g-117",
+              "g-118",
+              "g-119"
             ],
             "status": "satisfied",
             "score": 50,
             "description": "Andres García & Javier Hernández & Luis Ramirez & Jonah Goldberg & Tunde Adebayo & Frank Diallo & Albert Cohen-Diallo & Henry Goldberg-Lin together",
-            "details": "All at Table 1"
+            "details": "All at Paris"
           },
           {
-            "ruleId": "r-153",
+            "ruleId": "r-156",
+            "type": "must_table",
+            "hard": true,
+            "guests": [
+              "g-018",
+              "g-022",
+              "g-023",
+              "g-146"
+            ],
+            "status": "satisfied",
+            "score": 50,
+            "description": "Mia Williams-Cohen & Ella Park & Noah Park & Zara Lin at Kids Table",
+            "details": "All seated at Kids Table"
+          },
+          {
+            "ruleId": "r-159",
             "type": "must_not",
             "hard": true,
             "guests": [
@@ -3650,17 +3841,17 @@
               "g-014"
             ],
             "status": "satisfied",
-            "score": 50,
+            "score": 14.166666666666666,
             "description": "Keep Margaret Williams apart from James Williams",
             "details": "No conflicts"
           },
           {
-            "ruleId": "r-154",
+            "ruleId": "r-160",
             "type": "must_not",
             "hard": true,
             "guests": [
-              "g-099",
-              "g-107"
+              "g-104",
+              "g-112"
             ],
             "status": "satisfied",
             "score": 14,
@@ -3668,12 +3859,12 @@
             "details": "No conflicts"
           },
           {
-            "ruleId": "r-155",
+            "ruleId": "r-161",
             "type": "must_not",
             "hard": true,
             "guests": [
-              "g-081",
-              "g-090"
+              "g-086",
+              "g-095"
             ],
             "status": "satisfied",
             "score": 14,
@@ -3681,12 +3872,12 @@
             "details": "No conflicts"
           },
           {
-            "ruleId": "r-156",
+            "ruleId": "r-162",
             "type": "must_not",
             "hard": true,
             "guests": [
-              "g-082",
-              "g-101"
+              "g-087",
+              "g-106"
             ],
             "status": "satisfied",
             "score": 14,
@@ -3702,45 +3893,45 @@
         "violated": 0,
         "rules": [
           {
-            "ruleId": "r-146",
+            "ruleId": "r-151",
             "type": "prefer_together",
             "hard": false,
             "guests": [
-              "g-081",
-              "g-082",
-              "g-083",
-              "g-085",
               "g-086",
               "g-087",
               "g-088",
-              "g-089"
-            ],
-            "status": "satisfied",
-            "score": 30,
-            "description": "Sora Chen & Nina Nakamura & Olivia Patel-Singh & Lily Tanaka & Grace Nakamura & Emma Williams-Patel & Vikram Patel & Rohan Khan together",
-            "details": "All at Table 3"
-          },
-          {
-            "ruleId": "r-147",
-            "type": "prefer_together",
-            "hard": false,
-            "guests": [
               "g-090",
               "g-091",
               "g-092",
               "g-093",
-              "g-094",
+              "g-094"
+            ],
+            "status": "satisfied",
+            "score": 30,
+            "description": "Sora Chen & Nina Nakamura & Olivia Patel-Singh & Lily Tanaka & Grace Nakamura & Emma Williams-Patel & Vikram Patel & Rohan Khan together",
+            "details": "All at Venice"
+          },
+          {
+            "ruleId": "r-152",
+            "type": "prefer_together",
+            "hard": false,
+            "guests": [
+              "g-095",
               "g-096",
               "g-097",
-              "g-098"
+              "g-098",
+              "g-099",
+              "g-101",
+              "g-102",
+              "g-103"
             ],
             "status": "satisfied",
             "score": 30,
             "description": "Aaron Goldberg-Lin & Mateo Hernández & Levi Cohen & Pablo Ramirez & Marco García-Adebayo & Ezra Cohen-Diallo & Asher Goldberg-Lin & Noah Carter-Okonkwo together",
-            "details": "All at Table 4"
+            "details": "All at Barcelona"
           },
           {
-            "ruleId": "r-150",
+            "ruleId": "r-155",
             "type": "category_together",
             "hard": false,
             "guests": [
@@ -3758,41 +3949,41 @@
               "g-012"
             ],
             "status": "satisfied",
-            "score": 22.22222222222222,
+            "score": 28.888888888888893,
             "description": "Wedding Party guests together",
-            "details": "8 at Table 5, 4 at Table 6"
+            "details": "10 at Head Table, 2 at Sweetheart"
           },
           {
-            "ruleId": "r-151",
+            "ruleId": "r-157",
             "type": "near_object",
             "hard": false,
             "guests": [
-              "g-081",
-              "g-082",
-              "g-083",
-              "g-085",
               "g-086",
               "g-087",
               "g-088",
-              "g-089"
+              "g-090",
+              "g-091",
+              "g-092",
+              "g-093",
+              "g-094"
             ],
             "status": "satisfied",
-            "score": 112.65401916682967,
+            "score": 97.5444538526672,
             "description": "Sora Chen & Nina Nakamura & Olivia Patel-Singh & Lily Tanaka & Grace Nakamura & Emma Williams-Patel & Vikram Patel & Rohan Khan near Dance Floor",
-            "details": "Sora Chen: 19ft from Dance Floor, Nina Nakamura: 19ft from Dance Floor, Olivia Patel-Singh: 19ft from Dance Floor, Lily Tanaka: 19ft from Dance Floor, Grace Nakamura: 19ft from Dance Floor, Emma Williams-Patel: 19ft from Dance Floor, Vikram Patel: 19ft from Dance Floor, Rohan Khan: 19ft from Dance Floor"
+            "details": "Sora Chen: 24ft from Dance Floor, Nina Nakamura: 24ft from Dance Floor, Olivia Patel-Singh: 24ft from Dance Floor, Lily Tanaka: 24ft from Dance Floor, Grace Nakamura: 24ft from Dance Floor, Emma Williams-Patel: 24ft from Dance Floor, Vikram Patel: 24ft from Dance Floor, Rohan Khan: 24ft from Dance Floor"
           },
           {
-            "ruleId": "r-152",
+            "ruleId": "r-158",
             "type": "near_object",
             "hard": false,
             "guests": [
               "g-013",
-              "g-049"
+              "g-054"
             ],
             "status": "satisfied",
-            "score": 28.097560975609756,
+            "score": 30.068907913969515,
             "description": "Margaret Williams & Ngozi Okonkwo near Emergency Exit",
-            "details": "Margaret Williams: 20ft from Emergency Exit, Ngozi Okonkwo: 20ft from Emergency Exit"
+            "details": "Margaret Williams: 17ft from Emergency Exit, Ngozi Okonkwo: 17ft from Emergency Exit"
           }
         ]
       },
@@ -3801,22 +3992,21 @@
       "partyPlacements": [
         {
           "id": "p-015",
-          "names": "Owen & Sophie & Mia",
+          "names": "Owen & Sophie",
           "together": true,
-          "tableName": "Head Table",
+          "tableName": "Bali",
           "guestIds": [
             "g-016",
-            "g-017",
-            "g-018"
+            "g-017"
           ],
-          "seatedCount": 3,
-          "totalCount": 3
+          "seatedCount": 2,
+          "totalCount": 2
         },
         {
           "id": "p-019",
-          "names": "Helen & Robert",
+          "names": "Lily & Sam",
           "together": true,
-          "tableName": "Table 10",
+          "tableName": "Kyoto",
           "guestIds": [
             "g-020",
             "g-021"
@@ -3825,286 +4015,286 @@
           "totalCount": 2
         },
         {
-          "id": "p-022",
+          "id": "p-024",
+          "names": "Helen & Robert",
+          "together": true,
+          "tableName": "Vienna",
+          "guestIds": [
+            "g-025",
+            "g-026"
+          ],
+          "seatedCount": 2,
+          "totalCount": 2
+        },
+        {
+          "id": "p-027",
           "names": "Linda & Henry",
           "together": true,
-          "tableName": "Table 10",
+          "tableName": "Santorini",
           "guestIds": [
-            "g-023",
-            "g-024"
+            "g-028",
+            "g-029"
           ],
           "seatedCount": 2,
           "totalCount": 2
         },
         {
-          "id": "p-025",
+          "id": "p-030",
           "names": "Susan & Walter",
           "together": true,
-          "tableName": "Table 15",
+          "tableName": "Vienna",
           "guestIds": [
-            "g-026",
-            "g-027"
+            "g-031",
+            "g-032"
           ],
           "seatedCount": 2,
           "totalCount": 2
         },
         {
-          "id": "p-028",
+          "id": "p-033",
           "names": "Carol & Edward",
           "together": true,
-          "tableName": "Table 9",
+          "tableName": "Santorini",
           "guestIds": [
-            "g-029",
-            "g-030"
+            "g-034",
+            "g-035"
           ],
           "seatedCount": 2,
           "totalCount": 2
         },
         {
-          "id": "p-031",
+          "id": "p-036",
           "names": "Barbara & Frank",
           "together": true,
-          "tableName": "Table 9",
+          "tableName": "Vienna",
           "guestIds": [
-            "g-032",
-            "g-033"
+            "g-037",
+            "g-038"
           ],
           "seatedCount": 2,
           "totalCount": 2
         },
         {
-          "id": "p-034",
+          "id": "p-039",
           "names": "Sandra & Albert",
           "together": true,
-          "tableName": "Head Table",
+          "tableName": "Tokyo",
           "guestIds": [
-            "g-035",
-            "g-036"
+            "g-040",
+            "g-041"
           ],
           "seatedCount": 2,
           "totalCount": 2
         },
         {
-          "id": "p-037",
+          "id": "p-042",
           "names": "Priya & Arjun",
           "together": true,
-          "tableName": "Table 9",
+          "tableName": "Santorini",
           "guestIds": [
-            "g-038",
-            "g-039"
+            "g-043",
+            "g-044"
           ],
           "seatedCount": 2,
           "totalCount": 2
         },
         {
-          "id": "p-040",
+          "id": "p-045",
           "names": "Mei & Daniel",
           "together": true,
-          "tableName": "Head Table",
+          "tableName": "Kyoto",
           "guestIds": [
-            "g-041",
-            "g-042"
+            "g-046",
+            "g-047"
           ],
           "seatedCount": 2,
           "totalCount": 2
         },
         {
-          "id": "p-043",
+          "id": "p-048",
           "names": "Hana & Marcus",
           "together": true,
-          "tableName": "Table 7",
+          "tableName": "Tokyo",
           "guestIds": [
-            "g-044",
-            "g-045"
+            "g-049",
+            "g-050"
           ],
           "seatedCount": 2,
           "totalCount": 2
         },
         {
-          "id": "p-051",
+          "id": "p-056",
           "names": "Ifeoma & Diego",
           "together": true,
-          "tableName": "Table 10",
+          "tableName": "Kyoto",
           "guestIds": [
-            "g-052",
-            "g-053"
+            "g-057",
+            "g-058"
           ],
           "seatedCount": 2,
           "totalCount": 2
         },
         {
-          "id": "p-054",
+          "id": "p-059",
           "names": "Amara & Aaron",
           "together": true,
-          "tableName": "Table 13",
+          "tableName": "Florence",
           "guestIds": [
-            "g-055",
-            "g-056"
+            "g-060",
+            "g-061"
           ],
           "seatedCount": 2,
           "totalCount": 2
         },
         {
-          "id": "p-057",
+          "id": "p-062",
           "names": "Folake & Idris",
           "together": true,
-          "tableName": "Table 7",
+          "tableName": "Tokyo",
           "guestIds": [
-            "g-058",
-            "g-059"
+            "g-063",
+            "g-064"
           ],
           "seatedCount": 2,
           "totalCount": 2
         },
         {
-          "id": "p-060",
+          "id": "p-065",
           "names": "Sarah & Eli",
           "together": true,
-          "tableName": "Table 10",
+          "tableName": "Bali",
           "guestIds": [
-            "g-061",
-            "g-062"
+            "g-066",
+            "g-067"
           ],
           "seatedCount": 2,
           "totalCount": 2
         },
         {
-          "id": "p-063",
+          "id": "p-068",
           "names": "Naomi & Asher",
           "together": true,
-          "tableName": "Table 15",
+          "tableName": "Tokyo",
           "guestIds": [
-            "g-064",
-            "g-065"
+            "g-069",
+            "g-070"
           ],
           "seatedCount": 2,
           "totalCount": 2
         },
         {
-          "id": "p-066",
+          "id": "p-071",
           "names": "Sofia & Mateo",
           "together": true,
-          "tableName": "Table 7",
+          "tableName": "Santorini",
           "guestIds": [
-            "g-067",
-            "g-068"
+            "g-072",
+            "g-073"
           ],
           "seatedCount": 2,
           "totalCount": 2
         },
         {
-          "id": "p-069",
+          "id": "p-074",
           "names": "Camila & Carlos",
           "together": true,
-          "tableName": "Table 9",
+          "tableName": "Bali",
           "guestIds": [
-            "g-070",
-            "g-071"
+            "g-075",
+            "g-076"
           ],
           "seatedCount": 2,
           "totalCount": 2
         },
         {
-          "id": "p-072",
+          "id": "p-077",
           "names": "Chiamaka & Femi",
           "together": true,
-          "tableName": "Table 7",
+          "tableName": "Bali",
           "guestIds": [
-            "g-073",
-            "g-074"
+            "g-078",
+            "g-079"
           ],
           "seatedCount": 2,
           "totalCount": 2
         },
         {
-          "id": "p-075",
+          "id": "p-080",
           "names": "Esther & Bayo",
           "together": true,
-          "tableName": "Head Table",
+          "tableName": "Vienna",
           "guestIds": [
-            "g-076",
-            "g-077"
+            "g-081",
+            "g-082"
           ],
           "seatedCount": 2,
           "totalCount": 2
         },
         {
-          "id": "p-115",
+          "id": "p-120",
           "names": "Beverly & George",
           "together": true,
-          "tableName": "Table 14",
+          "tableName": "Prague",
           "guestIds": [
-            "g-116",
-            "g-117"
+            "g-121",
+            "g-122"
           ],
           "seatedCount": 2,
           "totalCount": 2
         },
         {
-          "id": "p-118",
+          "id": "p-123",
           "names": "Eleanor & Arthur",
           "together": true,
-          "tableName": "Table 11",
+          "tableName": "Lisbon",
           "guestIds": [
-            "g-119",
-            "g-120"
+            "g-124",
+            "g-125"
           ],
           "seatedCount": 2,
           "totalCount": 2
         },
         {
-          "id": "p-121",
+          "id": "p-126",
           "names": "Catherine & Thomas",
           "together": true,
-          "tableName": "Table 14",
+          "tableName": "Lisbon",
           "guestIds": [
-            "g-122",
-            "g-123"
+            "g-127",
+            "g-128"
           ],
           "seatedCount": 2,
           "totalCount": 2
         },
         {
-          "id": "p-124",
+          "id": "p-129",
           "names": "Gloria & Charles",
           "together": true,
-          "tableName": "Table 11",
+          "tableName": "Lisbon",
           "guestIds": [
-            "g-125",
-            "g-126"
+            "g-130",
+            "g-131"
           ],
           "seatedCount": 2,
           "totalCount": 2
         },
         {
-          "id": "p-127",
+          "id": "p-132",
           "names": "Ruth & Frederick",
           "together": true,
-          "tableName": "Table 11",
+          "tableName": "Lisbon",
           "guestIds": [
-            "g-128",
-            "g-129"
-          ],
-          "seatedCount": 2,
-          "totalCount": 2
-        },
-        {
-          "id": "p-130",
-          "names": "Edith & William",
-          "together": true,
-          "tableName": "Table 11",
-          "guestIds": [
-            "g-131",
-            "g-132"
+            "g-133",
+            "g-134"
           ],
           "seatedCount": 2,
           "totalCount": 2
         },
         {
           "id": "p-135",
-          "names": "Yasmin & Plus",
+          "names": "Edith & William",
           "together": true,
-          "tableName": "Table 12",
+          "tableName": "Prague",
           "guestIds": [
             "g-136",
             "g-137"
@@ -4113,14 +4303,26 @@
           "totalCount": 2
         },
         {
-          "id": "p-138",
-          "names": "Mei & Kwame & Zara",
+          "id": "p-140",
+          "names": "Yasmin & Plus",
           "together": true,
-          "tableName": "Table 14",
+          "tableName": "Prague",
           "guestIds": [
-            "g-139",
-            "g-140",
-            "g-141"
+            "g-141",
+            "g-142"
+          ],
+          "seatedCount": 2,
+          "totalCount": 2
+        },
+        {
+          "id": "p-143",
+          "names": "Mei & Kwame & Zara",
+          "together": false,
+          "tableName": "London, Kids Table",
+          "guestIds": [
+            "g-144",
+            "g-145",
+            "g-146"
           ],
           "seatedCount": 3,
           "totalCount": 3

@@ -158,66 +158,76 @@ function addFamilyParty(name, members) {
 // bride/groom badge on guest rows reads correctly. The web solver auto-
 // synthesizes a side_together rule per side; with only one guest each
 // side, both rules trivially satisfy at the sweetheart table.
+// Mirrors onboarding (OnboardingView.swift::coupleGuest, App.jsx:19816):
+// when the user enters bride/groom names + opts in to a sweetheart table,
+// the app tags the couple with TWO system categories:
+//   - 'bride' / 'groom'    — drives the white/dark seat highlight (App.jsx
+//                            line 7578) so the couple is visually flagged
+//                            on the canvas
+//   - 'sweetheart_table'   — pins them to the sweetheart at solve time
+//                            (solve.js Phase 1.5)
+// Without these the existingAssignments map below is silently dropped —
+// it only honours LOCKED tables, which the demo doesn't use.
 const bride = addGuest({
   firstName: 'Brooks', lastName: 'Williams',
-  side: 'bride', categories: ['cat-wedding-party'],
+  side: 'bride', categories: ['bride', 'cat-wedding-party', 'sweetheart_table'],
   meal: 'Pan-Seared Salmon', vip: true, isBride: true,
 })
 const groom = addGuest({
   firstName: 'Carter', lastName: 'Okonkwo',
-  side: 'groom', categories: ['cat-wedding-party'],
+  side: 'groom', categories: ['groom', 'cat-wedding-party', 'sweetheart_table'],
   meal: 'Beef Tenderloin', vip: true, isGroom: true,
 })
 
 // WEDDING PARTY — head table 10. side='both' so they don't drag side_together.
 const brideMOH = addGuest({   // bride's sister
   firstName: 'Charlotte', lastName: 'Williams',
-  side: 'both', categories: ['cat-wedding-party','cat-family'],
+  side: 'both', categories: ['cat-wedding-party','cat-family','head_table'],
   meal: 'Pan-Seared Salmon', vip: true,
 })
 const brideMaid1 = addGuest({
   firstName: 'Maya', lastName: 'Patel',
-  side: 'both', categories: ['cat-wedding-party','cat-friends'],
+  side: 'both', categories: ['cat-wedding-party','cat-friends','head_table'],
   meal: 'Vegetarian Risotto', dietaryTags: ['kosher'], vip: true,
 })
 const brideMaid2 = addGuest({
   firstName: 'Yuki', lastName: 'Tanaka',
-  side: 'both', categories: ['cat-wedding-party','cat-friends'],
+  side: 'both', categories: ['cat-wedding-party','cat-friends','head_table'],
   meal: 'Pan-Seared Salmon', vip: true,
 })
 const brideMaid3 = addGuest({
   firstName: 'Aisha', lastName: 'Khan',
-  side: 'both', categories: ['cat-wedding-party','cat-friends'],
+  side: 'both', categories: ['cat-wedding-party','cat-friends','head_table'],
   meal: 'Beef Tenderloin', dietaryTags: ['halal'], vip: true,
 })
 const brideDad = addGuest({
   firstName: 'David', lastName: 'Williams',
-  side: 'both', categories: ['cat-wedding-party','cat-family'],
+  side: 'both', categories: ['cat-wedding-party','cat-family','head_table'],
   meal: 'Beef Tenderloin', vip: true,
 })
 const brideMom = addGuest({
   firstName: 'Patricia', lastName: 'Williams',
-  side: 'both', categories: ['cat-wedding-party','cat-family'],
+  side: 'both', categories: ['cat-wedding-party','cat-family','head_table'],
   meal: 'Pan-Seared Salmon', vip: true,
 })
 const groomDad = addGuest({
   firstName: 'Chinedu', lastName: 'Okonkwo',
-  side: 'both', categories: ['cat-wedding-party','cat-family'],
+  side: 'both', categories: ['cat-wedding-party','cat-family','head_table'],
   meal: 'Beef Tenderloin', dietaryTags: ['gluten-free'], vip: true,
 })
 const groomMom = addGuest({
   firstName: 'Adaeze', lastName: 'Okonkwo',
-  side: 'both', categories: ['cat-wedding-party','cat-family'],
+  side: 'both', categories: ['cat-wedding-party','cat-family','head_table'],
   meal: 'Vegetarian Risotto', vip: true,
 })
 const groomBM = addGuest({   // groom's brother
   firstName: 'Tunde', lastName: 'Okonkwo',
-  side: 'both', categories: ['cat-wedding-party','cat-family'],
+  side: 'both', categories: ['cat-wedding-party','cat-family','head_table'],
   meal: 'Beef Tenderloin', vip: true,
 })
 const groomMan1 = addGuest({
   firstName: 'Jelani', lastName: 'Adebayo',
-  side: 'both', categories: ['cat-wedding-party','cat-friends'],
+  side: 'both', categories: ['cat-wedding-party','cat-friends','head_table'],
   meal: 'Beef Tenderloin', dietaryTags: ['halal'], vip: true,
 })
 
@@ -238,12 +248,27 @@ addGuest({
   meal: 'Beef Tenderloin', vip: true,
 })
 
-// Bride's brother Owen + spouse Sophie + child
-addFamilyParty("Owen's Family", [
+// Owen + Sophie as a couple (kids sit at Kids Table — see below).
+// Real-wedding-style: parents-and-children are listed as a household
+// on the guest sheet but seated apart so kids can cluster + parents
+// can socialise without supervising the table.
+addCouple("Owen & Sophie",
   { firstName: 'Owen',   lastName: 'Williams', side: 'none', categories: ['cat-family'], meal: 'Beef Tenderloin' },
   { firstName: 'Sophie', lastName: 'Williams-Cohen', side: 'none', categories: ['cat-family'], meal: 'Pan-Seared Salmon' },
-  { firstName: 'Mia',    lastName: 'Williams-Cohen', side: 'none', categories: ['cat-family','cat-kids'], meal: 'Kids Chicken Fingers', isChild: true },
-])
+)
+addGuest({ firstName: 'Mia', lastName: 'Williams-Cohen', side: 'none',
+  categories: ['cat-family','cat-kids'], meal: 'Kids Chicken Fingers', isChild: true })
+
+// Cousin Lily + Sam — same pattern. Their kids Ella + Noah join the
+// Kids Table.
+addCouple("Lily & Sam",
+  { firstName: 'Lily', lastName: 'Park', side: 'none', categories: ['cat-family'], meal: 'Pan-Seared Salmon' },
+  { firstName: 'Sam',  lastName: 'Park', side: 'none', categories: ['cat-family'], meal: 'Beef Tenderloin' },
+)
+addGuest({ firstName: 'Ella', lastName: 'Park', side: 'none',
+  categories: ['cat-family','cat-kids'], meal: 'Kids Chicken Fingers', isChild: true })
+addGuest({ firstName: 'Noah', lastName: 'Park', side: 'none',
+  categories: ['cat-family','cat-kids'], meal: 'Kids Chicken Fingers', isChild: true })
 
 // Bride's aunt + uncle — Park side
 addCouple("Helen & Robert (Park)",
@@ -489,7 +514,7 @@ console.log(`Generated ${guests.length} guests; declined: ${guests.filter(g => g
 // ── Tables (T-shape venue) ─────────────────────────────────────────────────
 
 const ROOM_W = 1200
-const ROOM_H = 1000  // taller than v2 to fit a real-sized dance floor + 4 rows of rounds + bar/DJ along the bottom wall
+const ROOM_H = 1350  // 90 ft tall — gives the 4×4 grid breathing room + bar against the back wall
 const tables = []
 
 // Sweetheart at top center
@@ -508,24 +533,60 @@ const head = {
 }
 tables.push(head)
 
-// 16 round tables in 4×4 grid below. Pushed down from the prior layout
-// so there's a real ~10ft gap between the head table and the first row
-// of guest tables — that's where the dance floor actually lives.
+// 15 themed adult tables (4×4 grid minus the bottom-right slot, which
+// is the Kids Table). Names come from the web app's "Travel & Cities"
+// theme (App.jsx::NG_THEMES) — demonstrates the table-name generator
+// feature without users needing to discover it first.
+//
+// The last grid slot (bottom-right) becomes the Kids Table — small (5
+// seats), pinned via a must_table rule below so the cat-kids guests
+// always cluster there regardless of solver run.
 const roundCols = [180, 460, 740, 1020]
-const roundRows = [500, 620, 740, 860]
+const roundRows = [560, 730, 900, 1070]  // 170 px (~11 ft) between centers
+// 13 main 8-seat city tables + Capri as a 4-seat cocktail round next
+// to the Kids Table (Amalfi was dropped — a 1-person table reads as
+// "the solver gave up" rather than "intentional accent"). Bottom row
+// becomes Kyoto / [open floor] / Capri / Kids Table — the gap groups
+// the two small tables together and gives the room some breathing
+// space next to the kids.
+const cityNames = [
+  'Paris', 'Rome', 'Venice', 'Barcelona',
+  'Santorini', 'Bali', 'Tokyo', 'London',
+  'Vienna', 'Prague', 'Lisbon', 'Florence',
+  'Kyoto',
+]
+const gridSlots = []
+for (const y of roundRows) for (const x of roundCols) gridSlots.push({ x, y })
+const kidsSlot = gridSlots[15]      // bottom-right
+const capriSlot = gridSlots[14]     // bottom-row, third column (next to kids)
+// Build the regular city tables in slots 0–12 (rows 1–3 + the
+// leftmost spot in row 4). Slot 13 is intentionally left empty.
 let roundIdx = 0
-for (const y of roundRows) {
-  for (const x of roundCols) {
-    roundIdx++
-    tables.push({
-      id: `t_round_${roundIdx.toString().padStart(2, '0')}`,
-      name: `Table ${roundIdx}`,
-      type: 'round', seats: 8,
-      x: x - 50, y: y - 50, diameter: 100,
-      color: '#C9A961', assignments: {},
-    })
-  }
+for (const slot of gridSlots.slice(0, 13)) {
+  tables.push({
+    id: `t_round_${(roundIdx + 1).toString().padStart(2, '0')}`,
+    name: cityNames[roundIdx],
+    type: 'round', seats: 8,
+    x: slot.x - 50, y: slot.y - 50, diameter: 100,
+    color: '#C9A961', assignments: {},
+  })
+  roundIdx++
 }
+// Capri — small cocktail round next to the Kids Table.
+tables.push({
+  id: 't_round_14', name: 'Capri',
+  type: 'round', seats: 4,
+  x: capriSlot.x - 37, y: capriSlot.y - 37, diameter: 75,
+  color: '#C9A961', assignments: {},
+})
+const kidsTable = {
+  id: 't_kids', name: 'Kids Table',
+  type: 'round', seats: 5,
+  x: kidsSlot.x - 40, y: kidsSlot.y - 40, diameter: 80,  // smaller than adult tables
+  color: '#D4956C',  // matches cat-kids category colour
+  assignments: {},
+}
+tables.push(kidsTable)
 
 // ── Room objects ──────────────────────────────────────────────────────────
 
@@ -542,10 +603,11 @@ const objects = [
     x: ROOM_W / 2 - 120, y: 300, width: 240, height: 130,
     color: '#EDE0C4', category: 'entertainment', isObstacle: false },
 
-  // Cake table — flanks the head table on the right so cake-cutting
-  // plays out near the wedding party.
+  // Cake table — inside the top stem of the T, right of the head table
+  // (top stem right wall is at ROOM_W * 0.8 = 960, so x=870 keeps the
+  // 70px-wide cake fully inside with breathing room).
   { id: 'obj_cake', type: 'cake', name: 'Cake Table',
-    x: 940, y: 200, width: 70, height: 70,
+    x: 870, y: 200, width: 70, height: 70,
     color: '#D4A5A5', category: 'food', isObstacle: false },
 
   // DJ Booth — embedded at the back-centre of the dance floor, where a
@@ -555,20 +617,69 @@ const objects = [
     x: ROOM_W / 2 - 40, y: 380, width: 80, height: 50,
     color: '#2D2D2D', category: 'entertainment', isObstacle: false },
 
-  // Bar — opposite corner from the DJ.
+  // Bar — full-length banquet bar against the back wall, bottom-left.
+  // Bigger than the catalogue default so it reads as the centrepiece
+  // of the back wall instead of an accent piece.
   { id: 'obj_bar', type: 'bar', name: 'Bar',
-    x: 40, y: ROOM_H - 70, width: 160, height: 60,
+    x: 40, y: ROOM_H - 100, width: 240, height: 80,
     color: '#8B8680', category: 'food', isObstacle: false },
+
+  // Gift Table — flanks the bar on the right. Common venue layout
+  // (gifts get dropped on the way in past the bar).
+  { id: 'obj_gift', type: 'gift', name: 'Gift Table',
+    x: 320, y: ROOM_H - 80, width: 120, height: 60,
+    color: '#9CAF88', category: 'ceremony', isObstacle: false },
+
+  // Guest Book — right next to the gift table so guests sign while
+  // they're already there. (Memorial Table was the alternative.)
+  { id: 'obj_guestbook', type: 'guestbook', name: 'Guest Book',
+    x: 470, y: ROOM_H - 80, width: 80, height: 50,
+    color: '#C9A961', category: 'services', isObstacle: false },
 
   // Main Entrance — top-left wall.
   { id: 'obj_entrance', type: 'entrance', name: 'Main Entrance',
     x: 30, y: 60, width: 40, height: 60,
     color: '#2D2D2D', category: 'structure', isObstacle: false },
 
-  // Emergency Exit — right wall mid-height.
+  // Welcome Sign — right of the entrance, sandwiched between the two
+  // entry florals so the entry zone reads as a complete arrival
+  // display: door → florals → sign → florals.
+  { id: 'obj_welcome', type: 'welcome', name: 'Welcome Sign',
+    x: 140, y: 150, width: 60, height: 80,
+    color: '#C9A961', category: 'services', isObstacle: false },
+
+  // Emergency Exit — right wall mid-height. Pushed below the T-stem
+  // boundary (ROOM_H * 0.35 ≈ 470) so it lands on the wide bottom
+  // section's right wall, not the top stem's narrower one.
   { id: 'obj_exit', type: 'exit', name: 'Emergency Exit',
-    x: ROOM_W - 50, y: 470, width: 40, height: 50,
+    x: ROOM_W - 50, y: 620, width: 40, height: 50,
     color: '#9CAF88', category: 'structure', isObstacle: false },
+
+  // Two speakers flanking the dance floor, opposite the DJ booth.
+  // Realistic placement — no real reception runs sound from one side
+  // only. Helps the demo show off small accent objects too.
+  { id: 'obj_speaker_l', type: 'speaker', name: 'Speaker',
+    x: 440, y: 350, width: 30, height: 30,
+    color: '#2D2D2D', category: 'entertainment', isObstacle: false },
+  { id: 'obj_speaker_r', type: 'speaker', name: 'Speaker',
+    x: 730, y: 350, width: 30, height: 30,
+    color: '#2D2D2D', category: 'entertainment', isObstacle: false },
+
+  // Floral arrangements at the entrance — an "entry display" pair.
+  // Common venue setup; gives the demo a softer touch beyond the
+  // structural items.
+  { id: 'obj_floral_l', type: 'floral', name: 'Entry Florals',
+    x: 80, y: 140, width: 50, height: 50,
+    color: '#9CAF88', category: 'ceremony', isObstacle: false },
+  { id: 'obj_floral_r', type: 'floral', name: 'Entry Florals',
+    x: 80, y: 210, width: 50, height: 50,
+    color: '#9CAF88', category: 'ceremony', isObstacle: false },
+
+  // Kitchen Entry — back-right wall, large service door so it reads
+  // as a real catering entry, not an accent.
+  { id: 'obj_kitchen', type: 'kitchen_entry', name: 'Kitchen Entry',
+    x: 860, y: ROOM_H - 50, width: 140, height: 50,
+    color: '#8B8680', category: 'structure', isObstacle: false },
 ]
 
 // ── Pre-pin head table + sweetheart ───────────────────────────────────────
@@ -622,6 +733,17 @@ addRule({
   guests: guests.filter(g => g.categories.includes('cat-wedding-party')).map(g => g.id),
   desc: 'Wedding party seated together',
   weight: 40, hard: false,
+})
+
+// 5b: must_table — pin the kids to the dedicated Kids Table.
+// cat-kids is a regular user category (not a solver-special), so we
+// need an explicit must_table rule to actually park them at t_kids.
+addRule({
+  type: 'must_table',
+  tableId: 't_kids',
+  guests: guests.filter(g => g.categories.includes('cat-kids')).map(g => g.id),
+  desc: 'Kids at the Kids Table',
+  weight: 50, hard: true,
 })
 
 // 6: near_object — bride's college friends near the dance floor (they're
@@ -687,8 +809,11 @@ console.log(`Rules: ${rules.length}`)
 
 console.log(`Solving: ${guests.length} guests, ${tables.length} tables, ${rules.length} rules…`)
 
-// Build solver-shaped guests
-const solverGuests = guests.map(g => ({
+// Build solver-shaped guests. The solver expects callers to pre-filter
+// rsvp == 'no' (web App.jsx:13092 and iOS SeatService both do); without
+// the filter the solver happily seats declined guests, which surfaced
+// as 5 'no' guests sitting at Florence/Kyoto/Lisbon in the demo plan.
+const solverGuests = guests.filter(g => g.rsvp !== 'no').map(g => ({
   id: g.id, name: g.name, party: g.party,
   side: g.side, vip: g.vip, rsvp: g.rsvp,
   meal: g.meal, dietaryTags: g.dietaryTags, isChild: g.isChild,
