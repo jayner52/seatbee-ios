@@ -1003,21 +1003,25 @@ final class PDFExportService {
 
     @MainActor
     static func generateFloorPlanImage(plan: SeatingPlan, showGuestNames: Bool = false) -> UIImage? {
-        // Print-quality chart: portrait 1080×1620 with ~94% of the canvas
+        // Print-quality chart: portrait 1080×1700 with ~88% of the canvas
         // dedicated to the floor plan itself. Replaces the v1 "branded
         // social card" layout (which boxed the floor plan into a 940×680
         // card and made guest names go granular when zoomed). User
         // feedback: "I want to see every name when I zoom in."
         //
         // Layout:
-        //   • Top strip (~80pt): tiny event name + date · venue
+        //   • Top strip (~140pt): bee badge + tiny "seatbee" wordmark +
+        //     event title + date · venue subtitle
         //   • Floor plan: ~1010×1430 — the entire middle of the canvas
         //   • Bottom strip (~70pt): stats + "Made with Seatbee · seatbee.app"
         //
-        // At scale 6 the PNG is 6480×9720 (~12-18 MB), still under iMessage's
-        // 100MB cap. With the canvas now ~94% floor plan instead of ~36%,
-        // perceived zoom-sharpness is ~2.5× better than the v1 card layout.
-        let size = CGSize(width: 1080, height: 1620)
+        // Canvas grew 1620→1700 to accommodate the bee badge without
+        // shrinking the floor plan area (user explicitly: "don't shrink
+        // the floor plan").
+        //
+        // At scale 6 the PNG is 6480×10200 (~12-18 MB), still under
+        // iMessage's 100MB cap.
+        let size = CGSize(width: 1080, height: 1700)
         let format = UIGraphicsImageRendererFormat.default()
         format.scale = 6
         let renderer = UIGraphicsImageRenderer(size: size, format: format)
@@ -1030,11 +1034,36 @@ final class PDFExportService {
             ctx.setFillColor(socialIvory.cgColor)
             ctx.fill(CGRect(origin: .zero, size: size))
 
-            // Top header strip: event name (bold) + optional date/venue
-            // sub-line. Auto-shrinks the title to fit so long names
-            // don't bleed past the side margins.
+            // Top header strip: tiny bee badge + wordmark, then event
+            // name (bold) + optional date/venue sub-line. Canvas was
+            // grown 1620→1700 to fit the badge without shrinking the
+            // floor plan area.
             let headerCx = size.width / 2
-            var headerY: CGFloat = 36
+            var headerY: CGFloat = 24
+
+            // Bee badge — small champagne halo + bee logo, centred.
+            let beeSide: CGFloat = 40
+            let haloR = beeSide / 2 + 4
+            let haloRect = CGRect(x: headerCx - haloR,
+                                   y: headerY + beeSide / 2 - haloR,
+                                   width: haloR * 2, height: haloR * 2)
+            ctx.setFillColor(socialChampagne.withAlphaComponent(0.55).cgColor)
+            ctx.fillEllipse(in: haloRect)
+            if let bee = UIImage(named: "SeatbeeLogo") {
+                bee.draw(in: CGRect(x: headerCx - beeSide / 2, y: headerY,
+                                     width: beeSide, height: beeSide))
+            }
+            headerY += beeSide + 6
+
+            // Wordmark — small "seatbee" beneath the bee.
+            let wordmarkW: CGFloat = 100
+            let wordmarkH: CGFloat = wordmarkW / 6   // 720x120 native ratio
+            if let mark = UIImage(named: "SeatbeeWordmark") {
+                mark.draw(in: CGRect(x: headerCx - wordmarkW / 2, y: headerY,
+                                      width: wordmarkW, height: wordmarkH))
+            }
+            headerY += wordmarkH + 14
+
             var titleSize: CGFloat = 28
             var titleAttrs: [NSAttributedString.Key: Any] = [
                 .font: UIFont.systemFont(ofSize: titleSize, weight: .semibold),

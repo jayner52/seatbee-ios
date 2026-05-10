@@ -134,7 +134,26 @@ enum CanvasPDFRenderer {
         ctx.setStrokeColor(lineColor.cgColor)
         ctx.setLineWidth(1.5)
 
-        if let pts = plan.customRoomPoints, pts.count >= 2 {
+        // Resolve the actual polygon to draw. Priority:
+        //   1. customRoomPoints (user-traced or AI-generated outline)
+        //   2. roomShape preset ("t", "l", "u", "circle", "oval") — convert
+        //      to the same polygon the canvas + web renderer use, so the
+        //      printable export matches what the user sees in the editor
+        //      (was previously falling through to a plain rectangle, which
+        //      was the user-reported "why did the shape change?" bug)
+        //   3. plain roomWidth × roomHeight rectangle as final fallback
+        let pts: [RoomPoint]? = {
+            if let custom = plan.customRoomPoints, custom.count >= 2 { return custom }
+            if let shape = plan.roomShape?.lowercased(),
+               shape != "rect", shape != "rectangle",
+               let w = plan.roomWidth, let h = plan.roomHeight {
+                let preset = RoomShapePresets.defaultPoints(shape: shape, width: w, height: h)
+                return preset.count >= 2 ? preset : nil
+            }
+            return nil
+        }()
+
+        if let pts {
             let path = UIBezierPath()
             path.move(to: CGPoint(x: pts[0].x, y: pts[0].y))
             for i in 1..<pts.count {
@@ -145,7 +164,6 @@ enum CanvasPDFRenderer {
                     path.addLine(to: CGPoint(x: p.x, y: p.y))
                 }
             }
-            // Close back to start (with arc if first point declared one)
             if let firstArc = pts[0].arc {
                 appendArc(to: path, end: CGPoint(x: pts[0].x, y: pts[0].y), arc: firstArc)
             } else {
