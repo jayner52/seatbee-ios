@@ -203,8 +203,15 @@ enum CanvasPDFRenderer {
         let w = CGFloat(o.width), h = CGFloat(o.height)
         let rect = CGRect(x: cx - w / 2, y: cy - h / 2, width: w, height: h)
 
+        // Mirror the canvas's CanvasViewController styling: object colour
+        // at 0.85 alpha, contrast-aware text colour (white on dark bg,
+        // dark on light bg), SF Symbol icon stacked above the label.
         let fill = parseColor(o.color) ?? UIColor(red: 0.94, green: 0.93, blue: 0.90, alpha: 1)
-        let stroke = UIColor(white: 0.55, alpha: 1)
+        let isDark = (o.color ?? "").lowercased() == "#2d2d2d"
+        let textColor = isDark
+            ? UIColor.white
+            : UIColor(red: 0.18, green: 0.18, blue: 0.18, alpha: 1)
+        let stroke = isDark ? fill : UIColor(white: 0.55, alpha: 1)
 
         ctx.saveGState()
         if let rot = o.rotation, rot != 0 {
@@ -214,20 +221,35 @@ enum CanvasPDFRenderer {
         }
 
         let path = UIBezierPath(roundedRect: rect, cornerRadius: 4)
-        ctx.setFillColor(fill.withAlphaComponent(0.45).cgColor)
+        ctx.setFillColor(fill.withAlphaComponent(0.85).cgColor)
         ctx.setStrokeColor(stroke.cgColor)
         ctx.setLineWidth(0.8)
         ctx.addPath(path.cgPath)
         ctx.drawPath(using: .fillStroke)
 
-        // Label centred inside the object.
+        // Icon — SF Symbol centred above the name. Same VenueIconMap
+        // resolution the canvas uses, so an object's web-style icon name
+        // (e.g. "music", "utensils") renders the same glyph everywhere.
+        let iconName = VenueIconMap.sfSymbol(for: o.icon)
+        let iconPt: CGFloat = min(w, h) * 0.32
+        let iconCfg = UIImage.SymbolConfiguration(pointSize: iconPt, weight: .regular)
+        if let icon = UIImage(systemName: iconName, withConfiguration: iconCfg)?
+                .withTintColor(textColor.withAlphaComponent(0.85), renderingMode: .alwaysOriginal) {
+            let iSize = icon.size
+            let iconRect = CGRect(x: cx - iSize.width / 2,
+                                   y: cy - iSize.height / 2 - 6,
+                                   width: iSize.width, height: iSize.height)
+            icon.draw(in: iconRect)
+        }
+
+        // Label centred under the icon.
         let attrs: [NSAttributedString.Key: Any] = [
-            .font: UIFont.systemFont(ofSize: 9, weight: .medium),
-            .foregroundColor: UIColor(white: 0.25, alpha: 1),
+            .font: UIFont.systemFont(ofSize: 8, weight: .medium),
+            .foregroundColor: textColor,
         ]
         let label = NSString(string: o.name)
         let size = label.size(withAttributes: attrs)
-        label.draw(at: CGPoint(x: cx - size.width / 2, y: cy - size.height / 2),
+        label.draw(at: CGPoint(x: cx - size.width / 2, y: cy + iconPt / 2 - 2),
                    withAttributes: attrs)
 
         ctx.restoreGState()
@@ -249,22 +271,36 @@ enum CanvasPDFRenderer {
         // Seats first (under the table body so the body's edge clips the dots).
         drawSeats(table: t, body: body, center: center, ctx: ctx)
 
-        // Table body
+        // Table body — match the canvas styling (CanvasViewController):
+        //   • Head Table   → charcoal fill, white text (dark hero strip)
+        //   • Sweetheart   → ivory fill, charcoal text (cream cloud)
+        //   • All others   → ivory fill, charcoal text, gold-ish rim
         let path = shapePath(for: t, body: body, center: center)
-        let fill = isHeadOrSweetheart(t)
-            ? UIColor(red: 0.79, green: 0.66, blue: 0.38, alpha: 1)   // gold for head/sweetheart
-            : UIColor(white: 0.97, alpha: 1)                           // ivory for others
-        let stroke = UIColor(red: 0.45, green: 0.40, blue: 0.32, alpha: 1)
+        let goldRim   = UIColor(red: 0.79, green: 0.66, blue: 0.38, alpha: 1)
+        let charcoal  = UIColor(red: 0.18, green: 0.18, blue: 0.18, alpha: 1)
+        let ivoryFill = UIColor(white: 0.97, alpha: 1)
+        let fill: UIColor
+        let stroke: UIColor
+        let nameColor: UIColor
+        switch t.type {
+        case .head:
+            fill = charcoal
+            stroke = charcoal
+            nameColor = .white
+        case .sweetheart:
+            fill = ivoryFill
+            stroke = goldRim
+            nameColor = charcoal
+        default:
+            fill = ivoryFill
+            stroke = goldRim
+            nameColor = charcoal
+        }
         ctx.setFillColor(fill.cgColor)
         ctx.setStrokeColor(stroke.cgColor)
-        ctx.setLineWidth(1.1)
+        ctx.setLineWidth(1.4)
         ctx.addPath(path.cgPath)
         ctx.drawPath(using: .fillStroke)
-
-        // Table name centred inside the body
-        let nameColor = isHeadOrSweetheart(t)
-            ? UIColor.white
-            : UIColor(red: 0.18, green: 0.18, blue: 0.18, alpha: 1)
         let nameAttrs: [NSAttributedString.Key: Any] = [
             .font: UIFont.systemFont(ofSize: 10, weight: .semibold),
             .foregroundColor: nameColor,
