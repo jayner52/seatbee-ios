@@ -44,6 +44,13 @@ class CanvasViewController: UIViewController, UIScrollViewDelegate {
     private var didRestoreViewport = false
     private static let viewportDefaultsPrefix = "seatbee.canvasViewport."
 
+    // Live viewport-centre cache, updated on every scroll/zoom step
+    // (not just end-of-gesture). UserDefaults persistence still happens
+    // on end events; this in-memory map exists so AddTableSheet /
+    // VenueObjectsSheet always read the freshest centre, even if the
+    // user taps + mid-deceleration before saveViewport has fired.
+    private static var liveViewportCentres: [String: CGPoint] = [:]
+
     // Room outline + floor plan backdrop layers. Both sit between the
     // dot pattern background (index 0) and the table/object subviews.
     private let floorPlanImageView = UIImageView()
@@ -176,6 +183,11 @@ class CanvasViewController: UIViewController, UIScrollViewDelegate {
             let offsetX = max(0, (self.canvasSize.width * 0.8 - self.scrollView.bounds.width) / 2)
             let offsetY = max(0, (self.canvasSize.height * 0.8 - self.scrollView.bounds.height) / 2)
             self.scrollView.contentOffset = CGPoint(x: offsetX, y: offsetY)
+            // Stamp the initial viewport centre so AddTableSheet has
+            // something to spawn against on the very first add — without
+            // this, the persisted dict only fills in after the user has
+            // scrolled or zoomed at least once.
+            self.saveViewport()
         }
     }
 
@@ -638,15 +650,63 @@ class CanvasViewController: UIViewController, UIScrollViewDelegate {
         return true
     }
 
+    /// Compute the centre of the visible region in ROOM (table-coordinate)
+    /// space and stash it in the live in-memory cache. Cheap — just a few
+    /// divides; safe to call on every scroll frame.
+    ///
+    /// Three coordinate systems collide here:
+    ///   1. Scroll-content coords — what scrollView.contentOffset and
+    ///      scrollView.bounds report. Already scaled by zoomScale.
+    ///   2. Canvas (unscaled) coords — divide scroll-content by zoom.
+    ///   3. Room coords — subtract canvasOrigin (typically the
+    ///      canvasPadding offset of 400). SeatTable.x / RoomObject.x
+    ///      live in *room* coords; the renderer at line ~949 does
+    ///      `canvasOrigin + table.x` to place the view.
+    /// AddTableSheet stores SeatTable.x in room coords, so we must
+    /// return room coords here. The earlier version dropped the
+    /// canvasOrigin subtraction, which placed every new table 400 px
+    /// down and 400 px right of where the user was looking — explaining
+    /// the off-screen-to-the-right reports.
+    private func updateLiveViewportCentre() {
+        guard let id = planId,
+              scrollView.bounds.width > 0,
+              scrollView.bounds.height > 0 else { return }
+        let zoom = max(scrollView.zoomScale, 0.0001)
+        let canvasX = (scrollView.contentOffset.x + scrollView.bounds.width / 2) / zoom
+        let canvasY = (scrollView.contentOffset.y + scrollView.bounds.height / 2) / zoom
+        let roomX = canvasX - canvasOrigin.x
+        let roomY = canvasY - canvasOrigin.y
+        Self.liveViewportCentres[id] = CGPoint(x: roomX, y: roomY)
+    }
+
     private func saveViewport() {
         guard let id = planId else { return }
+        updateLiveViewportCentre()
         let key = Self.viewportDefaultsPrefix + id
+        let centre = Self.liveViewportCentres[id] ?? .zero
         let dict: [String: Any] = [
             "zoom": Double(scrollView.zoomScale),
             "offsetX": Double(scrollView.contentOffset.x),
             "offsetY": Double(scrollView.contentOffset.y),
+            "centerX": Double(centre.x),
+            "centerY": Double(centre.y),
         ]
         UserDefaults.standard.set(dict, forKey: key)
+    }
+
+    /// Read the most recent viewport centre (canvas-space) for the given
+    /// plan. Used by AddTableSheet / VenueObjectsSheet to spawn new
+    /// entities at whatever the user is currently looking at. Prefers the
+    /// in-memory live cache (updated on every scroll frame) over the
+    /// UserDefaults persisted value (only updated on end-of-gesture).
+    /// Returns nil for plans the canvas hasn't ever rendered.
+    static func viewportCentre(forPlanId id: String) -> CGPoint? {
+        if let live = liveViewportCentres[id] { return live }
+        let key = viewportDefaultsPrefix + id
+        guard let dict = UserDefaults.standard.dictionary(forKey: key),
+              let cx = dict["centerX"] as? Double,
+              let cy = dict["centerY"] as? Double else { return nil }
+        return CGPoint(x: cx, y: cy)
     }
 
     func scrollViewDidEndZooming(_ scrollView: UIScrollView, with view: UIView?, atScale scale: CGFloat) {
@@ -661,6 +721,16 @@ class CanvasViewController: UIViewController, UIScrollViewDelegate {
         for tv in tableViews.values {
             tv.setZoom(z)
         }
+        updateLiveViewportCentre()
+    }
+
+    /// Fires on every scroll frame. We don't persist on each frame
+    /// (that's saveViewport's job at end-of-gesture), but we DO keep
+    /// the in-memory liveViewportCentres up to date — that's what
+    /// AddTableSheet reads when the user taps + while still mid-pan
+    /// or during deceleration before the end-events fire.
+    func scrollViewDidScroll(_ scrollView: UIScrollView) {
+        updateLiveViewportCentre()
     }
 
     // MARK: - Alignment guides
@@ -1327,7 +1397,17 @@ class CanvasTableView: UIView {
             let dot = CAShapeLayer()
             let r = CGRect(x: pos.x - dotSize/2, y: pos.y - dotSize/2, width: dotSize, height: dotSize)
             dot.path = UIBezierPath(ovalIn: r).cgPath
-            if i < filled {
+            // Fill state must come from the SAME source as the initials
+            // label below: a seat is occupied iff seatGuestByIndex has a
+            // guest at that position. The previous `i < filled` predicate
+            // assumed seats fill contiguously 0..N-1, but seatOrders can
+            // be sparse (web parity, App.jsx:8197 — once a seatMap exists,
+            // empty seats stay empty even when later seats are taken).
+            // The mismatch caused the gold-dots-without-initials and
+            // outline-dots-with-initials inversion seen in the zoomed-out
+            // canvas.
+            let isOccupied = (seatGuestByIndex[i] != nil)
+            if isOccupied {
                 dot.fillColor = gold.cgColor
                 dot.strokeColor = gold.cgColor
                 dot.lineWidth = 1
