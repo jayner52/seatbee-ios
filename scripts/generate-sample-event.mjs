@@ -609,18 +609,38 @@ const objects = [
     x: ROOM_W / 2 - 40, y: 380, width: 80, height: 50,
     color: '#2D2D2D', category: 'entertainment', isObstacle: false },
 
-  // Bar — opposite corner from the DJ.
+  // Bar — full-length banquet bar against the back wall, bottom-left.
+  // Bigger than the catalogue default so it reads as the centrepiece
+  // of the back wall instead of an accent piece.
   { id: 'obj_bar', type: 'bar', name: 'Bar',
-    x: 40, y: ROOM_H - 70, width: 160, height: 60,
+    x: 40, y: ROOM_H - 100, width: 240, height: 80,
     color: '#8B8680', category: 'food', isObstacle: false },
+
+  // Gift Table — flanks the bar on the right. Common venue layout
+  // (gifts get dropped on the way in past the bar).
+  { id: 'obj_gift', type: 'gift', name: 'Gift Table',
+    x: 320, y: ROOM_H - 80, width: 120, height: 60,
+    color: '#9CAF88', category: 'ceremony', isObstacle: false },
+
+  // Guest Book — right next to the gift table so guests sign while
+  // they're already there. (Memorial Table was the alternative.)
+  { id: 'obj_guestbook', type: 'guestbook', name: 'Guest Book',
+    x: 470, y: ROOM_H - 80, width: 80, height: 50,
+    color: '#C9A961', category: 'services', isObstacle: false },
 
   // Main Entrance — top-left wall.
   { id: 'obj_entrance', type: 'entrance', name: 'Main Entrance',
     x: 30, y: 60, width: 40, height: 60,
     color: '#2D2D2D', category: 'structure', isObstacle: false },
 
+  // Welcome Sign — just inside the entrance on the left wall of the
+  // wide section, where guests see it on their way in.
+  { id: 'obj_welcome', type: 'welcome', name: 'Welcome Sign',
+    x: 80, y: 540, width: 60, height: 80,
+    color: '#C9A961', category: 'services', isObstacle: false },
+
   // Emergency Exit — right wall mid-height. Pushed below the T-stem
-  // boundary (ROOM_H * 0.35 ≈ 490) so it lands on the wide bottom
+  // boundary (ROOM_H * 0.35 ≈ 470) so it lands on the wide bottom
   // section's right wall, not the top stem's narrower one.
   { id: 'obj_exit', type: 'exit', name: 'Emergency Exit',
     x: ROOM_W - 50, y: 620, width: 40, height: 50,
@@ -646,11 +666,10 @@ const objects = [
     x: 80, y: 210, width: 50, height: 50,
     color: '#9CAF88', category: 'ceremony', isObstacle: false },
 
-  // Kitchen Entry — back wall of the bottom section, opposite the bar.
-  // Service door for catering; lets the demo show that "structure"
-  // category isn't just front-of-house entrance/exit.
+  // Kitchen Entry — back-right wall, large service door so it reads
+  // as a real catering entry, not an accent.
   { id: 'obj_kitchen', type: 'kitchen_entry', name: 'Kitchen Entry',
-    x: 900, y: ROOM_H - 30, width: 60, height: 30,
+    x: 860, y: ROOM_H - 50, width: 140, height: 50,
     color: '#8B8680', category: 'structure', isObstacle: false },
 ]
 

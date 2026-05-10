@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-05-10T00:09:54.847Z",
+  "generatedAt": "2026-05-10T00:29:11.457Z",
   "solverScore": 98,
   "plan": {
     "id": "demo-sample-event",
@@ -86,13 +86,14 @@
         "diameter": 100,
         "color": "#C9A961",
         "assignments": {
-          "g-104": 0,
-          "g-107": 1,
-          "g-106": 2,
-          "g-110": 3,
-          "g-108": 4,
-          "g-105": 5,
-          "g-109": 6
+          "g-051": 0,
+          "g-104": 1,
+          "g-107": 2,
+          "g-106": 3,
+          "g-110": 4,
+          "g-108": 5,
+          "g-105": 6,
+          "g-109": 7
         }
       },
       {
@@ -145,14 +146,14 @@
         "diameter": 100,
         "color": "#C9A961",
         "assignments": {
-          "g-044": 0,
-          "g-037": 1,
-          "g-034": 2,
-          "g-035": 3,
-          "g-038": 4,
-          "g-049": 5,
-          "g-050": 6,
-          "g-043": 7
+          "g-037": 0,
+          "g-038": 1,
+          "g-020": 2,
+          "g-073": 3,
+          "g-021": 4,
+          "g-072": 5,
+          "g-031": 6,
+          "g-032": 7
         }
       },
       {
@@ -165,14 +166,14 @@
         "diameter": 100,
         "color": "#C9A961",
         "assignments": {
-          "g-075": 0,
-          "g-076": 1,
-          "g-078": 2,
-          "g-079": 3,
-          "g-063": 4,
-          "g-064": 5,
-          "g-020": 6,
-          "g-021": 7
+          "g-041": 0,
+          "g-034": 1,
+          "g-047": 2,
+          "g-035": 3,
+          "g-049": 4,
+          "g-050": 5,
+          "g-046": 6,
+          "g-040": 7
         }
       },
       {
@@ -185,14 +186,14 @@
         "diameter": 100,
         "color": "#C9A961",
         "assignments": {
-          "g-082": 0,
-          "g-081": 1,
+          "g-044": 0,
+          "g-067": 1,
           "g-025": 2,
-          "g-029": 3,
-          "g-028": 4,
-          "g-073": 5,
-          "g-026": 6,
-          "g-072": 7
+          "g-016": 3,
+          "g-043": 4,
+          "g-026": 5,
+          "g-066": 6,
+          "g-017": 7
         }
       },
       {
@@ -205,13 +206,14 @@
         "diameter": 100,
         "color": "#C9A961",
         "assignments": {
-          "g-061": 0,
-          "g-041": 1,
-          "g-060": 2,
-          "g-047": 3,
-          "g-046": 4,
-          "g-054": 5,
-          "g-040": 6
+          "g-075": 0,
+          "g-076": 1,
+          "g-058": 2,
+          "g-063": 3,
+          "g-064": 4,
+          "g-057": 5,
+          "g-013": 6,
+          "g-054": 7
         }
       },
       {
@@ -224,14 +226,14 @@
         "diameter": 100,
         "color": "#C9A961",
         "assignments": {
-          "g-070": 0,
-          "g-058": 1,
-          "g-067": 2,
-          "g-057": 3,
-          "g-069": 4,
-          "g-066": 5,
-          "g-031": 6,
-          "g-032": 7
+          "g-061": 0,
+          "g-060": 1,
+          "g-082": 2,
+          "g-078": 3,
+          "g-081": 4,
+          "g-079": 5,
+          "g-029": 6,
+          "g-028": 7
         }
       },
       {
@@ -244,13 +246,13 @@
         "diameter": 100,
         "color": "#C9A961",
         "assignments": {
-          "g-125": 0,
-          "g-100": 1,
-          "g-127": 2,
-          "g-139": 3,
-          "g-124": 4,
-          "g-089": 5,
-          "g-149": 6,
+          "g-121": 0,
+          "g-127": 1,
+          "g-139": 2,
+          "g-148": 3,
+          "g-122": 4,
+          "g-149": 5,
+          "g-147": 6,
           "g-128": 7
         }
       },
@@ -264,12 +266,14 @@
         "diameter": 100,
         "color": "#C9A961",
         "assignments": {
-          "g-148": 0,
-          "g-138": 1,
-          "g-134": 2,
-          "g-142": 3,
-          "g-133": 4,
-          "g-141": 5
+          "g-125": 0,
+          "g-124": 1,
+          "g-138": 2,
+          "g-134": 3,
+          "g-142": 4,
+          "g-133": 5,
+          "g-150": 6,
+          "g-141": 7
         }
       },
       {
@@ -282,14 +286,13 @@
         "diameter": 100,
         "color": "#C9A961",
         "assignments": {
-          "g-051": 0,
-          "g-052": 1,
+          "g-052": 0,
+          "g-070": 1,
           "g-083": 2,
           "g-084": 3,
-          "g-013": 4,
+          "g-069": 4,
           "g-055": 5,
-          "g-053": 6,
-          "g-085": 7
+          "g-085": 6
         }
       },
       {
@@ -302,14 +305,13 @@
         "diameter": 100,
         "color": "#C9A961",
         "assignments": {
-          "g-121": 0,
+          "g-100": 0,
           "g-131": 1,
           "g-136": 2,
-          "g-122": 3,
-          "g-130": 4,
-          "g-147": 5,
-          "g-150": 6,
-          "g-137": 7
+          "g-130": 3,
+          "g-089": 4,
+          "g-053": 5,
+          "g-137": 6
         }
       },
       {
@@ -322,10 +324,9 @@
         "diameter": 75,
         "color": "#C9A961",
         "assignments": {
-          "g-014": 0,
+          "g-145": 0,
           "g-111": 1,
-          "g-016": 2,
-          "g-017": 3
+          "g-144": 2
         }
       },
       {
@@ -338,8 +339,7 @@
         "diameter": 75,
         "color": "#C9A961",
         "assignments": {
-          "g-145": 0,
-          "g-144": 1
+          "g-014": 0
         }
       },
       {
@@ -3124,11 +3124,35 @@
         "type": "bar",
         "name": "Bar",
         "x": 40,
-        "y": 1280,
-        "width": 160,
-        "height": 60,
+        "y": 1250,
+        "width": 240,
+        "height": 80,
         "color": "#8B8680",
         "category": "food",
+        "isObstacle": false
+      },
+      {
+        "id": "obj_gift",
+        "type": "gift",
+        "name": "Gift Table",
+        "x": 320,
+        "y": 1270,
+        "width": 120,
+        "height": 60,
+        "color": "#9CAF88",
+        "category": "ceremony",
+        "isObstacle": false
+      },
+      {
+        "id": "obj_guestbook",
+        "type": "guestbook",
+        "name": "Guest Book",
+        "x": 470,
+        "y": 1270,
+        "width": 80,
+        "height": 50,
+        "color": "#C9A961",
+        "category": "services",
         "isObstacle": false
       },
       {
@@ -3141,6 +3165,18 @@
         "height": 60,
         "color": "#2D2D2D",
         "category": "structure",
+        "isObstacle": false
+      },
+      {
+        "id": "obj_welcome",
+        "type": "welcome",
+        "name": "Welcome Sign",
+        "x": 80,
+        "y": 540,
+        "width": 60,
+        "height": 80,
+        "color": "#C9A961",
+        "category": "services",
         "isObstacle": false
       },
       {
@@ -3207,10 +3243,10 @@
         "id": "obj_kitchen",
         "type": "kitchen_entry",
         "name": "Kitchen Entry",
-        "x": 900,
-        "y": 1320,
-        "width": 60,
-        "height": 30,
+        "x": 860,
+        "y": 1300,
+        "width": 140,
+        "height": 50,
         "color": "#8B8680",
         "category": "structure",
         "isObstacle": false
@@ -3520,52 +3556,52 @@
       "g-101": "t_round_04",
       "g-102": "t_round_04",
       "g-103": "t_round_04",
-      "g-013": "t_round_12",
+      "g-013": "t_round_08",
       "g-054": "t_round_08",
-      "g-016": "t_round_14",
-      "g-017": "t_round_14",
-      "g-020": "t_round_06",
-      "g-021": "t_round_06",
+      "g-016": "t_round_07",
+      "g-017": "t_round_07",
+      "g-020": "t_round_05",
+      "g-021": "t_round_05",
       "g-025": "t_round_07",
       "g-026": "t_round_07",
-      "g-028": "t_round_07",
-      "g-029": "t_round_07",
-      "g-031": "t_round_09",
-      "g-032": "t_round_09",
-      "g-034": "t_round_05",
-      "g-035": "t_round_05",
+      "g-028": "t_round_09",
+      "g-029": "t_round_09",
+      "g-031": "t_round_05",
+      "g-032": "t_round_05",
+      "g-034": "t_round_06",
+      "g-035": "t_round_06",
       "g-037": "t_round_05",
       "g-038": "t_round_05",
-      "g-040": "t_round_08",
-      "g-041": "t_round_08",
-      "g-043": "t_round_05",
-      "g-044": "t_round_05",
-      "g-046": "t_round_08",
-      "g-047": "t_round_08",
-      "g-049": "t_round_05",
-      "g-050": "t_round_05",
-      "g-057": "t_round_09",
-      "g-058": "t_round_09",
-      "g-060": "t_round_08",
-      "g-061": "t_round_08",
-      "g-063": "t_round_06",
-      "g-064": "t_round_06",
-      "g-066": "t_round_09",
-      "g-067": "t_round_09",
-      "g-069": "t_round_09",
-      "g-070": "t_round_09",
-      "g-072": "t_round_07",
-      "g-073": "t_round_07",
-      "g-075": "t_round_06",
-      "g-076": "t_round_06",
-      "g-078": "t_round_06",
-      "g-079": "t_round_06",
-      "g-081": "t_round_07",
-      "g-082": "t_round_07",
-      "g-121": "t_round_13",
-      "g-122": "t_round_13",
-      "g-124": "t_round_10",
-      "g-125": "t_round_10",
+      "g-040": "t_round_06",
+      "g-041": "t_round_06",
+      "g-043": "t_round_07",
+      "g-044": "t_round_07",
+      "g-046": "t_round_06",
+      "g-047": "t_round_06",
+      "g-049": "t_round_06",
+      "g-050": "t_round_06",
+      "g-057": "t_round_08",
+      "g-058": "t_round_08",
+      "g-060": "t_round_09",
+      "g-061": "t_round_09",
+      "g-063": "t_round_08",
+      "g-064": "t_round_08",
+      "g-066": "t_round_07",
+      "g-067": "t_round_07",
+      "g-069": "t_round_12",
+      "g-070": "t_round_12",
+      "g-072": "t_round_05",
+      "g-073": "t_round_05",
+      "g-075": "t_round_08",
+      "g-076": "t_round_08",
+      "g-078": "t_round_09",
+      "g-079": "t_round_09",
+      "g-081": "t_round_09",
+      "g-082": "t_round_09",
+      "g-121": "t_round_10",
+      "g-122": "t_round_10",
+      "g-124": "t_round_11",
+      "g-125": "t_round_11",
       "g-127": "t_round_10",
       "g-128": "t_round_10",
       "g-130": "t_round_13",
@@ -3576,25 +3612,25 @@
       "g-137": "t_round_13",
       "g-141": "t_round_11",
       "g-142": "t_round_11",
-      "g-014": "t_round_14",
+      "g-014": "t_round_15",
       "g-055": "t_round_12",
-      "g-051": "t_round_12",
+      "g-051": "t_round_02",
       "g-052": "t_round_12",
-      "g-053": "t_round_12",
+      "g-053": "t_round_13",
       "g-083": "t_round_12",
       "g-084": "t_round_12",
       "g-085": "t_round_12",
-      "g-089": "t_round_10",
-      "g-100": "t_round_10",
+      "g-089": "t_round_13",
+      "g-100": "t_round_13",
       "g-111": "t_round_14",
       "g-138": "t_round_11",
       "g-139": "t_round_10",
-      "g-147": "t_round_13",
-      "g-148": "t_round_11",
+      "g-147": "t_round_10",
+      "g-148": "t_round_10",
       "g-149": "t_round_10",
-      "g-150": "t_round_13",
-      "g-144": "t_round_15",
-      "g-145": "t_round_15"
+      "g-150": "t_round_11",
+      "g-144": "t_round_14",
+      "g-145": "t_round_14"
     },
     "seatOrders": {
       "t_kids": [
@@ -3638,7 +3674,7 @@
         "g-108",
         "g-109",
         "g-110",
-        null
+        "g-051"
       ],
       "t_round_03": [
         "g-086",
@@ -3660,110 +3696,110 @@
         "g-102",
         "g-103"
       ],
-      "t_round_12": [
-        "g-013",
-        "g-055",
-        "g-051",
-        "g-052",
-        "g-053",
-        "g-083",
-        "g-084",
-        "g-085"
-      ],
       "t_round_08": [
+        "g-013",
         "g-054",
+        "g-057",
+        "g-058",
+        "g-063",
+        "g-064",
+        "g-075",
+        "g-076"
+      ],
+      "t_round_07": [
+        "g-016",
+        "g-017",
+        "g-025",
+        "g-026",
+        "g-043",
+        "g-044",
+        "g-066",
+        "g-067"
+      ],
+      "t_round_05": [
+        "g-020",
+        "g-021",
+        "g-031",
+        "g-032",
+        "g-037",
+        "g-038",
+        "g-072",
+        "g-073"
+      ],
+      "t_round_09": [
+        "g-028",
+        "g-029",
+        "g-060",
+        "g-061",
+        "g-078",
+        "g-079",
+        "g-081",
+        "g-082"
+      ],
+      "t_round_06": [
+        "g-034",
+        "g-035",
         "g-040",
         "g-041",
         "g-046",
         "g-047",
-        "g-060",
-        "g-061",
-        null
-      ],
-      "t_round_14": [
-        "g-016",
-        "g-017",
-        "g-014",
-        "g-111"
-      ],
-      "t_round_06": [
-        "g-020",
-        "g-021",
-        "g-063",
-        "g-064",
-        "g-075",
-        "g-076",
-        "g-078",
-        "g-079"
-      ],
-      "t_round_07": [
-        "g-025",
-        "g-026",
-        "g-028",
-        "g-029",
-        "g-072",
-        "g-073",
-        "g-081",
-        "g-082"
-      ],
-      "t_round_09": [
-        "g-031",
-        "g-032",
-        "g-057",
-        "g-058",
-        "g-066",
-        "g-067",
-        "g-069",
-        "g-070"
-      ],
-      "t_round_05": [
-        "g-034",
-        "g-035",
-        "g-037",
-        "g-038",
-        "g-043",
-        "g-044",
         "g-049",
         "g-050"
       ],
-      "t_round_13": [
-        "g-121",
-        "g-122",
-        "g-130",
-        "g-131",
-        "g-136",
-        "g-137",
-        "g-147",
-        "g-150"
+      "t_round_12": [
+        "g-069",
+        "g-070",
+        "g-055",
+        "g-052",
+        "g-083",
+        "g-084",
+        "g-085",
+        null
       ],
       "t_round_10": [
-        "g-124",
-        "g-125",
+        "g-121",
+        "g-122",
         "g-127",
         "g-128",
-        "g-089",
-        "g-100",
         "g-139",
+        "g-147",
+        "g-148",
         "g-149"
       ],
       "t_round_11": [
+        "g-124",
+        "g-125",
         "g-133",
         "g-134",
         "g-141",
         "g-142",
         "g-138",
-        "g-148",
-        null,
+        "g-150"
+      ],
+      "t_round_13": [
+        "g-130",
+        "g-131",
+        "g-136",
+        "g-137",
+        "g-053",
+        "g-089",
+        "g-100",
         null
       ],
       "t_round_15": [
+        "g-014",
+        null,
+        null,
+        null
+      ],
+      "t_round_14": [
+        "g-111",
         "g-144",
         "g-145",
-        null,
         null
       ]
     },
-    "score": 25175.011385180638,
+    "score": 25172.976898341454,
     "scorecard": {
       "overallPercent": 98,
       "overallLabel": "Excellent",
@@ -3840,7 +3876,7 @@
               "g-014"
             ],
             "status": "satisfied",
-            "score": 48.76958296133178,
+            "score": 36.70452590924207,
             "description": "Keep Margaret Williams apart from James Williams",
             "details": "No conflicts"
           },
@@ -3980,9 +4016,9 @@
               "g-054"
             ],
             "status": "satisfied",
-            "score": 25.173870940508202,
+            "score": 30.068907913969515,
             "description": "Margaret Williams & Ngozi Okonkwo near Emergency Exit",
-            "details": "Margaret Williams: 30ft from Emergency Exit, Ngozi Okonkwo: 17ft from Emergency Exit"
+            "details": "Margaret Williams: 17ft from Emergency Exit, Ngozi Okonkwo: 17ft from Emergency Exit"
           }
         ]
       },
@@ -3993,7 +4029,7 @@
           "id": "p-015",
           "names": "Owen & Sophie",
           "together": true,
-          "tableName": "Capri",
+          "tableName": "Tokyo",
           "guestIds": [
             "g-016",
             "g-017"
@@ -4005,7 +4041,7 @@
           "id": "p-019",
           "names": "Lily & Sam",
           "together": true,
-          "tableName": "Bali",
+          "tableName": "Santorini",
           "guestIds": [
             "g-020",
             "g-021"
@@ -4029,7 +4065,7 @@
           "id": "p-027",
           "names": "Linda & Henry",
           "together": true,
-          "tableName": "Tokyo",
+          "tableName": "Vienna",
           "guestIds": [
             "g-028",
             "g-029"
@@ -4041,7 +4077,7 @@
           "id": "p-030",
           "names": "Susan & Walter",
           "together": true,
-          "tableName": "Vienna",
+          "tableName": "Santorini",
           "guestIds": [
             "g-031",
             "g-032"
@@ -4053,7 +4089,7 @@
           "id": "p-033",
           "names": "Carol & Edward",
           "together": true,
-          "tableName": "Santorini",
+          "tableName": "Bali",
           "guestIds": [
             "g-034",
             "g-035"
@@ -4077,7 +4113,7 @@
           "id": "p-039",
           "names": "Sandra & Albert",
           "together": true,
-          "tableName": "London",
+          "tableName": "Bali",
           "guestIds": [
             "g-040",
             "g-041"
@@ -4089,7 +4125,7 @@
           "id": "p-042",
           "names": "Priya & Arjun",
           "together": true,
-          "tableName": "Santorini",
+          "tableName": "Tokyo",
           "guestIds": [
             "g-043",
             "g-044"
@@ -4101,7 +4137,7 @@
           "id": "p-045",
           "names": "Mei & Daniel",
           "together": true,
-          "tableName": "London",
+          "tableName": "Bali",
           "guestIds": [
             "g-046",
             "g-047"
@@ -4113,7 +4149,7 @@
           "id": "p-048",
           "names": "Hana & Marcus",
           "together": true,
-          "tableName": "Santorini",
+          "tableName": "Bali",
           "guestIds": [
             "g-049",
             "g-050"
@@ -4125,7 +4161,7 @@
           "id": "p-056",
           "names": "Ifeoma & Diego",
           "together": true,
-          "tableName": "Vienna",
+          "tableName": "London",
           "guestIds": [
             "g-057",
             "g-058"
@@ -4137,7 +4173,7 @@
           "id": "p-059",
           "names": "Amara & Aaron",
           "together": true,
-          "tableName": "London",
+          "tableName": "Vienna",
           "guestIds": [
             "g-060",
             "g-061"
@@ -4149,7 +4185,7 @@
           "id": "p-062",
           "names": "Folake & Idris",
           "together": true,
-          "tableName": "Bali",
+          "tableName": "London",
           "guestIds": [
             "g-063",
             "g-064"
@@ -4161,7 +4197,7 @@
           "id": "p-065",
           "names": "Sarah & Eli",
           "together": true,
-          "tableName": "Vienna",
+          "tableName": "Tokyo",
           "guestIds": [
             "g-066",
             "g-067"
@@ -4173,7 +4209,7 @@
           "id": "p-068",
           "names": "Naomi & Asher",
           "together": true,
-          "tableName": "Vienna",
+          "tableName": "Florence",
           "guestIds": [
             "g-069",
             "g-070"
@@ -4185,7 +4221,7 @@
           "id": "p-071",
           "names": "Sofia & Mateo",
           "together": true,
-          "tableName": "Tokyo",
+          "tableName": "Santorini",
           "guestIds": [
             "g-072",
             "g-073"
@@ -4197,7 +4233,7 @@
           "id": "p-074",
           "names": "Camila & Carlos",
           "together": true,
-          "tableName": "Bali",
+          "tableName": "London",
           "guestIds": [
             "g-075",
             "g-076"
@@ -4209,7 +4245,7 @@
           "id": "p-077",
           "names": "Chiamaka & Femi",
           "together": true,
-          "tableName": "Bali",
+          "tableName": "Vienna",
           "guestIds": [
             "g-078",
             "g-079"
@@ -4221,7 +4257,7 @@
           "id": "p-080",
           "names": "Esther & Bayo",
           "together": true,
-          "tableName": "Tokyo",
+          "tableName": "Vienna",
           "guestIds": [
             "g-081",
             "g-082"
@@ -4233,7 +4269,7 @@
           "id": "p-120",
           "names": "Beverly & George",
           "together": true,
-          "tableName": "Kyoto",
+          "tableName": "Prague",
           "guestIds": [
             "g-121",
             "g-122"
@@ -4245,7 +4281,7 @@
           "id": "p-123",
           "names": "Eleanor & Arthur",
           "together": true,
-          "tableName": "Prague",
+          "tableName": "Lisbon",
           "guestIds": [
             "g-124",
             "g-125"
@@ -4317,7 +4353,7 @@
           "id": "p-143",
           "names": "Mei & Kwame & Zara",
           "together": false,
-          "tableName": "Amalfi, Kids Table",
+          "tableName": "Capri, Kids Table",
           "guestIds": [
             "g-144",
             "g-145",
