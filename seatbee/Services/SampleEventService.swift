@@ -232,7 +232,7 @@ private struct SampleGuest: Decodable {
             categories: categories ?? [],
             dietary: nil,
             notes: nil,
-            rsvp: Guest.RSVPStatus(rawValue: rsvp) ?? .yes,
+            rsvp: Guest.RSVPStatus.parse(rsvp),
             side: Guest.GuestSide(rawValue: side) ?? .none,
             vip: vip,
             accessibility: nil,
