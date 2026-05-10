@@ -586,7 +586,23 @@ struct GuestDetailSheet: View {
 
     private func loadGuest() {
         guard let guest else { return }
-        name = guest.displayName
+        // CRITICAL: load the canonical FULL name into the editable
+        // field, not displayName. displayName prefers `display` (web
+        // commonly stores the first name there for compact list
+        // rendering), and pre-filling the form with the abbreviated
+        // form means saveGuest's split-on-first-space re-derives
+        // firstName/lastName from "Adam" instead of "Adam Williams"
+        // and silently wipes the last name on round-trip. Prefer
+        // firstName+lastName join when available, fall back to the
+        // raw `name` field, only fall back to displayName as a last
+        // resort for legacy guests with neither.
+        name = {
+            if let f = guest.firstName, let l = guest.lastName,
+               !(f.isEmpty && l.isEmpty) {
+                return "\(f) \(l)".trimmingCharacters(in: .whitespaces)
+            }
+            return guest.name.isEmpty ? guest.displayName : guest.name
+        }()
         email = guest.email ?? ""
         meal = guest.meal ?? ""
         dietary = guest.dietary ?? ""
@@ -606,14 +622,34 @@ struct GuestDetailSheet: View {
         let trimmedName = name.trimmingCharacters(in: .whitespaces)
         guard !trimmedName.isEmpty else { return }
 
-        let parts = trimmedName.split(separator: " ", maxSplits: 1)
-        let firstName = String(parts.first ?? "")
-        let lastName = parts.count > 1 ? String(parts.last ?? "") : nil
-
         // Preserve fields iOS doesn't author here (display, isBride/Groom
         // cached flags, groupIds, guestCreatedAt) by reading from the
         // existing guest if we have one.
         let existing = guest
+
+        // CRITICAL: when the user did NOT edit the name field, preserve
+        // the existing firstName/lastName split. Web is the source of
+        // truth for that split — it can be non-trivial (e.g. multi-
+        // token first names like "Mary Anne Smith" → first 'Mary Anne',
+        // last 'Smith') and a naive split-on-first-space corrupts those
+        // round-trip. Detect "no change" by comparing the joined form
+        // against the trimmed name field.
+        let firstName: String
+        let lastName: String?
+        if let existingFirst = existing?.firstName,
+           let existingLast = existing?.lastName,
+           "\(existingFirst) \(existingLast)".trimmingCharacters(in: .whitespaces) == trimmedName {
+            firstName = existingFirst
+            lastName = existingLast
+        } else {
+            // Edited (or no prior split exists) — derive from the new
+            // name. Split on first space so two-word names round-trip
+            // cleanly; multi-word names lose web's nuance, but only
+            // when the user actually changed the name field.
+            let parts = trimmedName.split(separator: " ", maxSplits: 1)
+            firstName = String(parts.first ?? "")
+            lastName = parts.count > 1 ? String(parts.last ?? "") : nil
+        }
 
         let updatedGuest = Guest(
             id: existing?.id ?? UUID().uuidString,
