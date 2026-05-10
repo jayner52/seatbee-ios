@@ -234,6 +234,12 @@ enum GuestCSVParser {
             // Auto-derive display = first token so canvas / place cards
             // show "Asher" while the form keeps the full "Asher Russell"
             // (matches web's createGuest behaviour at App.jsx:10443).
+            // Also infer dietaryTags from the dietary free-text — same
+            // path the CSV parser uses, so "Sarah Chen, vegetarian"
+            // produces both dietary="vegetarian" AND a vegetarian
+            // dietaryTag chip in the Edit Guest UI. Without this, the
+            // chip stays unselected even though the text was captured.
+            let inferredTags = inferDietaryTags(from: dietary)
             guests.append(Guest(
                 id: UUID().uuidString,
                 name: name,
@@ -243,7 +249,8 @@ enum GuestCSVParser {
                 rsvp: .unknown, side: .none, vip: false,
                 accessibility: nil, plusOne: nil, party: nil,
                 display: firstToken.isEmpty ? nil : firstToken,
-                dietaryTags: nil, highChair: nil, isChild: nil, groupIds: nil,
+                dietaryTags: inferredTags.isEmpty ? nil : inferredTags,
+                highChair: nil, isChild: nil, groupIds: nil,
                 isBride: nil, isGroom: nil, meal: nil, guestCreatedAt: nil
             ))
         }
