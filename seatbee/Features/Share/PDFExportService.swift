@@ -1007,7 +1007,14 @@ final class PDFExportService {
         // visual hero and the square crop reads cleanly on IG / X
         // / iMessage previews without letterboxing.
         let size = CGSize(width: 1080, height: 1080)
-        let renderer = UIGraphicsImageRenderer(size: size)
+        // Force scale = 3 so the underlying pixel buffer is 3240×3240
+        // regardless of which device renders it. The default scale
+        // tracks UIScreen.main.scale, which can fall back to 1.0 in
+        // background contexts and ship a granular PNG (user-reported:
+        // names look pixelated when zoomed in on the seating chart).
+        let format = UIGraphicsImageRendererFormat.default()
+        format.scale = 3
+        let renderer = UIGraphicsImageRenderer(size: size, format: format)
         return renderer.image { context in
             let ctx = context.cgContext
 
