@@ -81,9 +81,16 @@ enum CanvasPDFRenderer {
         // each table and labels under objects.
         let seatPad: CGFloat = 22
 
+        // CRITICAL — web/iOS parity: a table's stored (x, y) is the
+        // TOP-LEFT corner of its bounding box, NOT the centre. The live
+        // canvas adds body.width/2 to position UIView.center; the
+        // exporter has to do the same conversion or every table renders
+        // shifted up-and-left by half its size (visible to the user as
+        // "tables and objects in the wrong place relative to floor plan").
         for t in plan.tables {
             let body = bodySize(for: t)
-            let cx = CGFloat(t.x), cy = CGFloat(t.y)
+            let cx = CGFloat(t.x) + body.width / 2
+            let cy = CGFloat(t.y) + body.height / 2
             // Use diagonal-half so rotated tables still fit.
             let half = max(body.width, body.height) / 2 + seatPad
             minX = min(minX, cx - half)
@@ -92,9 +99,11 @@ enum CanvasPDFRenderer {
             maxY = max(maxY, cy + half)
         }
         for o in plan.objects {
-            let cx = CGFloat(o.x), cy = CGFloat(o.y)
+            // Same top-left convention for room objects.
             let halfW = CGFloat(o.width) / 2
             let halfH = CGFloat(o.height) / 2
+            let cx = CGFloat(o.x) + halfW
+            let cy = CGFloat(o.y) + halfH
             minX = min(minX, cx - halfW)
             minY = min(minY, cy - halfH)
             maxX = max(maxX, cx + halfW)
@@ -134,7 +143,26 @@ enum CanvasPDFRenderer {
         ctx.setStrokeColor(lineColor.cgColor)
         ctx.setLineWidth(1.5)
 
-        if let pts = plan.customRoomPoints, pts.count >= 2 {
+        // Resolve the actual polygon to draw. Priority:
+        //   1. customRoomPoints (user-traced or AI-generated outline)
+        //   2. roomShape preset ("t", "l", "u", "circle", "oval") — convert
+        //      to the same polygon the canvas + web renderer use, so the
+        //      printable export matches what the user sees in the editor
+        //      (was previously falling through to a plain rectangle, which
+        //      was the user-reported "why did the shape change?" bug)
+        //   3. plain roomWidth × roomHeight rectangle as final fallback
+        let pts: [RoomPoint]? = {
+            if let custom = plan.customRoomPoints, custom.count >= 2 { return custom }
+            if let shape = plan.roomShape?.lowercased(),
+               shape != "rect", shape != "rectangle",
+               let w = plan.roomWidth, let h = plan.roomHeight {
+                let preset = RoomShapePresets.defaultPoints(shape: shape, width: w, height: h)
+                return preset.count >= 2 ? preset : nil
+            }
+            return nil
+        }()
+
+        if let pts {
             let path = UIBezierPath()
             path.move(to: CGPoint(x: pts[0].x, y: pts[0].y))
             for i in 1..<pts.count {
@@ -145,7 +173,6 @@ enum CanvasPDFRenderer {
                     path.addLine(to: CGPoint(x: p.x, y: p.y))
                 }
             }
-            // Close back to start (with arc if first point declared one)
             if let firstArc = pts[0].arc {
                 appendArc(to: path, end: CGPoint(x: pts[0].x, y: pts[0].y), arc: firstArc)
             } else {
@@ -181,12 +208,23 @@ enum CanvasPDFRenderer {
     // MARK: - Room objects
 
     private static func drawRoomObject(_ o: RoomObject, ctx: CGContext) {
-        let cx = CGFloat(o.x), cy = CGFloat(o.y)
+        // (x, y) is TOP-LEFT — see computeWorldBounds for the parity
+        // note. Convert to centre once here so the rest of the routine
+        // can treat (cx, cy) as the box centre.
         let w = CGFloat(o.width), h = CGFloat(o.height)
+        let cx = CGFloat(o.x) + w / 2
+        let cy = CGFloat(o.y) + h / 2
         let rect = CGRect(x: cx - w / 2, y: cy - h / 2, width: w, height: h)
 
+        // Mirror the canvas's CanvasViewController styling: object colour
+        // at 0.85 alpha, contrast-aware text colour (white on dark bg,
+        // dark on light bg), SF Symbol icon stacked above the label.
         let fill = parseColor(o.color) ?? UIColor(red: 0.94, green: 0.93, blue: 0.90, alpha: 1)
-        let stroke = UIColor(white: 0.55, alpha: 1)
+        let isDark = (o.color ?? "").lowercased() == "#2d2d2d"
+        let textColor = isDark
+            ? UIColor.white
+            : UIColor(red: 0.18, green: 0.18, blue: 0.18, alpha: 1)
+        let stroke = isDark ? fill : UIColor(white: 0.55, alpha: 1)
 
         ctx.saveGState()
         if let rot = o.rotation, rot != 0 {
@@ -196,21 +234,50 @@ enum CanvasPDFRenderer {
         }
 
         let path = UIBezierPath(roundedRect: rect, cornerRadius: 4)
-        ctx.setFillColor(fill.withAlphaComponent(0.45).cgColor)
+        ctx.setFillColor(fill.withAlphaComponent(0.85).cgColor)
         ctx.setStrokeColor(stroke.cgColor)
         ctx.setLineWidth(0.8)
         ctx.addPath(path.cgPath)
         ctx.drawPath(using: .fillStroke)
 
-        // Label centred inside the object.
+        // Icon + name — pixel-for-pixel mirror of CanvasViewController's
+        // venue-object layout (line 1864-1879):
+        //   • Fixed 24pt icon frame (regardless of object size — even
+        //     tiny accent items use the same glyph size)
+        //   • Symbol glyph at 18pt
+        //   • Icon TOP at center.y - 24 - 2 (above centre by 26pt total)
+        //   • Name centred horizontally with 4pt side margins, y at
+        //     center.y + 4, height 14, tail-truncated
+        // Both icon and name may extend outside very small object boxes
+        // — that's the canvas behaviour too (no clipping). The label is
+        // never skipped: removing it would diverge from the canvas.
+        let iconName = VenueIconMap.sfSymbol(for: o.icon)
+        let iconCfg = UIImage.SymbolConfiguration(pointSize: 18, weight: .regular)
+        let iconBoxSize: CGFloat = 24
+        if let icon = UIImage(systemName: iconName, withConfiguration: iconCfg)?
+                .withTintColor(textColor, renderingMode: .alwaysOriginal) {
+            // Centre the (possibly non-square) glyph inside a 24×24 box.
+            let iSize = icon.size
+            let iconBoxOriginY = cy - iconBoxSize - 2
+            let drawRect = CGRect(x: cx - iSize.width / 2,
+                                   y: iconBoxOriginY + (iconBoxSize - iSize.height) / 2,
+                                   width: iSize.width, height: iSize.height)
+            icon.draw(in: drawRect)
+        }
+
+        let labelPara = NSMutableParagraphStyle()
+        labelPara.lineBreakMode = .byTruncatingTail
+        labelPara.alignment = .center
         let attrs: [NSAttributedString.Key: Any] = [
             .font: UIFont.systemFont(ofSize: 9, weight: .medium),
-            .foregroundColor: UIColor(white: 0.25, alpha: 1),
+            .foregroundColor: textColor,
+            .paragraphStyle: labelPara,
         ]
-        let label = NSString(string: o.name)
-        let size = label.size(withAttributes: attrs)
-        label.draw(at: CGPoint(x: cx - size.width / 2, y: cy - size.height / 2),
-                   withAttributes: attrs)
+        let labelRect = CGRect(x: cx - (w - 8) / 2,
+                                y: cy + 4,
+                                width: w - 8,
+                                height: 14)
+        (o.name as NSString).draw(in: labelRect, withAttributes: attrs)
 
         ctx.restoreGState()
     }
@@ -219,7 +286,9 @@ enum CanvasPDFRenderer {
 
     private static func drawTable(_ t: SeatTable, plan: SeatingPlan, showGuestNames: Bool, ctx: CGContext) {
         let body = bodySize(for: t)
-        let center = CGPoint(x: t.x, y: t.y)
+        // Top-left → centre conversion (see computeWorldBounds parity note).
+        let center = CGPoint(x: CGFloat(t.x) + body.width / 2,
+                              y: CGFloat(t.y) + body.height / 2)
 
         ctx.saveGState()
         if let rot = t.rotation, rot != 0 {
@@ -231,22 +300,36 @@ enum CanvasPDFRenderer {
         // Seats first (under the table body so the body's edge clips the dots).
         drawSeats(table: t, body: body, center: center, ctx: ctx)
 
-        // Table body
+        // Table body — match the canvas styling (CanvasViewController):
+        //   • Head Table   → charcoal fill, white text (dark hero strip)
+        //   • Sweetheart   → ivory fill, charcoal text (cream cloud)
+        //   • All others   → ivory fill, charcoal text, gold-ish rim
         let path = shapePath(for: t, body: body, center: center)
-        let fill = isHeadOrSweetheart(t)
-            ? UIColor(red: 0.79, green: 0.66, blue: 0.38, alpha: 1)   // gold for head/sweetheart
-            : UIColor(white: 0.97, alpha: 1)                           // ivory for others
-        let stroke = UIColor(red: 0.45, green: 0.40, blue: 0.32, alpha: 1)
+        let goldRim   = UIColor(red: 0.79, green: 0.66, blue: 0.38, alpha: 1)
+        let charcoal  = UIColor(red: 0.18, green: 0.18, blue: 0.18, alpha: 1)
+        let ivoryFill = UIColor(white: 0.97, alpha: 1)
+        let fill: UIColor
+        let stroke: UIColor
+        let nameColor: UIColor
+        switch t.type {
+        case .head:
+            fill = charcoal
+            stroke = charcoal
+            nameColor = .white
+        case .sweetheart:
+            fill = ivoryFill
+            stroke = goldRim
+            nameColor = charcoal
+        default:
+            fill = ivoryFill
+            stroke = goldRim
+            nameColor = charcoal
+        }
         ctx.setFillColor(fill.cgColor)
         ctx.setStrokeColor(stroke.cgColor)
-        ctx.setLineWidth(1.1)
+        ctx.setLineWidth(1.4)
         ctx.addPath(path.cgPath)
         ctx.drawPath(using: .fillStroke)
-
-        // Table name centred inside the body
-        let nameColor = isHeadOrSweetheart(t)
-            ? UIColor.white
-            : UIColor(red: 0.18, green: 0.18, blue: 0.18, alpha: 1)
         let nameAttrs: [NSAttributedString.Key: Any] = [
             .font: UIFont.systemFont(ofSize: 10, weight: .semibold),
             .foregroundColor: nameColor,
@@ -317,16 +400,17 @@ enum CanvasPDFRenderer {
         }
 
         // Guest names render INSIDE the canvas's scaleBy() transform
-        // (typically ~0.7×) and then again through the export's pixel
-        // scale (4×) — so 7.5pt source ended up at ~21 pixels per name
-        // height, which read as soft when zoomed in Photos. Bumping the
-        // source to 9pt brings effective output to ~25 px without
-        // crowding adjacent labels (names are ~6 chars after truncation).
+        // (typically ~0.62×) and then again through the export's pixel
+        // scale. With the export now at scale 8 and source font 10pt,
+        // effective output ≈ 10 × 0.62 × 8 = ~50 actual pixels per
+        // name. Names are ~6 chars after truncation; the +1 offset bump
+        // (12pt) keeps them clear of seat dots given the slightly larger
+        // glyph height.
         let labelAttrs: [NSAttributedString.Key: Any] = [
-            .font: UIFont.systemFont(ofSize: 9, weight: .semibold),
+            .font: UIFont.systemFont(ofSize: 10, weight: .semibold),
             .foregroundColor: UIColor(red: 0.18, green: 0.18, blue: 0.18, alpha: 1),
         ]
-        let labelOffset: CGFloat = 11  // distance from seat dot to label centre
+        let labelOffset: CGFloat = 12  // distance from seat dot to label centre
 
         for (i, p) in positions.enumerated() {
             guard let g = guestBySeat[i] else { continue }
@@ -391,12 +475,22 @@ enum CanvasPDFRenderer {
             return CGPoint(x: p.x + nx * (offset + labelSize.height / 2),
                            y: p.y + ny * (offset + labelSize.height / 2))
         case .rect, .head:
-            // Top row of seats sits above the body, bottom row below.
-            // Push the label further in the same direction so it's
-            // beyond the seat dot.
+            // Head / rect seats sit in a single horizontal row above the
+            // body. With 10 seats on a 400pt table the centres are only
+            // ~40pt apart — labels at 9pt font easily run together into
+            // a smear. Stagger by alternating two height tiers so
+            // adjacent labels never share a line.
             let above = p.y < c.y
+            let direction: CGFloat = above ? -1 : 1
+            // Use the seat's x relative to the body to determine a stable
+            // odd/even index — robust to seat ordering changes.
+            let body = bodySize(for: table)
+            let leftEdge = c.x - body.width / 2
+            let seatSpacing = max(1, body.width / CGFloat(max(1, table.seats)))
+            let approxIdx = Int(((p.x - leftEdge) / seatSpacing).rounded())
+            let tier: CGFloat = (approxIdx & 1 == 0) ? 0 : (labelSize.height + 4)
             return CGPoint(x: p.x,
-                           y: p.y + (above ? -offset : offset))
+                           y: p.y + direction * (offset + tier))
         }
     }
 

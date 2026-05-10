@@ -1003,91 +1003,143 @@ final class PDFExportService {
 
     @MainActor
     static func generateFloorPlanImage(plan: SeatingPlan, showGuestNames: Bool = false) -> UIImage? {
-        // Floor plan stays square 1080² — the floor plan is the
-        // visual hero and the square crop reads cleanly on IG / X
-        // / iMessage previews without letterboxing.
-        let size = CGSize(width: 1080, height: 1080)
-        // Force scale = 6 so the underlying pixel buffer is 6480×6480.
-        // Math for the user-visible sharpness:
-        //   guest names render at 9pt, then through CanvasPDFRenderer's
-        //   scaleBy(~0.62 for a typical room fitting the card), then
-        //   through this format scale → 9 × 0.62 × 6 ≈ 33 actual pixels
-        //   per name height. The previous scale=4 only got us to ~22 px,
-        //   which still read as soft when the user zoomed in Photos.
-        // PNG file size lands around 8-12MB on a typical plan — well
-        // under iMessage's 100MB ceiling, well over what AirDrop / Files
-        // care about. Vector PDF is still the best for unlimited zoom;
-        // this is the practical PNG ceiling without redesigning the card.
+        // Print-quality chart: portrait 1080×1700 with ~88% of the canvas
+        // dedicated to the floor plan itself. Replaces the v1 "branded
+        // social card" layout (which boxed the floor plan into a 940×680
+        // card and made guest names go granular when zoomed). User
+        // feedback: "I want to see every name when I zoom in."
+        //
+        // Layout:
+        //   • Top strip (~140pt): bee badge + tiny "seatbee" wordmark +
+        //     event title + date · venue subtitle
+        //   • Floor plan: ~1010×1430 — the entire middle of the canvas
+        //   • Bottom strip (~70pt): stats + "Made with Seatbee · seatbee.app"
+        //
+        // Canvas grew 1620→1700 to accommodate the bee badge without
+        // shrinking the floor plan area (user explicitly: "don't shrink
+        // the floor plan").
+        //
+        // At scale 6 the PNG is 6480×10200 (~12-18 MB), still under
+        // iMessage's 100MB cap.
+        let size = CGSize(width: 1080, height: 1700)
         let format = UIGraphicsImageRendererFormat.default()
         format.scale = 6
         let renderer = UIGraphicsImageRenderer(size: size, format: format)
         return renderer.image { context in
             let ctx = context.cgContext
 
-            drawSocialBackground(ctx: ctx, size: size)
+            // Solid ivory background — no gradient + no decorative
+            // border. The floor plan is the hero; chrome would just
+            // shrink it.
+            ctx.setFillColor(socialIvory.cgColor)
+            ctx.fill(CGRect(origin: .zero, size: size))
 
-            var y: CGFloat = 70
-            // No tagline — the floor plan diagram IS the content, and
-            // the bee + wordmark already establishes brand. Avoids the
-            // visual noise of "FLOOR PLAN" labelled twice.
-            y = drawSocialBranding(ctx: ctx, size: size, topY: y, tagline: nil)
-            y = drawSocialEventBlock(ctx: ctx, plan: plan, size: size, topY: y + 24)
+            // Top header strip: tiny bee badge + wordmark, then event
+            // name (bold) + optional date/venue sub-line. Canvas was
+            // grown 1620→1700 to fit the badge without shrinking the
+            // floor plan area.
+            let headerCx = size.width / 2
+            var headerY: CGFloat = 24
 
-            // Floor plan card — generous footprint so it reads as the
-            // hero. Reserved space for the mini-stats line + footer
-            // below so the card has breathing room from the bottom.
-            let cardTop = y + 28
-            let cardBottom = size.height - 200
-            let cardSide: CGFloat = 70
-            let cardRect = CGRect(x: cardSide, y: cardTop,
-                                   width: size.width - cardSide * 2,
-                                   height: cardBottom - cardTop)
+            // Bee badge — small champagne halo + bee logo, centred.
+            let beeSide: CGFloat = 40
+            let haloR = beeSide / 2 + 4
+            let haloRect = CGRect(x: headerCx - haloR,
+                                   y: headerY + beeSide / 2 - haloR,
+                                   width: haloR * 2, height: haloR * 2)
+            ctx.setFillColor(socialChampagne.withAlphaComponent(0.55).cgColor)
+            ctx.fillEllipse(in: haloRect)
+            if let bee = UIImage(named: "SeatbeeLogo") {
+                bee.draw(in: CGRect(x: headerCx - beeSide / 2, y: headerY,
+                                     width: beeSide, height: beeSide))
+            }
+            headerY += beeSide + 6
 
-            // Soft drop-shadow effect via a slightly offset darker
-            // rounded rect peeking out below the card. Subtle — adds
-            // depth without looking "Web 2.0".
-            ctx.saveGState()
-            let shadowRect = cardRect.offsetBy(dx: 0, dy: 6)
-            ctx.setFillColor(UIColor.black.withAlphaComponent(0.06).cgColor)
-            let shadowPath = UIBezierPath(roundedRect: shadowRect, cornerRadius: 18)
-            ctx.addPath(shadowPath.cgPath)
-            ctx.fillPath()
-            ctx.restoreGState()
+            // Wordmark — small "seatbee" beneath the bee.
+            let wordmarkW: CGFloat = 100
+            let wordmarkH: CGFloat = wordmarkW / 6   // 720x120 native ratio
+            if let mark = UIImage(named: "SeatbeeWordmark") {
+                mark.draw(in: CGRect(x: headerCx - wordmarkW / 2, y: headerY,
+                                      width: wordmarkW, height: wordmarkH))
+            }
+            headerY += wordmarkH + 14
 
-            // Card body — slightly off-white with a thin gold border
-            // matching the outer canvas border for visual consistency.
-            ctx.setFillColor(UIColor.white.withAlphaComponent(0.85).cgColor)
-            ctx.setStrokeColor(socialGold.withAlphaComponent(0.4).cgColor)
-            ctx.setLineWidth(1.2)
-            let cardPath = UIBezierPath(roundedRect: cardRect, cornerRadius: 18)
-            ctx.addPath(cardPath.cgPath)
-            ctx.drawPath(using: .fillStroke)
+            var titleSize: CGFloat = 28
+            var titleAttrs: [NSAttributedString.Key: Any] = [
+                .font: UIFont.systemFont(ofSize: titleSize, weight: .semibold),
+                .foregroundColor: socialCharcoal,
+                .kern: 0.6,
+            ]
+            let title = NSString(string: plan.name)
+            var titleMeasured = title.size(withAttributes: titleAttrs)
+            while titleMeasured.width > size.width - 80 && titleSize > 16 {
+                titleSize -= 2
+                titleAttrs[.font] = UIFont.systemFont(ofSize: titleSize, weight: .semibold)
+                titleMeasured = title.size(withAttributes: titleAttrs)
+            }
+            title.draw(at: CGPoint(x: headerCx - titleMeasured.width / 2, y: headerY),
+                       withAttributes: titleAttrs)
+            headerY += titleMeasured.height + 4
 
-            // Inset the actual drawing rect a hair so seat dots and
-            // labels don't kiss the card border.
-            let drawRect = cardRect.insetBy(dx: 16, dy: 16)
+            var subParts: [String] = []
+            if let date = plan.eventDate {
+                let f = DateFormatter()
+                f.dateStyle = .long
+                subParts.append(f.string(from: date))
+            }
+            if let venue = plan.venue, !venue.isEmpty { subParts.append(venue) }
+            if !subParts.isEmpty {
+                let subAttrs: [NSAttributedString.Key: Any] = [
+                    .font: UIFont.systemFont(ofSize: 13, weight: .regular),
+                    .foregroundColor: socialWarm,
+                ]
+                let sub = NSString(string: subParts.joined(separator: " · "))
+                let sSize = sub.size(withAttributes: subAttrs)
+                sub.draw(at: CGPoint(x: headerCx - sSize.width / 2, y: headerY),
+                         withAttributes: subAttrs)
+                headerY += sSize.height
+            }
+
+            // Floor plan area — between the top header and the bottom
+            // strip, with thin side margins. No card chrome, no border,
+            // no shadow — every pixel goes to the diagram.
+            let bottomStripHeight: CGFloat = 70
+            let drawRect = CGRect(x: 32,
+                                   y: headerY + 16,
+                                   width: size.width - 64,
+                                   height: size.height - bottomStripHeight - (headerY + 16) - 16)
             CanvasPDFRenderer.drawFloorPlan(in: ctx, rect: drawRect, plan: plan,
                                              showGuestNames: showGuestNames)
 
-            // Mini-stats line under the card: "110 GUESTS · 19 TABLES".
-            // Small + restrained — the floor plan is the hero, this is
-            // just context. Skip if the plan is empty.
+            // Bottom strip: stats + tiny brand line. Single 14pt row,
+            // dot-separated, kerned so it reads as a print credit
+            // line rather than a "card footer".
             let totalGuests = plan.guests.filter { $0.rsvp != .no }.count
             let totalTables = plan.tables.count
-            if totalGuests > 0 || totalTables > 0 {
-                let statsY = cardBottom + 18
-                let statsAttrs: [NSAttributedString.Key: Any] = [
-                    .font: UIFont.systemFont(ofSize: 16, weight: .semibold),
-                    .foregroundColor: socialWarm,
-                    .kern: 1.5,
-                ]
-                let statsText = NSString(string: "\(totalGuests) GUESTS · \(totalTables) TABLES")
-                let sSize = statsText.size(withAttributes: statsAttrs)
-                statsText.draw(at: CGPoint(x: size.width / 2 - sSize.width / 2, y: statsY),
-                               withAttributes: statsAttrs)
-            }
-
-            drawSocialFooter(ctx: ctx, size: size)
+            let stripY = size.height - bottomStripHeight + 22
+            let creditAttrs: [NSAttributedString.Key: Any] = [
+                .font: UIFont.systemFont(ofSize: 12, weight: .medium),
+                .foregroundColor: socialWarm,
+                .kern: 1.2,
+            ]
+            let urlAttrs: [NSAttributedString.Key: Any] = [
+                .font: UIFont.systemFont(ofSize: 12, weight: .bold),
+                .foregroundColor: socialGoldDk,
+                .kern: 1.2,
+            ]
+            let stats = "\(totalGuests) GUESTS · \(totalTables) TABLES"
+            let credit = "  ·  Made with "
+            let urlText = "Seatbee · seatbee.app"
+            let cw = (stats as NSString).size(withAttributes: creditAttrs).width
+            let cm = (credit as NSString).size(withAttributes: creditAttrs).width
+            let uw = (urlText as NSString).size(withAttributes: urlAttrs).width
+            let totalW = cw + cm + uw
+            var x = (size.width - totalW) / 2
+            (stats as NSString).draw(at: CGPoint(x: x, y: stripY), withAttributes: creditAttrs)
+            x += cw
+            (credit as NSString).draw(at: CGPoint(x: x, y: stripY), withAttributes: creditAttrs)
+            x += cm
+            (urlText as NSString).draw(at: CGPoint(x: x, y: stripY), withAttributes: urlAttrs)
         }
     }
 
