@@ -317,16 +317,17 @@ enum CanvasPDFRenderer {
         }
 
         // Guest names render INSIDE the canvas's scaleBy() transform
-        // (typically ~0.7×) and then again through the export's pixel
-        // scale (4×) — so 7.5pt source ended up at ~21 pixels per name
-        // height, which read as soft when zoomed in Photos. Bumping the
-        // source to 9pt brings effective output to ~25 px without
-        // crowding adjacent labels (names are ~6 chars after truncation).
+        // (typically ~0.62×) and then again through the export's pixel
+        // scale. With the export now at scale 8 and source font 10pt,
+        // effective output ≈ 10 × 0.62 × 8 = ~50 actual pixels per
+        // name. Names are ~6 chars after truncation; the +1 offset bump
+        // (12pt) keeps them clear of seat dots given the slightly larger
+        // glyph height.
         let labelAttrs: [NSAttributedString.Key: Any] = [
-            .font: UIFont.systemFont(ofSize: 9, weight: .semibold),
+            .font: UIFont.systemFont(ofSize: 10, weight: .semibold),
             .foregroundColor: UIColor(red: 0.18, green: 0.18, blue: 0.18, alpha: 1),
         ]
-        let labelOffset: CGFloat = 11  // distance from seat dot to label centre
+        let labelOffset: CGFloat = 12  // distance from seat dot to label centre
 
         for (i, p) in positions.enumerated() {
             guard let g = guestBySeat[i] else { continue }

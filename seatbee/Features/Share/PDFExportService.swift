@@ -1007,19 +1007,16 @@ final class PDFExportService {
         // visual hero and the square crop reads cleanly on IG / X
         // / iMessage previews without letterboxing.
         let size = CGSize(width: 1080, height: 1080)
-        // Force scale = 6 so the underlying pixel buffer is 6480×6480.
-        // Math for the user-visible sharpness:
-        //   guest names render at 9pt, then through CanvasPDFRenderer's
-        //   scaleBy(~0.62 for a typical room fitting the card), then
-        //   through this format scale → 9 × 0.62 × 6 ≈ 33 actual pixels
-        //   per name height. The previous scale=4 only got us to ~22 px,
-        //   which still read as soft when the user zoomed in Photos.
-        // PNG file size lands around 8-12MB on a typical plan — well
-        // under iMessage's 100MB ceiling, well over what AirDrop / Files
-        // care about. Vector PDF is still the best for unlimited zoom;
-        // this is the practical PNG ceiling without redesigning the card.
+        // Force scale = 8 so the underlying pixel buffer is 8640×8640.
+        // Combined with the guest-name font bump to 10pt:
+        //   10pt × ~0.62 (canvas scaleBy) × 8 ≈ 50 actual pixels per
+        //   name height — comfortably sharp at ~8× Photos zoom.
+        // PNG file size lands around 15-25MB on a typical plan, still
+        // under iMessage's 100MB ceiling. This is the practical PNG
+        // ceiling without redesigning the card layout — vector PDF is
+        // the only true unlimited-zoom option from here.
         let format = UIGraphicsImageRendererFormat.default()
-        format.scale = 6
+        format.scale = 8
         let renderer = UIGraphicsImageRenderer(size: size, format: format)
         return renderer.image { context in
             let ctx = context.cgContext
