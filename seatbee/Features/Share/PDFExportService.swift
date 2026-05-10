@@ -1039,11 +1039,15 @@ final class PDFExportService {
             // grown 1620→1700 to fit the badge without shrinking the
             // floor plan area.
             let headerCx = size.width / 2
-            var headerY: CGFloat = 24
+            var headerY: CGFloat = 36
 
-            // Bee badge — small champagne halo + bee logo, centred.
-            let beeSide: CGFloat = 40
-            let haloR = beeSide / 2 + 4
+            // Bee badge — champagne halo + bee logo, centred. The
+            // floor plan diagram is centred inside a 1080×~1430pt
+            // bounding box and almost never fills the full height,
+            // so growing the header by ~80pt is absorbed entirely by
+            // the diagram's own internal padding.
+            let beeSide: CGFloat = 96
+            let haloR = beeSide / 2 + 8
             let haloRect = CGRect(x: headerCx - haloR,
                                    y: headerY + beeSide / 2 - haloR,
                                    width: haloR * 2, height: haloR * 2)
@@ -1053,18 +1057,18 @@ final class PDFExportService {
                 bee.draw(in: CGRect(x: headerCx - beeSide / 2, y: headerY,
                                      width: beeSide, height: beeSide))
             }
-            headerY += beeSide + 6
+            headerY += beeSide + 8
 
-            // Wordmark — small "seatbee" beneath the bee.
-            let wordmarkW: CGFloat = 100
+            // Wordmark — "seatbee" beneath the bee.
+            let wordmarkW: CGFloat = 200
             let wordmarkH: CGFloat = wordmarkW / 6   // 720x120 native ratio
             if let mark = UIImage(named: "SeatbeeWordmark") {
                 mark.draw(in: CGRect(x: headerCx - wordmarkW / 2, y: headerY,
                                       width: wordmarkW, height: wordmarkH))
             }
-            headerY += wordmarkH + 14
+            headerY += wordmarkH + 22
 
-            var titleSize: CGFloat = 28
+            var titleSize: CGFloat = 54
             var titleAttrs: [NSAttributedString.Key: Any] = [
                 .font: UIFont.systemFont(ofSize: titleSize, weight: .semibold),
                 .foregroundColor: socialCharcoal,
@@ -1072,14 +1076,14 @@ final class PDFExportService {
             ]
             let title = NSString(string: plan.name)
             var titleMeasured = title.size(withAttributes: titleAttrs)
-            while titleMeasured.width > size.width - 80 && titleSize > 16 {
+            while titleMeasured.width > size.width - 80 && titleSize > 22 {
                 titleSize -= 2
                 titleAttrs[.font] = UIFont.systemFont(ofSize: titleSize, weight: .semibold)
                 titleMeasured = title.size(withAttributes: titleAttrs)
             }
             title.draw(at: CGPoint(x: headerCx - titleMeasured.width / 2, y: headerY),
                        withAttributes: titleAttrs)
-            headerY += titleMeasured.height + 4
+            headerY += titleMeasured.height + 6
 
             var subParts: [String] = []
             if let date = plan.eventDate {
@@ -1090,7 +1094,7 @@ final class PDFExportService {
             if let venue = plan.venue, !venue.isEmpty { subParts.append(venue) }
             if !subParts.isEmpty {
                 let subAttrs: [NSAttributedString.Key: Any] = [
-                    .font: UIFont.systemFont(ofSize: 13, weight: .regular),
+                    .font: UIFont.systemFont(ofSize: 20, weight: .regular),
                     .foregroundColor: socialWarm,
                 ]
                 let sub = NSString(string: subParts.joined(separator: " · "))
