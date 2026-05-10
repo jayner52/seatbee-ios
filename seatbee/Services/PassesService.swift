@@ -36,7 +36,7 @@ final class PassesService {
         var errorDescription: String? {
             switch self {
             case .unauthorized:           return "Please sign in to manage passes."
-            case .noAvailablePasses:      return "No available passes. Purchase one on seatbee.app to continue."
+            case .noAvailablePasses:      return "No available passes. Purchase one to continue."
             case .alreadyHasPass(let m):  return m
             case .planNotFound:           return "Plan not found."
             case .planOwnerMismatch:      return "This plan does not belong to your account."

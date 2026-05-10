@@ -15,9 +15,7 @@ enum AppConfig {
     static let universalLinkDomain = "seatbee.app"
     static let googlePlacesAPIKey = "" // Add your Google Places API key here
 
-    /// Release flag for Apple IAP. Set to `true` only after the end-to-end
-    /// purchase flow has been QA'd on a TestFlight build. When `false`, tier
-    /// gates still fire but open seatbee.app/pricing in Safari instead of
-    /// the native UpgradeView (so testers don't pay and land in a broken state).
-    static let iapEnabled = false
+    /// Release flag for Apple IAP. Native UpgradeView is shown for all
+    /// tier gates. QA'd on TestFlight 2026-05-09.
+    static let iapEnabled = true
 }
