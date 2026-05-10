@@ -176,6 +176,11 @@ class CanvasViewController: UIViewController, UIScrollViewDelegate {
             let offsetX = max(0, (self.canvasSize.width * 0.8 - self.scrollView.bounds.width) / 2)
             let offsetY = max(0, (self.canvasSize.height * 0.8 - self.scrollView.bounds.height) / 2)
             self.scrollView.contentOffset = CGPoint(x: offsetX, y: offsetY)
+            // Stamp the initial viewport centre so AddTableSheet has
+            // something to spawn against on the very first add — without
+            // this, the persisted dict only fills in after the user has
+            // scrolled or zoomed at least once.
+            self.saveViewport()
         }
     }
 
@@ -641,12 +646,35 @@ class CanvasViewController: UIViewController, UIScrollViewDelegate {
     private func saveViewport() {
         guard let id = planId else { return }
         let key = Self.viewportDefaultsPrefix + id
+        // Compute the centre of the visible region in CANVAS (unscaled)
+        // coordinates so AddTableSheet / VenueObjectsSheet can spawn new
+        // entities right where the user is looking instead of in the
+        // top-left corner. (centreX, centreY) is the canvas-space point
+        // currently under the centre of the viewport.
+        let zoom = scrollView.zoomScale
+        let centreX = (scrollView.contentOffset.x + scrollView.bounds.width / 2) / max(zoom, 0.0001)
+        let centreY = (scrollView.contentOffset.y + scrollView.bounds.height / 2) / max(zoom, 0.0001)
         let dict: [String: Any] = [
-            "zoom": Double(scrollView.zoomScale),
+            "zoom": Double(zoom),
             "offsetX": Double(scrollView.contentOffset.x),
             "offsetY": Double(scrollView.contentOffset.y),
+            "centerX": Double(centreX),
+            "centerY": Double(centreY),
         ]
         UserDefaults.standard.set(dict, forKey: key)
+    }
+
+    /// Read the most recent viewport centre (canvas-space) saved for the
+    /// given plan. Used by AddTableSheet / VenueObjectsSheet to spawn new
+    /// entities at whatever the user is currently looking at, instead of a
+    /// fixed corner-of-canvas grid. Returns nil for plans the canvas
+    /// hasn't ever rendered (first launch on this plan).
+    static func viewportCentre(forPlanId id: String) -> CGPoint? {
+        let key = viewportDefaultsPrefix + id
+        guard let dict = UserDefaults.standard.dictionary(forKey: key),
+              let cx = dict["centerX"] as? Double,
+              let cy = dict["centerY"] as? Double else { return nil }
+        return CGPoint(x: cx, y: cy)
     }
 
     func scrollViewDidEndZooming(_ scrollView: UIScrollView, with view: UIView?, atScale scale: CGFloat) {

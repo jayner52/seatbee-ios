@@ -322,12 +322,19 @@ struct VenueObjectsSheet: View {
 
     private func addObject(_ def: VenueObjectDef) {
         guard var plan = appState.activePlan else { return }
+        // Spawn at the centre of whatever the user is currently looking at
+        // on the canvas — was previously a small jittered area near the
+        // top-left, which sometimes dropped objects off-screen when the
+        // user was zoomed in elsewhere.
+        let spawnPoint = CanvasViewController.viewportCentre(forPlanId: plan.id)
+            ?? CGPoint(x: 200 + Double.random(in: -50...50),
+                       y: 200 + Double.random(in: -50...50))
         let obj = RoomObject(
             id: UUID().uuidString,
             type: def.type,
             name: def.name,
-            x: 200 + Double.random(in: -50...50),
-            y: 200 + Double.random(in: -50...50),
+            x: max(0, Double(spawnPoint.x) - def.width / 2),
+            y: max(0, Double(spawnPoint.y) - def.height / 2),
             width: def.width,
             height: def.height,
             rotation: 0,

@@ -130,13 +130,25 @@ struct AddTableSheet: View {
             default:           return "Table \(tableCount + 1)"
             }
         }()
+        // Spawn at the centre of whatever the user is currently looking
+        // at on the canvas — the previous fixed (100,100) + grid math
+        // dropped tables in the top-left of the room regardless of pan.
+        // CanvasViewController stamps the latest viewport centre to
+        // UserDefaults on every scroll/zoom (and on initial load).
+        let tableW = dims.width ?? dims.diameter ?? 100
+        let tableH = dims.height ?? dims.diameter ?? 100
+        let spawnPoint = CanvasViewController.viewportCentre(forPlanId: plan.id)
+            ?? CGPoint(x: 100 + (tableCount % 3) * 150,
+                       y: 100 + (tableCount / 3) * 150)
         let newTable = SeatTable(
             id: UUID().uuidString,
             name: assignedName,
             type: type,
             seats: seats,
-            x: Double(100 + (tableCount % 3) * 150),
-            y: Double(100 + (tableCount / 3) * 150),
+            // CGPoint is the table's centre; subtract half-size to convert
+            // to top-left, which is what SeatTable.x/y stores.
+            x: max(0, Double(spawnPoint.x) - tableW / 2),
+            y: max(0, Double(spawnPoint.y) - tableH / 2),
             rotation: 0,
             assignments: [:],
             locked: false,
