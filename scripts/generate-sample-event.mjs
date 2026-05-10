@@ -543,34 +543,42 @@ tables.push(head)
 // always cluster there regardless of solver run.
 const roundCols = [180, 460, 740, 1020]
 const roundRows = [560, 730, 900, 1070]  // 170 px (~11 ft) between centers
-// 13 main 8-seat city tables + 2 smaller 4-seat "cocktail" rounds for
-// the bottom-row stragglers. A real reception almost always has a
-// couple of small accent tables for late RSVPs, kids' grandparents,
-// etc — keeping all tables at 8 seats was leaving Capri + Amalfi at
-// 3/8 and 2/8 which read as "broken" instead of "intentional".
+// 13 main 8-seat city tables + Capri as a 4-seat cocktail round next
+// to the Kids Table (Amalfi was dropped — a 1-person table reads as
+// "the solver gave up" rather than "intentional accent"). Bottom row
+// becomes Kyoto / [open floor] / Capri / Kids Table — the gap groups
+// the two small tables together and gives the room some breathing
+// space next to the kids.
 const cityNames = [
   'Paris', 'Rome', 'Venice', 'Barcelona',
   'Santorini', 'Bali', 'Tokyo', 'London',
   'Vienna', 'Prague', 'Lisbon', 'Florence',
-  'Kyoto', 'Capri', 'Amalfi',
+  'Kyoto',
 ]
-let roundIdx = 0
 const gridSlots = []
 for (const y of roundRows) for (const x of roundCols) gridSlots.push({ x, y })
-const kidsSlot = gridSlots.pop()  // last slot (bottom-right) for kids table
-for (const slot of gridSlots) {
-  const isCocktail = roundIdx >= 13  // Capri + Amalfi
-  const seats = isCocktail ? 4 : 8
-  const diameter = isCocktail ? 75 : 100
+const kidsSlot = gridSlots[15]      // bottom-right
+const capriSlot = gridSlots[14]     // bottom-row, third column (next to kids)
+// Build the regular city tables in slots 0–12 (rows 1–3 + the
+// leftmost spot in row 4). Slot 13 is intentionally left empty.
+let roundIdx = 0
+for (const slot of gridSlots.slice(0, 13)) {
   tables.push({
     id: `t_round_${(roundIdx + 1).toString().padStart(2, '0')}`,
     name: cityNames[roundIdx],
-    type: 'round', seats,
-    x: slot.x - diameter / 2, y: slot.y - diameter / 2, diameter,
+    type: 'round', seats: 8,
+    x: slot.x - 50, y: slot.y - 50, diameter: 100,
     color: '#C9A961', assignments: {},
   })
   roundIdx++
 }
+// Capri — small cocktail round next to the Kids Table.
+tables.push({
+  id: 't_round_14', name: 'Capri',
+  type: 'round', seats: 4,
+  x: capriSlot.x - 37, y: capriSlot.y - 37, diameter: 75,
+  color: '#C9A961', assignments: {},
+})
 const kidsTable = {
   id: 't_kids', name: 'Kids Table',
   type: 'round', seats: 5,
@@ -633,10 +641,11 @@ const objects = [
     x: 30, y: 60, width: 40, height: 60,
     color: '#2D2D2D', category: 'structure', isObstacle: false },
 
-  // Welcome Sign — just inside the entrance on the left wall of the
-  // wide section, where guests see it on their way in.
+  // Welcome Sign — right of the entrance, sandwiched between the two
+  // entry florals so the entry zone reads as a complete arrival
+  // display: door → florals → sign → florals.
   { id: 'obj_welcome', type: 'welcome', name: 'Welcome Sign',
-    x: 80, y: 540, width: 60, height: 80,
+    x: 140, y: 150, width: 60, height: 80,
     color: '#C9A961', category: 'services', isObstacle: false },
 
   // Emergency Exit — right wall mid-height. Pushed below the T-stem
