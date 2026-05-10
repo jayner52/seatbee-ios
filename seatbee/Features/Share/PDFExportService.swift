@@ -1007,13 +1007,13 @@ final class PDFExportService {
         // visual hero and the square crop reads cleanly on IG / X
         // / iMessage previews without letterboxing.
         let size = CGSize(width: 1080, height: 1080)
-        // Force scale = 3 so the underlying pixel buffer is 3240×3240
-        // regardless of which device renders it. The default scale
-        // tracks UIScreen.main.scale, which can fall back to 1.0 in
-        // background contexts and ship a granular PNG (user-reported:
-        // names look pixelated when zoomed in on the seating chart).
+        // Force scale = 4 so the underlying pixel buffer is 4320×4320
+        // regardless of which device renders it. Combined with the
+        // guest-name font bump (CanvasPDFRenderer 7.5→9pt), names are
+        // now ~33 actual pixels tall instead of ~16, so they stay sharp
+        // when the user zooms past the native 1080-pt size in Photos.
         let format = UIGraphicsImageRendererFormat.default()
-        format.scale = 3
+        format.scale = 4
         let renderer = UIGraphicsImageRenderer(size: size, format: format)
         return renderer.image { context in
             let ctx = context.cgContext
