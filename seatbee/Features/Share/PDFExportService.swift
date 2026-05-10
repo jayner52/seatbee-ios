@@ -1041,9 +1041,13 @@ final class PDFExportService {
             let headerCx = size.width / 2
             var headerY: CGFloat = 24
 
-            // Bee badge — small champagne halo + bee logo, centred.
-            let beeSide: CGFloat = 40
-            let haloR = beeSide / 2 + 4
+            // Bee badge — champagne halo + bee logo, centred. Sizes
+            // bumped per user feedback that the brand block read as
+            // smaller than the surrounding chrome warranted. The
+            // floor plan area shrinks ~25pt as a result, which is
+            // imperceptible at 1430pt of available vertical.
+            let beeSide: CGFloat = 56
+            let haloR = beeSide / 2 + 5
             let haloRect = CGRect(x: headerCx - haloR,
                                    y: headerY + beeSide / 2 - haloR,
                                    width: haloR * 2, height: haloR * 2)
@@ -1055,16 +1059,16 @@ final class PDFExportService {
             }
             headerY += beeSide + 6
 
-            // Wordmark — small "seatbee" beneath the bee.
-            let wordmarkW: CGFloat = 100
+            // Wordmark — "seatbee" beneath the bee.
+            let wordmarkW: CGFloat = 130
             let wordmarkH: CGFloat = wordmarkW / 6   // 720x120 native ratio
             if let mark = UIImage(named: "SeatbeeWordmark") {
                 mark.draw(in: CGRect(x: headerCx - wordmarkW / 2, y: headerY,
                                       width: wordmarkW, height: wordmarkH))
             }
-            headerY += wordmarkH + 14
+            headerY += wordmarkH + 16
 
-            var titleSize: CGFloat = 28
+            var titleSize: CGFloat = 36
             var titleAttrs: [NSAttributedString.Key: Any] = [
                 .font: UIFont.systemFont(ofSize: titleSize, weight: .semibold),
                 .foregroundColor: socialCharcoal,
@@ -1072,7 +1076,7 @@ final class PDFExportService {
             ]
             let title = NSString(string: plan.name)
             var titleMeasured = title.size(withAttributes: titleAttrs)
-            while titleMeasured.width > size.width - 80 && titleSize > 16 {
+            while titleMeasured.width > size.width - 80 && titleSize > 18 {
                 titleSize -= 2
                 titleAttrs[.font] = UIFont.systemFont(ofSize: titleSize, weight: .semibold)
                 titleMeasured = title.size(withAttributes: titleAttrs)
@@ -1090,7 +1094,7 @@ final class PDFExportService {
             if let venue = plan.venue, !venue.isEmpty { subParts.append(venue) }
             if !subParts.isEmpty {
                 let subAttrs: [NSAttributedString.Key: Any] = [
-                    .font: UIFont.systemFont(ofSize: 13, weight: .regular),
+                    .font: UIFont.systemFont(ofSize: 15, weight: .regular),
                     .foregroundColor: socialWarm,
                 ]
                 let sub = NSString(string: subParts.joined(separator: " · "))
