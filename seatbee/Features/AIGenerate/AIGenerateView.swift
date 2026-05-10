@@ -158,6 +158,16 @@ struct AIGenerateView: View {
                    let scorecard = gen.result.scorecard {
                     lastRunCard(scorecard)
                 }
+                // AI Insight panel — also renders on the ready screen
+                // when there's a cached insight for the active plan.
+                // Without this, generating then leaving the tab and
+                // coming back drops the user into readyState (phase
+                // resets) — the insight was cached on AppState but
+                // had no visible home in readyState. Now the user
+                // sees it under the Last Run card on every return.
+                if case .ready = aiInsight {
+                    aiInsightPanel
+                }
                 generateButton
                 if guestsSeated > 0 {
                     resetButton

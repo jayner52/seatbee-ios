@@ -44,6 +44,13 @@ class CanvasViewController: UIViewController, UIScrollViewDelegate {
     private var didRestoreViewport = false
     private static let viewportDefaultsPrefix = "seatbee.canvasViewport."
 
+    // Live viewport-centre cache, updated on every scroll/zoom step
+    // (not just end-of-gesture). UserDefaults persistence still happens
+    // on end events; this in-memory map exists so AddTableSheet /
+    // VenueObjectsSheet always read the freshest centre, even if the
+    // user taps + mid-deceleration before saveViewport has fired.
+    private static var liveViewportCentres: [String: CGPoint] = [:]
+
     // Room outline + floor plan backdrop layers. Both sit between the
     // dot pattern background (index 0) and the table/object subviews.
     private let floorPlanImageView = UIImageView()
@@ -643,33 +650,42 @@ class CanvasViewController: UIViewController, UIScrollViewDelegate {
         return true
     }
 
+    /// Compute the centre of the visible region in CANVAS (unscaled)
+    /// coordinates and stash it in the live in-memory cache. Cheap —
+    /// just a few divides; safe to call on every scroll frame.
+    private func updateLiveViewportCentre() {
+        guard let id = planId,
+              scrollView.bounds.width > 0,
+              scrollView.bounds.height > 0 else { return }
+        let zoom = max(scrollView.zoomScale, 0.0001)
+        let cx = (scrollView.contentOffset.x + scrollView.bounds.width / 2) / zoom
+        let cy = (scrollView.contentOffset.y + scrollView.bounds.height / 2) / zoom
+        Self.liveViewportCentres[id] = CGPoint(x: cx, y: cy)
+    }
+
     private func saveViewport() {
         guard let id = planId else { return }
+        updateLiveViewportCentre()
         let key = Self.viewportDefaultsPrefix + id
-        // Compute the centre of the visible region in CANVAS (unscaled)
-        // coordinates so AddTableSheet / VenueObjectsSheet can spawn new
-        // entities right where the user is looking instead of in the
-        // top-left corner. (centreX, centreY) is the canvas-space point
-        // currently under the centre of the viewport.
-        let zoom = scrollView.zoomScale
-        let centreX = (scrollView.contentOffset.x + scrollView.bounds.width / 2) / max(zoom, 0.0001)
-        let centreY = (scrollView.contentOffset.y + scrollView.bounds.height / 2) / max(zoom, 0.0001)
+        let centre = Self.liveViewportCentres[id] ?? .zero
         let dict: [String: Any] = [
-            "zoom": Double(zoom),
+            "zoom": Double(scrollView.zoomScale),
             "offsetX": Double(scrollView.contentOffset.x),
             "offsetY": Double(scrollView.contentOffset.y),
-            "centerX": Double(centreX),
-            "centerY": Double(centreY),
+            "centerX": Double(centre.x),
+            "centerY": Double(centre.y),
         ]
         UserDefaults.standard.set(dict, forKey: key)
     }
 
-    /// Read the most recent viewport centre (canvas-space) saved for the
-    /// given plan. Used by AddTableSheet / VenueObjectsSheet to spawn new
-    /// entities at whatever the user is currently looking at, instead of a
-    /// fixed corner-of-canvas grid. Returns nil for plans the canvas
-    /// hasn't ever rendered (first launch on this plan).
+    /// Read the most recent viewport centre (canvas-space) for the given
+    /// plan. Used by AddTableSheet / VenueObjectsSheet to spawn new
+    /// entities at whatever the user is currently looking at. Prefers the
+    /// in-memory live cache (updated on every scroll frame) over the
+    /// UserDefaults persisted value (only updated on end-of-gesture).
+    /// Returns nil for plans the canvas hasn't ever rendered.
     static func viewportCentre(forPlanId id: String) -> CGPoint? {
+        if let live = liveViewportCentres[id] { return live }
         let key = viewportDefaultsPrefix + id
         guard let dict = UserDefaults.standard.dictionary(forKey: key),
               let cx = dict["centerX"] as? Double,
@@ -689,6 +705,16 @@ class CanvasViewController: UIViewController, UIScrollViewDelegate {
         for tv in tableViews.values {
             tv.setZoom(z)
         }
+        updateLiveViewportCentre()
+    }
+
+    /// Fires on every scroll frame. We don't persist on each frame
+    /// (that's saveViewport's job at end-of-gesture), but we DO keep
+    /// the in-memory liveViewportCentres up to date — that's what
+    /// AddTableSheet reads when the user taps + while still mid-pan
+    /// or during deceleration before the end-events fire.
+    func scrollViewDidScroll(_ scrollView: UIScrollView) {
+        updateLiveViewportCentre()
     }
 
     // MARK: - Alignment guides
