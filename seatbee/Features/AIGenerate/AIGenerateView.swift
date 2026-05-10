@@ -71,6 +71,25 @@ struct AIGenerateView: View {
             if appState.userPasses.passes.isEmpty {
                 await appState.refreshPasses()
             }
+            // Restore the previously-cached AI insight when the user
+            // returns to this tab after generating earlier in the
+            // session. The insight lives on AppState so it survives
+            // tab navigation; without this restore the panel comes up
+            // empty even though the run still has a stored insight.
+            if case .idle = aiInsight,
+               let cached = appState.lastGenInsight,
+               cached.planId == appState.activePlan?.id {
+                aiInsight = .ready(cached.result)
+            }
+        }
+        .onChange(of: appState.activePlan?.id) { _, _ in
+            // Switching plans must drop any insight from the previous
+            // plan — it's narrative tied to a specific layout.
+            aiInsight = .idle
+            if let cached = appState.lastGenInsight,
+               cached.planId == appState.activePlan?.id {
+                aiInsight = .ready(cached.result)
+            }
         }
         .alert(
             tierGateAlert?.title ?? "",
@@ -1078,6 +1097,10 @@ struct AIGenerateView: View {
         // Clear any previous insight so the panel doesn't show
         // stale narrative against a freshly-generated layout.
         aiInsight = .idle
+        // Also clear the AppState-cached insight so a tab away/back
+        // round-trip doesn't restore the old narrative on top of a
+        // new run that hasn't completed yet.
+        appState.lastGenInsight = nil
 
         do {
             let result = try await appState.seat.generateSeating(plan: plan)
@@ -1116,6 +1139,18 @@ struct AIGenerateView: View {
         }
     }
 
+    /// Set both the local `aiInsight` and the AppState-cached insight
+    /// in one place so they never drift. AppState's cache is what
+    /// survives a tab navigation; without it the user generates,
+    /// walks to Plans, comes back, and the insight panel is gone.
+    @MainActor
+    private func setInsight(_ state: AIInsightState, planId: String) {
+        aiInsight = state
+        if case .ready(let result) = state {
+            appState.lastGenInsight = (planId: planId, result: result)
+        }
+    }
+
     /// Background AI Insight call. Web-parity narrative analysis
     /// (App.jsx:13051 analyzeWithAI). Failures are swallowed into
     /// state — never throw to caller — so a flaky LLM doesn't ruin
@@ -1128,11 +1163,11 @@ struct AIGenerateView: View {
         // out at 97%, leaving the two cards visibly disagreeing).
         if plan.isDemo {
             let pct = (try? SampleEventService.shared.preBakedResult().scorecard?.overallPercent) ?? 97
-            aiInsight = .ready(AIService.ConflictResult(
+            setInsight(.ready(AIService.ConflictResult(
                 conflicts: [],
                 score: pct,
                 summary: "Sample wedding seated at \(pct)%. The couple is at the sweetheart, the wedding party is together at the head table, and the four children are clustered at the Kids Table with their meal pre-set. Both grandmothers landed within reach of the emergency exit, and the bride's college friends are next to the dance floor where they'll actually use it. Every must-sit family stayed at one table, and the divorced grandparents and rival ex-coworkers are seated apart."
-            ))
+            )), planId: plan.id)
             return
         }
         aiInsight = .loading
@@ -1147,7 +1182,7 @@ struct AIGenerateView: View {
             } else if result.summary.trimmingCharacters(in: .whitespaces).isEmpty {
                 aiInsight = .unparseable
             } else {
-                aiInsight = .ready(result)
+                setInsight(.ready(result), planId: plan.id)
             }
         } catch let err as AIService.AIError {
             aiInsight = .failed(err.localizedDescription)

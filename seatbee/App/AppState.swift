@@ -44,6 +44,14 @@ final class AppState {
     // when the user switches plans. Survives tab navigation within a session.
     var lastGenResult: (planId: String, result: SeatService.GenerateResult)?
 
+    // Last AI insight summary (the post-generate narrative card). Lives on
+    // AppState so it survives tab navigation — without this it was a
+    // @State on AIGenerateView and got discarded the moment the user
+    // walked over to Plans/Edit/Share. Keyed by plan ID so switching
+    // plans invalidates it; cleared on a new run before the network call.
+    // Session-only: app restart wipes it (next run re-fetches).
+    var lastGenInsight: (planId: String, result: AIService.ConflictResult)?
+
     /// Re-fetch the active plan from Supabase so tier/expiry
     /// columns reflect server-side changes (e.g. after an IAP).
     func refreshActivePlan() async {
