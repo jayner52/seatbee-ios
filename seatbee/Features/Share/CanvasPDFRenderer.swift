@@ -242,15 +242,29 @@ enum CanvasPDFRenderer {
             icon.draw(in: iconRect)
         }
 
-        // Label centred under the icon.
+        // Label centred under the icon. Clipped to the object bounds and
+        // truncated with an ellipsis when it doesn't fit — small accent
+        // objects (40×60 entrance, 30×30 speaker) were rendering "Welcome
+        // Sign" / "Main Entrance" at full width and bleeding into their
+        // neighbours. Matches the canvas's UILabel-truncation behaviour.
+        let labelPara = NSMutableParagraphStyle()
+        labelPara.lineBreakMode = .byTruncatingTail
+        labelPara.alignment = .center
         let attrs: [NSAttributedString.Key: Any] = [
             .font: UIFont.systemFont(ofSize: 8, weight: .medium),
             .foregroundColor: textColor,
+            .paragraphStyle: labelPara,
         ]
-        let label = NSString(string: o.name)
-        let size = label.size(withAttributes: attrs)
-        label.draw(at: CGPoint(x: cx - size.width / 2, y: cy + iconPt / 2 - 2),
-                   withAttributes: attrs)
+        // Tiny objects (< 28pt either dimension) — icon already conveys
+        // identity; the label would just be noise. Skip it entirely.
+        if min(w, h) >= 28 {
+            let labelW = w - 4
+            let labelRect = CGRect(x: cx - labelW / 2,
+                                    y: cy + iconPt / 2 - 2,
+                                    width: labelW,
+                                    height: 12)
+            (o.name as NSString).draw(in: labelRect, withAttributes: attrs)
+        }
 
         ctx.restoreGState()
     }
@@ -446,12 +460,22 @@ enum CanvasPDFRenderer {
             return CGPoint(x: p.x + nx * (offset + labelSize.height / 2),
                            y: p.y + ny * (offset + labelSize.height / 2))
         case .rect, .head:
-            // Top row of seats sits above the body, bottom row below.
-            // Push the label further in the same direction so it's
-            // beyond the seat dot.
+            // Head / rect seats sit in a single horizontal row above the
+            // body. With 10 seats on a 400pt table the centres are only
+            // ~40pt apart — labels at 9pt font easily run together into
+            // a smear. Stagger by alternating two height tiers so
+            // adjacent labels never share a line.
             let above = p.y < c.y
+            let direction: CGFloat = above ? -1 : 1
+            // Use the seat's x relative to the body to determine a stable
+            // odd/even index — robust to seat ordering changes.
+            let body = bodySize(for: table)
+            let leftEdge = c.x - body.width / 2
+            let seatSpacing = max(1, body.width / CGFloat(max(1, table.seats)))
+            let approxIdx = Int(((p.x - leftEdge) / seatSpacing).rounded())
+            let tier: CGFloat = (approxIdx & 1 == 0) ? 0 : (labelSize.height + 4)
             return CGPoint(x: p.x,
-                           y: p.y + (above ? -offset : offset))
+                           y: p.y + direction * (offset + tier))
         }
     }
 
