@@ -175,6 +175,26 @@ class CanvasViewController: UIViewController, UIScrollViewDelegate {
         let tap = UITapGestureRecognizer(target: self, action: #selector(handleBackgroundTap(_:)))
         contentView.addGestureRecognizer(tap)
 
+        // Double-tap to toggle zoom (Maps-style). Zooms in toward the tap
+        // point when currently zoomed out, fit-to-content when currently
+        // zoomed in. UIKit routes taps to the topmost hit-test view first,
+        // so a double-tap that lands on a table fires the table's own
+        // double-tap recogniser (open detail sheet) and never reaches us.
+        let doubleTap = UITapGestureRecognizer(target: self, action: #selector(handleDoubleTapToZoom(_:)))
+        doubleTap.numberOfTapsRequired = 2
+        contentView.addGestureRecognizer(doubleTap)
+        // Single-tap-to-deselect waits for the double-tap to fail so it
+        // doesn't fire mid-double-tap and clear the selection on what
+        // turns out to be a zoom gesture.
+        tap.require(toFail: doubleTap)
+
+        // Two-finger tap to zoom out (Maps + Photos convention). Always
+        // calls fitToContent — the conventional pair to double-tap zoom.
+        let twoFingerTap = UITapGestureRecognizer(target: self, action: #selector(handleTwoFingerTapToZoom(_:)))
+        twoFingerTap.numberOfTouchesRequired = 2
+        twoFingerTap.numberOfTapsRequired = 1
+        contentView.addGestureRecognizer(twoFingerTap)
+
         // Initial zoom
         scrollView.zoomScale = 0.8
 
@@ -1099,6 +1119,61 @@ class CanvasViewController: UIViewController, UIScrollViewDelegate {
         selectedType = nil
         updateSelectionVisuals()
         delegate?.canvasDidDeselectAll()
+    }
+
+    /// Maps-style double-tap zoom toggle. Zoomed out → step in toward
+    /// the tap point. Zoomed in → fit to content. Skips when the tap
+    /// lands on a table or object (those have their own double-tap
+    /// recogniser to open the detail sheet, but UIKit hit-testing
+    /// naturally routes to the topmost view first; this guard catches
+    /// the edge case where a double-tap lands on the room outline or
+    /// an item we've decided to special-case in the future).
+    @objc private func handleDoubleTapToZoom(_ gesture: UITapGestureRecognizer) {
+        let pointInContent = gesture.location(in: contentView)
+        // Belt-and-suspenders: if the tapped point is inside any
+        // table/object's frame in content coords, treat as a passthrough
+        // and don't fire the zoom — the table's own recogniser handled it.
+        for (_, tv) in tableViews {
+            let local = tv.convert(pointInContent, from: contentView)
+            if tv.point(inside: local, with: nil) { return }
+        }
+        for (_, ov) in objectViews {
+            let local = ov.convert(pointInContent, from: contentView)
+            if ov.point(inside: local, with: nil) { return }
+        }
+
+        // Threshold for "zoomed in vs out". 1.0 is the canonical 1:1
+        // reference; users browsing the overview sit below it (initial
+        // 0.8), users reading seat names sit well above it.
+        let zoomedIn = scrollView.zoomScale >= 1.0
+        if zoomedIn {
+            // Already zoomed in → fit-to-content for one-gesture reset.
+            fitToContent(animated: true)
+            return
+        }
+
+        // Zooming in toward the tapped point. Compute a rect around the
+        // point sized for the target zoom level — UIScrollView.zoom(to:)
+        // animates pan + zoom together, so the tapped point stays under
+        // the user's finger. Target ~1.8x lands seat initials in the
+        // sweet spot (CanvasTableView's seatLabelZoomThreshold is 1.3,
+        // full-name threshold is 2.0).
+        let targetZoom: CGFloat = 1.8
+        let targetWidth = scrollView.bounds.width / targetZoom
+        let targetHeight = scrollView.bounds.height / targetZoom
+        let targetRect = CGRect(
+            x: pointInContent.x - targetWidth / 2,
+            y: pointInContent.y - targetHeight / 2,
+            width: targetWidth,
+            height: targetHeight
+        )
+        scrollView.zoom(to: targetRect, animated: true)
+    }
+
+    /// Two-finger tap to zoom out (Maps / Photos convention). Always
+    /// fit-to-content. Conventional pair to double-tap zoom-in.
+    @objc private func handleTwoFingerTapToZoom(_ gesture: UITapGestureRecognizer) {
+        fitToContent(animated: true)
     }
 
     private func updateSelectionVisuals() {
