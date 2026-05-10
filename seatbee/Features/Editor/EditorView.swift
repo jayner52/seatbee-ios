@@ -989,8 +989,8 @@ struct EditorView: View {
         // Free plan is capped at 100 SEATED guests — adding to the list
         // is free, but assigning to a table counts.
         guard appState.canSeatGuest(guest.id) else {
-            appState.showUpgrade = true
             HapticEngine.error()
+            dismissSheetsAndShowUpgrade()
             return
         }
         let table = p.tables[ti]
@@ -1163,6 +1163,15 @@ struct EditorView: View {
         Task { try? await appState.database.savePlanData(plan: p) }
     }
 
+    private func dismissSheetsAndShowUpgrade() {
+        showDrawer = false
+        showGuestPicker = false
+        showDetailSheet = false
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+            appState.showUpgrade = true
+        }
+    }
+
     private func deleteTableById(_ id: String) {
         guard var p = appState.activePlan else { return }
         p.tables.removeAll { $0.id == id }
@@ -1280,8 +1289,8 @@ struct EditorView: View {
         // Same tier gate as assignGuestToNextEmpty — every seat-assignment
         // path on the free plan must respect the 100-guest cap.
         guard appState.canSeatGuest(guest.id) else {
-            appState.showUpgrade = true
             HapticEngine.error()
+            dismissSheetsAndShowUpgrade()
             return
         }
         p.tables[ti].assignments[guest.id] = seatIndex
