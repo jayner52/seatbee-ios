@@ -186,6 +186,44 @@ final class AppState {
         return true
     }
 
+    /// Effective expiry date for a plan's pass, mirroring the
+    /// resolution chain used by `activePlanTier`. Required because
+    /// the `event_pass_expires_at` column on `seating_plans` was added
+    /// part-way through the web app's life — older redemptions, admin
+    /// overrides (web's `admin.js:5583`), and some legacy promo paths
+    /// set `tier` without backfilling the column. We fall back to the
+    /// user's pass inventory (which is the source of truth and always
+    /// has `expires_at`).
+    ///
+    /// Resolution order:
+    ///   1. plan.eventPassExpiresAt if set
+    ///   2. user's redeemed pass tied to this plan ID, if any
+    ///   3. plan.eventPassPurchasedAt + 180 days (matches web's
+    ///      TIER_LIMITS expiry for all paid tiers)
+    ///   4. nil — no expiry knowable; UI hides the days-left badge
+    func effectivePassExpiry(for plan: SeatingPlan) -> Date? {
+        if let exp = plan.eventPassExpiresAt { return exp }
+        if let pass = userPasses.passes.first(where: { p in
+            p.status == "redeemed" && p.redeemedForPlanId == plan.id
+        }), let exp = pass.expiresAt {
+            return exp
+        }
+        if let purchased = plan.eventPassPurchasedAt {
+            return Calendar.current.date(byAdding: .day, value: 180, to: purchased)
+        }
+        return nil
+    }
+
+    /// Whole days between now and the plan's effective pass expiry
+    /// (see `effectivePassExpiry`). Returns nil if no expiry is on
+    /// file via any of the resolution paths.
+    func daysRemaining(for plan: SeatingPlan) -> Int? {
+        guard let exp = effectivePassExpiry(for: plan) else { return nil }
+        let secs = exp.timeIntervalSince(Date())
+        guard secs > 0 else { return 0 }
+        return Int(secs / 86_400)
+    }
+
     /// Number of unique guests currently seated at any table. Web parity
     /// (App.jsx ~4463 `seatedCount`) — only this number matters for the
     /// tier cap; the unsorted guest list itself is unmetered.

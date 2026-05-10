@@ -298,7 +298,7 @@ struct DashboardView: View {
     private func tierBadge(for plan: SeatingPlan) -> some View {
         let tier = appState.activePlanTier
         let expired = appState.isActivePlanExpired
-        let daysLeft = daysRemaining(plan)
+        let daysLeft = appState.daysRemaining(for: plan)
 
         if tier == .free || expired {
             // Free / expired → tappable upgrade chip.
@@ -357,13 +357,6 @@ struct DashboardView: View {
         case .proPass:       return (Color.sbCharcoal.opacity(0.10), Color.sbCharcoal)
         case .free:          return (Color.sbChampagne,             Color.sbGoldDk)
         }
-    }
-
-    private func daysRemaining(_ plan: SeatingPlan) -> Int? {
-        guard let exp = plan.eventPassExpiresAt else { return nil }
-        let secs = exp.timeIntervalSince(Date())
-        guard secs > 0 else { return 0 }
-        return Int(secs / 86_400)
     }
 
     // MARK: - Quick Actions
