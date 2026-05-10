@@ -44,6 +44,12 @@ struct GuestsView: View {
     @State private var editingGuest: Guest?
     @FocusState private var searchFocused: Bool
 
+    // Paste-list fallback on the empty state. Mirrors the onboarding
+    // step-2 paste experience so a planner who lands on a fresh event
+    // can drop a list straight in without going through CSV import.
+    @State private var pasteText = ""
+    @State private var pasteParsed: [Guest] = []
+
     private var plan: SeatingPlan? { appState.activePlan }
     private var guests: [Guest] { plan?.guests ?? [] }
 
@@ -276,7 +282,7 @@ struct GuestsView: View {
 
     private var emptyGuestsState: some View {
         VStack(spacing: 20) {
-            Spacer().frame(height: 60)
+            Spacer().frame(height: 40)
             Image(systemName: "person.badge.plus")
                 .font(.system(size: 44))
                 .foregroundStyle(Color.sbGold)
@@ -295,11 +301,94 @@ struct GuestsView: View {
                     showCSVImport = true
                 }
             }
+
+            // OR PASTE divider
+            HStack {
+                Rectangle().fill(Color.sbLine2).frame(height: 1)
+                Text("OR PASTE")
+                    .font(SBFont.capsLabel)
+                    .foregroundStyle(Color.sbWarm)
+                Rectangle().fill(Color.sbLine2).frame(height: 1)
+            }
+            .padding(.top, 4)
+
+            // Paste-list fallback. Same parser as onboarding step 2 so
+            // header-row CSV pastes detect headers, while "Name, diet"
+            // lines come through as one guest per line.
+            ZStack(alignment: .topLeading) {
+                TextEditor(text: $pasteText)
+                    .font(SBFont.body)
+                    .scrollContentBackground(.hidden)
+                    .padding(8)
+                    .focused($searchFocused)
+                    .onChange(of: pasteText) { _, _ in parsePasteText() }
+                if pasteText.isEmpty {
+                    Text("Sarah Chen, vegetarian\nJon Park\nAmir Patel, gluten-free\n…")
+                        .font(SBFont.body)
+                        .foregroundStyle(Color.sbWarm2)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 16)
+                        .allowsHitTesting(false)
+                }
+            }
+            .frame(height: 140)
+            .background(Color.sbIvory2)
+            .clipShape(RoundedRectangle(cornerRadius: SBRadius.button))
+
+            HStack(spacing: 4) {
+                Image(systemName: "lightbulb")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Color.sbGoldDk)
+                Text("Tip: add a comma + dietary note (e.g. \"Sarah Chen, vegetarian\"). Add meals + parties after.")
+                    .font(SBFont.caption)
+                    .foregroundStyle(Color.sbWarm)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .multilineTextAlignment(.leading)
+            }
+
+            if !pasteParsed.isEmpty {
+                SBButton(
+                    title: "Add \(pasteParsed.count) guest\(pasteParsed.count == 1 ? "" : "s")",
+                    icon: "checkmark",
+                    variant: .gold,
+                    fullWidth: true
+                ) {
+                    commitPasteParsed()
+                }
+            }
+
             Spacer()
         }
         .frame(maxWidth: .infinity)
         .padding(.horizontal, SBSpacing.screenMargin)
         .transition(.opacity)
+    }
+
+    // MARK: - Paste-list fallback
+
+    /// Re-parse the paste field on every keystroke. Synchronous and
+    /// cheap — same path the onboarding paste field uses.
+    private func parsePasteText() {
+        guard !pasteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            pasteParsed = []
+            return
+        }
+        pasteParsed = GuestCSVParser.parseFlexible(pasteText).guests
+    }
+
+    /// Commit parsed guests to the active plan, preserving all the
+    /// fields the parser populated (name, firstName, lastName,
+    /// dietary, etc.). Doesn't dedupe — paste twice and you get
+    /// duplicates, same as web.
+    private func commitPasteParsed() {
+        guard var plan = appState.activePlan, !pasteParsed.isEmpty else { return }
+        plan.guests.append(contentsOf: pasteParsed)
+        appState.activePlan = plan
+        let snap = plan
+        Task { try? await appState.database.savePlanData(plan: snap) }
+        HapticEngine.success()
+        pasteText = ""
+        pasteParsed = []
     }
 
     // MARK: - Main Content
