@@ -809,8 +809,11 @@ console.log(`Rules: ${rules.length}`)
 
 console.log(`Solving: ${guests.length} guests, ${tables.length} tables, ${rules.length} rules…`)
 
-// Build solver-shaped guests
-const solverGuests = guests.map(g => ({
+// Build solver-shaped guests. The solver expects callers to pre-filter
+// rsvp == 'no' (web App.jsx:13092 and iOS SeatService both do); without
+// the filter the solver happily seats declined guests, which surfaced
+// as 5 'no' guests sitting at Florence/Kyoto/Lisbon in the demo plan.
+const solverGuests = guests.filter(g => g.rsvp !== 'no').map(g => ({
   id: g.id, name: g.name, party: g.party,
   side: g.side, vip: g.vip, rsvp: g.rsvp,
   meal: g.meal, dietaryTags: g.dietaryTags, isChild: g.isChild,
