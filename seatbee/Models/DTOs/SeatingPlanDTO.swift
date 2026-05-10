@@ -270,10 +270,34 @@ struct GuestDTO: Codable {
     let createdAt: String?
 
     func toDomain() -> Guest {
-        let displayName = display ?? name ?? "\(firstName ?? "") \(lastName ?? "")".trimmingCharacters(in: .whitespaces)
+        // CRITICAL: do not collapse `name` and `display` into a single
+        // field. Earlier versions used `display ?? name ?? first+last`
+        // for both — that meant when web stored name="Asher Russell"
+        // and display="Asher" (web's normal pattern: full name in
+        // `name`, abbreviated form in `display`), iOS dropped the full
+        // name entirely. Guest.name became "Asher", got written back
+        // on save, and web's Full Name field went from "Asher Russell"
+        // to "Asher" after a single round-trip.
+        //
+        // Right priority for the canonical full name:
+        //   1. `name` from the wire (web's authoritative full name)
+        //   2. firstName + " " + lastName join (modern shape)
+        //   3. `display` (last-resort — never preferred over the others)
+        //   4. literal "Guest" so the model never has an empty name.
+        let resolvedName: String = {
+            if let n = name, !n.trimmingCharacters(in: .whitespaces).isEmpty {
+                return n.trimmingCharacters(in: .whitespaces)
+            }
+            let f = firstName ?? ""
+            let l = lastName ?? ""
+            let joined = "\(f) \(l)".trimmingCharacters(in: .whitespaces)
+            if !joined.isEmpty { return joined }
+            if let d = display, !d.isEmpty { return d }
+            return "Guest"
+        }()
         return Guest(
             id: id,
-            name: displayName.isEmpty ? "Guest" : displayName,
+            name: resolvedName,
             firstName: firstName,
             lastName: lastName,
             email: email,
