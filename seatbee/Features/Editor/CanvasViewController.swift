@@ -733,6 +733,13 @@ class CanvasViewController: UIViewController, UIScrollViewDelegate {
         saveViewport()
     }
 
+    // Tab switches destroy the VC entirely (AppRouter uses switch, not TabView).
+    // Save here so a mid-gesture navigation doesn't leave stale data in UserDefaults.
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        saveViewport()
+    }
+
     /// Forward zoom changes to each table view so seats can render
     /// initials past the threshold. setZoom() short-circuits when the
     /// threshold isn't crossed, so this is cheap on every frame.
