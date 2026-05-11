@@ -49,9 +49,44 @@ final class AuthService {
         do {
             let session = try await supabase.auth.session
             currentUser = session.user
+            Task { await recordPageViewPing() }
         } catch {
             currentUser = nil
         }
+    }
+
+    /// Fire-and-forget ping to the web's page-views endpoint. The
+    /// admin dashboard joins city + country onto user records by
+    /// taking the most recent page_views row per user_id; web pings
+    /// it on every page load, but iOS doesn't load web pages, so
+    /// iOS-only users used to show no location. Sending this ping
+    /// once per session (sign-in OR app launch with a restored
+    /// session) closes the gap. City + country are derived
+    /// server-side from Vercel's `x-vercel-ip-city` /
+    /// `x-vercel-ip-country` headers — no Core Location, no permission
+    /// prompts, no Privacy Manifest changes. Failure (offline,
+    /// endpoint down) is silent — location is nice-to-have, not
+    /// load-bearing.
+    private func recordPageViewPing() async {
+        guard let userId = currentUser?.id.uuidString else { return }
+        guard let url = URL(string: "https://www.seatbee.app/api/admin?resource=page-views") else { return }
+        let payload: [String: Any] = [
+            "events": [[
+                "sessionId": UUID().uuidString,
+                "pagePath": "ios:app-session",
+                "userId": userId,
+            ]]
+        ]
+        guard let body = try? JSONSerialization.data(withJSONObject: payload) else { return }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        // Endpoint's bot filter rejects UAs matching bot|crawl|spider|...
+        // "Seatbee-iOS" doesn't match, but make the UA explicit so it's
+        // identifiable in any future server-side filtering.
+        request.setValue("Seatbee-iOS/1.0", forHTTPHeaderField: "User-Agent")
+        request.httpBody = body
+        _ = try? await URLSession.shared.data(for: request)
     }
 
     // MARK: - Profile (web parity — src/hooks/useAuth.jsx)
@@ -267,6 +302,7 @@ final class AuthService {
                 return parts.isEmpty ? nil : parts.joined(separator: " ")
             }()
             await writeIOSSignupProfileIfNew(appleFullName: appleName)
+            Task { await recordPageViewPing() }
         } catch is CancellationError {
             // Task cancelled — not a real error.
         } catch let e {
@@ -296,6 +332,7 @@ final class AuthService {
             }
             currentUser = session.user
             await writeIOSSignupProfileIfNew()
+            Task { await recordPageViewPing() }
         } catch is CancellationError {
             // Task cancelled — not a real error.
         } catch let e {
@@ -335,6 +372,7 @@ final class AuthService {
             let session = try await supabase.auth.session(from: url)
             currentUser = session.user
             await writeIOSSignupProfileIfNew()
+            Task { await recordPageViewPing() }
         } catch {
             self.error = "Failed to complete sign in"
         }
