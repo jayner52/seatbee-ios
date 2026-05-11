@@ -233,4 +233,88 @@ final class PassesService {
         let error: String?
         let code: String?
     }
+
+    // MARK: - Promo Code (discount codes, not gift codes)
+
+    /// Validates a promo code with the web backend. If the code gives a
+    /// 100% discount, redeems a free pass directly. Partial discounts
+    /// can't be applied to StoreKit purchases — returns a message.
+    func validateAndRedeemPromo(code: String, packType: String, planId: String?) async throws -> String {
+        guard let passesURL = URL(string: baseURL),
+              var components = URLComponents(url: passesURL, resolvingAgainstBaseURL: false) else {
+            throw PassesError.server("Invalid URL")
+        }
+
+        // Step 1: Validate the promo code
+        components.path = "/api/create-checkout"
+        components.queryItems = [URLQueryItem(name: "action", value: "validate-promo")]
+        guard let validateURL = components.url else {
+            throw PassesError.server("Invalid validate URL")
+        }
+
+        var request = URLRequest(url: validateURL)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if let token = await AuthService().accessToken {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+
+        let body: [String: Any] = ["code": code, "packType": packType]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse else {
+            throw PassesError.server("Invalid response")
+        }
+
+        struct ValidateResponse: Codable {
+            let valid: Bool
+            let discountType: String?  // "percent" | "fixed" | "free"
+            let discountValue: Double?
+            let code: String?
+            let error: String?
+        }
+
+        let result = try JSONDecoder().decode(ValidateResponse.self, from: data)
+        guard result.valid else {
+            throw PassesError.server(result.error ?? "Invalid promo code")
+        }
+
+        // Step 2: If 100% free, redeem directly
+        if result.discountType == "free" || (result.discountType == "percent" && result.discountValue == 100) {
+            components.path = "/api/passes"
+            components.queryItems = [URLQueryItem(name: "action", value: "redeem-free-pass")]
+            guard let redeemURL = components.url else {
+                throw PassesError.server("Invalid redeem URL")
+            }
+
+            var redeemReq = URLRequest(url: redeemURL)
+            redeemReq.httpMethod = "POST"
+            redeemReq.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            if let token = await AuthService().accessToken {
+                redeemReq.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            }
+
+            var redeemBody: [String: Any] = ["packType": packType, "promoCodeId": result.code ?? code]
+            if let pid = planId { redeemBody["planId"] = pid }
+            redeemReq.httpBody = try JSONSerialization.data(withJSONObject: redeemBody)
+
+            let (redeemData, redeemResponse) = try await URLSession.shared.data(for: redeemReq)
+            guard let redeemHttp = redeemResponse as? HTTPURLResponse, redeemHttp.statusCode == 200 else {
+                let errBody = try? JSONDecoder().decode(ErrorBody.self, from: redeemData)
+                throw PassesError.server(errBody?.error ?? "Failed to redeem free pass")
+            }
+
+            return "Pass unlocked for free! 🎉"
+        }
+
+        // Step 3: Partial discount — can't apply to StoreKit
+        if result.discountType == "percent", let val = result.discountValue {
+            return "Code valid for \(Int(val))% off — apply it at seatbee.app to use the discount."
+        } else if result.discountType == "fixed", let val = result.discountValue {
+            return "Code valid for $\(String(format: "%.2f", val / 100)) off — apply it at seatbee.app to use the discount."
+        }
+
+        return "Code validated but cannot be applied to in-app purchases."
+    }
 }
