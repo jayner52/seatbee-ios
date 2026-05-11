@@ -37,7 +37,6 @@ struct AppRouter: View {
                 .ignoresSafeArea()
             }
         }
-        .coordinateSpace(name: "spotlight")
         .onPreferenceChange(SpotlightPreferenceKey.self) { items in
             for item in items {
                 spotlightRects[item.id] = item.rect

@@ -35,10 +35,12 @@ struct DashboardView: View {
 
     var body: some View {
         NavigationStack {
+            ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: SBSpacing.sectionGapLarge) {
-                    // Greeting
+                    // Greeting — also serves as the scroll-to-top anchor for the tour
                     greeting
+                        .id("dashboard-top")
 
                     // Error state
                     if let loadError {
@@ -126,7 +128,6 @@ struct DashboardView: View {
                             heroCard(plan)
                         }
                         .buttonStyle(.plain)
-                        .spotlightTag("tour_sample")
                     }
 
                     // Quick actions — show whenever we have an active plan
@@ -152,7 +153,19 @@ struct DashboardView: View {
             .refreshable {
                 await loadPlans()
             }
-        }
+            .onChange(of: appState.spotlightStepId) { _, newId in
+                if newId == "tour_sample", let id = samplePlan?.id {
+                    withAnimation(.easeInOut(duration: 0.4)) {
+                        proxy.scrollTo(id, anchor: .center)
+                    }
+                } else if newId == "tour_settings" {
+                    withAnimation(.easeInOut(duration: 0.4)) {
+                        proxy.scrollTo("dashboard-top", anchor: .top)
+                    }
+                }
+            }
+        } // ScrollViewReader
+        } // NavigationStack
         .task {
             await loadPlans()
             // Refresh pass inventory so tier gates anywhere in the app
@@ -446,6 +459,7 @@ struct DashboardView: View {
 
             ForEach(otherPlanRows) { plan in
                 planRow(plan)
+                    .if(plan.id == samplePlan?.id) { $0.spotlightTag("tour_sample") }
             }
         }
     }
