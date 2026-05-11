@@ -2,6 +2,7 @@ import SwiftUI
 
 struct AppRouter: View {
     @Environment(AppState.self) private var appState
+    @State private var showFeatureTour = false
 
     var body: some View {
         @Bindable var state = appState
@@ -35,6 +36,16 @@ struct AppRouter: View {
         .sheet(isPresented: $state.showUpgrade) {
             UpgradeView()
                 .environment(appState)
+        }
+        .fullScreenCover(isPresented: $showFeatureTour) {
+            FeatureTourView()
+        }
+        .onAppear {
+            if !UserDefaults.standard.bool(forKey: "seatbee.hasSeenFeatureTour") {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    showFeatureTour = true
+                }
+            }
         }
     }
 }
