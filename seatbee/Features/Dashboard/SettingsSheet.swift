@@ -302,6 +302,9 @@ struct SettingsSheet: View {
                 profileDisplayName = await appState.auth.loadFullName()
                 profileLoaded = true
             }
+            .onChange(of: appState.showUpgrade) { _, show in
+                if show { dismiss() }
+            }
             .alert("Sign Out?", isPresented: $showSignOutConfirm) {
                 Button("Sign Out", role: .destructive) {
                     Task {
