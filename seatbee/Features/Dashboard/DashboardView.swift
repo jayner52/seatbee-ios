@@ -126,7 +126,6 @@ struct DashboardView: View {
                             heroCard(plan)
                         }
                         .buttonStyle(.plain)
-                        .spotlightTag("tour_sample")
                     }
 
                     // Quick actions — show whenever we have an active plan
@@ -446,6 +445,7 @@ struct DashboardView: View {
 
             ForEach(otherPlanRows) { plan in
                 planRow(plan)
+                    .if(plan.id == samplePlan?.id) { $0.spotlightTag("tour_sample") }
             }
         }
     }
