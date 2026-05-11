@@ -15,6 +15,12 @@ struct SignupConsentView: View {
     @State private var emailMarketingOptIn = true   // matches web default
     @State private var isSubmitting = false
     @State private var enteredName = ""
+    /// Tracks whether the user has manually edited the name field. While
+    /// false, the effective name is derived from `displayName` on every
+    /// render — so if displayName arrives a few hundred ms after first
+    /// render (unlikely but possible during session decode), the name
+    /// section can still hide and the Continue gate stays passable.
+    @State private var nameWasEdited = false
 
     // Web parity: role IDs must match App.jsx line 22633 exactly.
     private static let roleOptions: [(id: String, label: String, icon: String)] = [
@@ -29,7 +35,14 @@ struct SignupConsentView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
                     header
-                    nameSection
+                    // Skip the name section entirely when the OAuth provider
+                    // already gave us a non-empty name (Google always; Apple
+                    // when the user picked "Use My Real Name"). Faster flow,
+                    // no awkward "confirm your name" beat. Editable later
+                    // from Settings if needed.
+                    if !hasPrefilledName {
+                        nameSection
+                    }
                     roleSection
                     marketingSection
                     tosSection
@@ -42,6 +55,27 @@ struct SignupConsentView: View {
             }
             .background(Color.sbIvory)
         }
+    }
+
+    /// The name we'll save on Continue. Derived from OAuth metadata
+    /// when the user hasn't manually typed; from `enteredName` once
+    /// they have. Re-evaluated on every render, so a late-arriving
+    /// `displayName` from the auth session decode flow still flows
+    /// through correctly.
+    private var effectiveName: String {
+        if nameWasEdited { return enteredName }
+        return appState.auth.displayName ?? enteredName
+    }
+
+    /// True when we already know the user's name from the OAuth provider
+    /// (and the user hasn't manually overridden it). Drives whether to
+    /// show the name section.
+    private var hasPrefilledName: Bool {
+        guard !nameWasEdited else { return false }
+        if let name = appState.auth.displayName, !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return true
+        }
+        return false
     }
 
     // MARK: - Sections
@@ -57,9 +91,9 @@ struct SignupConsentView: View {
         }
     }
 
-    // Name field — shown to all new users. Pre-filled from OAuth metadata
-    // (Google/Apple) when available; otherwise the user types their name.
-    // Email/magic-link users have no OAuth name at all.
+    // Name field — only rendered when the OAuth provider didn't give us
+    // a usable name (Apple "Hide My Name" or email/magic-link sign-ins).
+    // Required when shown — Continue stays disabled until non-empty.
     private var nameSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("YOUR NAME")
@@ -77,13 +111,17 @@ struct SignupConsentView: View {
                 )
                 .textContentType(.name)
                 .autocorrectionDisabled()
+                // First keystroke flips the manual-edit flag so further
+                // displayName changes (e.g. an async metadata refresh)
+                // can't overwrite what the user is typing.
+                .onChange(of: enteredName) { nameWasEdited = true }
         }
-        .onAppear {
-            // Pre-fill from OAuth metadata if available
-            if let name = appState.auth.displayName, !name.isEmpty {
-                enteredName = name
-            }
-        }
+    }
+
+    /// Trimmed effective name — drives both the Continue gate and the
+    /// payload saved to the profile.
+    private var trimmedName: String {
+        effectiveName.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private var roleSection: some View {
@@ -183,14 +221,14 @@ struct SignupConsentView: View {
                 await appState.auth.completeSignupConsent(
                     userRoles: Array(selectedRoles),
                     emailMarketingOptIn: emailMarketingOptIn,
-                    displayName: enteredName.isEmpty ? nil : enteredName
+                    displayName: trimmedName
                 )
                 // needsSignupConsent flips to false inside the call,
                 // RootView swaps to AppRouter automatically.
                 isSubmitting = false
             }
         }
-        .disabled(isSubmitting)
+        .disabled(isSubmitting || trimmedName.isEmpty)
     }
 }
 
