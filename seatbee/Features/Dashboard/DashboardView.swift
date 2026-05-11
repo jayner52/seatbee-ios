@@ -8,6 +8,7 @@ struct DashboardView: View {
     @State private var loadError: String?
     @State private var showEditPlan = false
     @State private var showSettings = false
+    @State private var ctaAppeared = false
 
     /// Plan currently driving the hero card. Mirrors appState.activePlan so
     /// switches initiated from any tab keep the dashboard in sync, falling
@@ -61,36 +62,59 @@ struct DashboardView: View {
                             .padding(.top, 40)
                     }
 
-                    // Empty state — prompt to create wedding. Renders when
-                    // the user has no real plans yet AND hasn't tapped the
-                    // sample card to make it active. Sample plan still
-                    // appears in the "Other plans" list below for them
-                    // to discover.
-                    if !isLoading && hasNoRealPlans && activePlan == nil && loadError == nil {
-                        VStack(spacing: 20) {
-                            Spacer().frame(height: 20)
+                    // Welcome CTA — shown when the user has no real plans.
+                    // Encourages creating their own event while keeping
+                    // the sample plan visible below for exploration.
+                    if !isLoading && hasNoRealPlans && loadError == nil {
+                        VStack(spacing: 16) {
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 28))
+                                .foregroundStyle(Color.sbGold)
+                                .scaleEffect(ctaAppeared ? 1 : 0.6)
+                                .opacity(ctaAppeared ? 1 : 0)
 
-                            Image("SeatbeeLogo")
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                                .frame(width: 64, height: 64)
-
-                            Text("Your wedding,\nperfectly seated")
+                            Text("Ready to plan\nyour event?")
                                 .font(SBFont.displayLarge)
                                 .foregroundStyle(Color.sbCharcoal)
                                 .multilineTextAlignment(.center)
+                                .opacity(ctaAppeared ? 1 : 0)
+                                .offset(y: ctaAppeared ? 0 : 12)
 
                             Text("Create your seating plan in minutes with AI")
                                 .font(SBFont.body)
                                 .foregroundStyle(Color.sbWarm)
                                 .multilineTextAlignment(.center)
+                                .opacity(ctaAppeared ? 1 : 0)
+                                .offset(y: ctaAppeared ? 0 : 12)
 
-                            SBButton(title: "Plan your wedding", icon: "sparkles", variant: .gold, fullWidth: true) {
+                            SBButton(title: "Start planning", icon: "sparkles", variant: .gold, fullWidth: true) {
                                 appState.showOnboarding = true
                             }
+                            .opacity(ctaAppeared ? 1 : 0)
+                            .offset(y: ctaAppeared ? 0 : 16)
                         }
                         .frame(maxWidth: .infinity)
-                        .padding(.top, 20)
+                        .padding(.vertical, 28)
+                        .padding(.horizontal, 20)
+                        .background(
+                            RoundedRectangle(cornerRadius: 20)
+                                .fill(
+                                    LinearGradient(
+                                        colors: [Color.sbChampagne.opacity(0.6), Color.sbIvory],
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    )
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 20)
+                                        .strokeBorder(Color.sbGold.opacity(0.3), lineWidth: 1)
+                                )
+                        )
+                        .onAppear {
+                            withAnimation(.spring(response: 0.7, dampingFraction: 0.8).delay(0.2)) {
+                                ctaAppeared = true
+                            }
+                        }
                     }
 
                     // Hero card - active event
