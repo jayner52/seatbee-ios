@@ -504,15 +504,21 @@ struct DashboardView: View {
 
     // MARK: - Helpers
 
+    private func attendingGuests(_ plan: SeatingPlan) -> [Guest] {
+        plan.guests.filter { $0.rsvp != .no }
+    }
+
     private func seatedProgress(_ plan: SeatingPlan) -> CGFloat {
-        guard plan.guests.count > 0 else { return 0 }
-        let seated = plan.tables.reduce(0) { $0 + $1.filledCount }
-        return CGFloat(seated) / CGFloat(plan.guests.count)
+        let attending = attendingGuests(plan)
+        guard !attending.isEmpty else { return 0 }
+        let seatedIds = Set(plan.tables.flatMap { $0.assignments.keys })
+        let seatedCount = attending.filter { seatedIds.contains($0.id) }.count
+        return CGFloat(seatedCount) / CGFloat(attending.count)
     }
 
     private func unseatedCount(_ plan: SeatingPlan) -> Int {
-        let seated = plan.tables.reduce(0) { $0 + $1.filledCount }
-        return max(0, plan.guests.count - seated)
+        let seatedIds = Set(plan.tables.flatMap { $0.assignments.keys })
+        return attendingGuests(plan).filter { !seatedIds.contains($0.id) }.count
     }
 
     private func loadPlans() async {
