@@ -75,6 +75,7 @@ struct SBTabBar: View {
                     .letterSpacing(0.5)
             }
             .frame(maxWidth: .infinity)
+            .spotlightTag("tour_tab_\(tab.label.lowercased())")
         }
         .buttonStyle(.plain)
     }

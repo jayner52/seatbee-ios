@@ -125,6 +125,7 @@ struct DashboardView: View {
                             heroCard(plan)
                         }
                         .buttonStyle(.plain)
+                        .spotlightTag("tour_sample")
                     }
 
                     // Quick actions — show whenever we have an active plan
@@ -190,6 +191,7 @@ struct DashboardView: View {
                     .background(Color.sbChampagne)
                     .clipShape(Circle())
             }
+            .spotlightTag("tour_plus")
 
             Button {
                 showSettings = true
@@ -201,6 +203,7 @@ struct DashboardView: View {
                     .background(Color.sbIvory2)
                     .clipShape(Circle())
             }
+            .spotlightTag("tour_settings")
         }
     }
 
