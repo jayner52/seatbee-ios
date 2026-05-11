@@ -10,6 +10,11 @@ struct UpgradeView: View {
     @State private var showSuccess = false
     @State private var shimmerOffset: CGFloat = -200
     @State private var appearAnimation = false
+    @State private var promoCode = ""
+    @State private var showPromoField = false
+    @State private var redeemingPromo = false
+    @State private var promoMessage: String?
+    @State private var promoSuccess = false
 
     private var daysUntilWedding: Int? {
         guard let date = appState.activePlan?.eventDate else { return nil }
@@ -74,6 +79,11 @@ struct UpgradeView: View {
                     // What's included
                     whatsIncluded
                         .padding(.top, 28)
+                        .padding(.horizontal, 20)
+
+                    // Promo code
+                    promoCodeSection
+                        .padding(.top, 20)
                         .padding(.horizontal, 20)
 
                     // Trust
@@ -438,6 +448,95 @@ struct UpgradeView: View {
             Text("Manage your subscription in Settings")
                 .font(.system(size: 11))
                 .foregroundStyle(Color.sbWarm2)
+        }
+    }
+
+    // MARK: - Promo Code
+
+    private var promoCodeSection: some View {
+        VStack(spacing: 10) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    showPromoField.toggle()
+                }
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "tag")
+                        .font(.system(size: 12))
+                    Text("Have a promo code?")
+                        .font(SBFont.inter(13, weight: .medium))
+                    Image(systemName: showPromoField ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 10, weight: .semibold))
+                }
+                .foregroundStyle(Color.sbGoldDk)
+            }
+            .buttonStyle(.plain)
+
+            if showPromoField {
+                HStack(spacing: 8) {
+                    TextField("SEAT-XXXX-XXXX", text: $promoCode)
+                        .font(.system(size: 13, weight: .medium, design: .monospaced))
+                        .textInputAutocapitalization(.characters)
+                        .autocorrectionDisabled()
+                        .padding(10)
+                        .background(Color.sbIvory2)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .strokeBorder(Color.sbLine, lineWidth: 1)
+                        )
+
+                    Button {
+                        Task { await submitPromoCode() }
+                    } label: {
+                        Text(redeemingPromo ? "…" : "Redeem")
+                            .font(SBFont.inter(13, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 10)
+                            .background(canSubmitPromo ? Color.sbGoldDk : Color.sbWarm2)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                    .disabled(!canSubmitPromo)
+                    .buttonStyle(.plain)
+                }
+
+                if let message = promoMessage {
+                    Text(message)
+                        .font(SBFont.caption)
+                        .foregroundStyle(promoSuccess ? Color.sbGoldDk : Color.sbError)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+        }
+    }
+
+    private var canSubmitPromo: Bool {
+        !redeemingPromo && promoCode.trimmingCharacters(in: .whitespaces).count >= 4
+    }
+
+    private func submitPromoCode() async {
+        let code = promoCode.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !code.isEmpty else { return }
+        redeemingPromo = true
+        promoMessage = nil
+        promoSuccess = false
+        defer { redeemingPromo = false }
+        do {
+            let result = try await appState.passes.redeemGiftCode(code)
+            HapticEngine.success()
+            await appState.refreshPasses()
+            await appState.refreshActivePlan()
+            promoSuccess = true
+            promoMessage = result.message ?? "Pass redeemed! 🎉"
+            promoCode = ""
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { dismiss() }
+        } catch let err as PassesService.PassesError {
+            HapticEngine.error()
+            promoMessage = err.localizedDescription
+        } catch {
+            HapticEngine.error()
+            promoMessage = error.localizedDescription
         }
     }
 
