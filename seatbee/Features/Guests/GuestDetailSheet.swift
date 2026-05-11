@@ -303,7 +303,13 @@ struct GuestDetailSheet: View {
                 Text("This will remove \(guest?.displayName ?? "this guest") from the plan.")
             }
             .onChange(of: showTierLimitAlert) { _, show in
-                if show { showTierLimitAlert = false; appState.showUpgrade = true }
+                if show {
+                    showTierLimitAlert = false
+                    dismiss()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                        appState.showUpgrade = true
+                    }
+                }
             }
         }
         .onAppear { loadGuest() }
