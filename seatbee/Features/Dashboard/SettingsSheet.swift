@@ -249,6 +249,21 @@ struct SettingsSheet: View {
                                 .foregroundStyle(Color.sbWarm)
                         }
                     }
+                    Button {
+                        dismiss()
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                            appState.selectedTab = .plans
+                            appState.showSpotlightTour = true
+                        }
+                    } label: {
+                        HStack {
+                            Text("Replay Feature Tour")
+                            Spacer()
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 12))
+                                .foregroundStyle(Color.sbGoldDk)
+                        }
+                    }
                 } header: {
                     Text("Help & Legal")
                 }
