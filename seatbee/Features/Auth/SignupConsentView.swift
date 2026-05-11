@@ -29,7 +29,14 @@ struct SignupConsentView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
                     header
-                    nameSection
+                    // Skip the name section entirely when the OAuth provider
+                    // already gave us a non-empty name (Google always; Apple
+                    // when the user picked "Use My Real Name"). Faster flow,
+                    // no awkward "confirm your name" beat. Editable later
+                    // from Settings if needed.
+                    if !hasPrefilledName {
+                        nameSection
+                    }
                     roleSection
                     marketingSection
                     tosSection
@@ -42,6 +49,23 @@ struct SignupConsentView: View {
             }
             .background(Color.sbIvory)
         }
+        .onAppear {
+            // Pre-fill enteredName at the view level (not just inside the
+            // nameSection's onAppear) so the Continue gate has a populated
+            // value even when the name section itself is hidden.
+            if let name = appState.auth.displayName, !name.isEmpty {
+                enteredName = name
+            }
+        }
+    }
+
+    /// True when we already know the user's name from the OAuth provider
+    /// (or any pre-fill source). Drives whether to show the name section.
+    private var hasPrefilledName: Bool {
+        if let name = appState.auth.displayName, !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return true
+        }
+        return false
     }
 
     // MARK: - Sections
@@ -57,10 +81,9 @@ struct SignupConsentView: View {
         }
     }
 
-    // Name field — required, since Apple Sign-In often hides the name
-    // ("Hide My Email" / "Hide My Name" defaults) and email/magic-link
-    // sign-ins have no OAuth name to fall back on. Pre-filled from
-    // OAuth metadata when available; required to continue when not.
+    // Name field — only rendered when the OAuth provider didn't give us
+    // a usable name (Apple "Hide My Name" or email/magic-link sign-ins).
+    // Required when shown — Continue stays disabled until non-empty.
     private var nameSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("YOUR NAME")
@@ -78,12 +101,6 @@ struct SignupConsentView: View {
                 )
                 .textContentType(.name)
                 .autocorrectionDisabled()
-        }
-        .onAppear {
-            // Pre-fill from OAuth metadata if available
-            if let name = appState.auth.displayName, !name.isEmpty {
-                enteredName = name
-            }
         }
     }
 
