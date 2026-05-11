@@ -204,10 +204,11 @@ class CanvasViewController: UIViewController, UIScrollViewDelegate {
             let offsetY = max(0, (self.canvasSize.height * 0.8 - self.scrollView.bounds.height) / 2)
             self.scrollView.contentOffset = CGPoint(x: offsetX, y: offsetY)
             // Stamp the initial viewport centre so AddTableSheet has
-            // something to spawn against on the very first add — without
-            // this, the persisted dict only fills in after the user has
-            // scrolled or zoomed at least once.
-            self.saveViewport()
+            // something to spawn against on the very first add. Use
+            // updateLiveViewportCentre (not saveViewport) so we don't
+            // overwrite UserDefaults with the initial zoom=0.8 before
+            // restoreViewport has had a chance to read the user's real value.
+            self.updateLiveViewportCentre()
         }
     }
 
