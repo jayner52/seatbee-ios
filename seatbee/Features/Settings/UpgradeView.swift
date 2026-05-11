@@ -461,9 +461,9 @@ struct UpgradeView: View {
                 }
             } label: {
                 HStack(spacing: 4) {
-                    Image(systemName: "tag")
+                    Image(systemName: "gift")
                         .font(.system(size: 12))
-                    Text("Have a promo code?")
+                    Text("Have a gift code?")
                         .font(SBFont.inter(13, weight: .medium))
                     Image(systemName: showPromoField ? "chevron.up" : "chevron.down")
                         .font(.system(size: 10, weight: .semibold))
@@ -474,7 +474,7 @@ struct UpgradeView: View {
 
             if showPromoField {
                 HStack(spacing: 8) {
-                    TextField("Enter code", text: $promoCode)
+                    TextField("SEAT-XXXX-XXXX", text: $promoCode)
                         .font(.system(size: 13, weight: .medium, design: .monospaced))
                         .textInputAutocapitalization(.characters)
                         .autocorrectionDisabled()
@@ -487,9 +487,9 @@ struct UpgradeView: View {
                         )
 
                     Button {
-                        Task { await submitPromoCode() }
+                        Task { await submitGiftCode() }
                     } label: {
-                        Text(redeemingPromo ? "…" : "Apply")
+                        Text(redeemingPromo ? "…" : "Redeem")
                             .font(SBFont.inter(13, weight: .semibold))
                             .foregroundStyle(.white)
                             .padding(.horizontal, 14)
@@ -515,51 +515,28 @@ struct UpgradeView: View {
         !redeemingPromo && promoCode.trimmingCharacters(in: .whitespaces).count >= 4
     }
 
-    private func submitPromoCode() async {
+    private func submitGiftCode() async {
         let code = promoCode.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
         guard !code.isEmpty else { return }
         redeemingPromo = true
         promoMessage = nil
         promoSuccess = false
         defer { redeemingPromo = false }
-
-        if code.hasPrefix("SEAT-") {
-            // Gift code — redeem via /api/redeem-gift-code
-            do {
-                let result = try await appState.passes.redeemGiftCode(code)
-                HapticEngine.success()
-                await appState.refreshPasses()
-                await appState.refreshActivePlan()
-                promoSuccess = true
-                promoMessage = result.message ?? "Gift pass added!"
-                promoCode = ""
-                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { dismiss() }
-            } catch let err as PassesService.PassesError {
-                HapticEngine.error()
-                promoMessage = err.localizedDescription
-            } catch {
-                HapticEngine.error()
-                promoMessage = error.localizedDescription
-            }
-        } else {
-            // Promo code — validate via /api/create-checkout, redeem if 100% free
-            do {
-                let result = try await appState.passes.validateAndRedeemPromo(
-                    code: code,
-                    packType: selectedProduct.rawValue,
-                    planId: appState.activePlan?.id
-                )
-                HapticEngine.success()
-                await appState.refreshPasses()
-                await appState.refreshActivePlan()
-                promoSuccess = true
-                promoMessage = result
-                promoCode = ""
-                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { dismiss() }
-            } catch {
-                HapticEngine.error()
-                promoMessage = error.localizedDescription
-            }
+        do {
+            let result = try await appState.passes.redeemGiftCode(code)
+            HapticEngine.success()
+            await appState.refreshPasses()
+            await appState.refreshActivePlan()
+            promoSuccess = true
+            promoMessage = result.message ?? "Gift pass added!"
+            promoCode = ""
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { dismiss() }
+        } catch let err as PassesService.PassesError {
+            HapticEngine.error()
+            promoMessage = err.localizedDescription
+        } catch {
+            HapticEngine.error()
+            promoMessage = error.localizedDescription
         }
     }
 
