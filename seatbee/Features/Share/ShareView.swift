@@ -743,7 +743,7 @@ struct ShareView: View {
                                 .clipShape(Capsule())
                         }
                     }
-                    Text("Place cards or table seating cards")
+                    Text("Bulk-create place cards & table seating cards")
                         .font(SBFont.caption)
                         .foregroundStyle(Color.sbWarm)
                         .lineLimit(2)
