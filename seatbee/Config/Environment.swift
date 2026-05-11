@@ -13,7 +13,7 @@ enum AppConfig {
     static let passesAPIBaseURL = "https://www.seatbee.app/api/passes"
     static let appScheme = "seatbee"
     static let universalLinkDomain = "seatbee.app"
-    static let googlePlacesAPIKey = "" // Add your Google Places API key here
+    static let googlePlacesAPIKey = Secrets.googlePlacesAPIKey
 
     /// Release flag for Apple IAP. Native UpgradeView is shown for all
     /// tier gates. QA'd on TestFlight 2026-05-09.
