@@ -57,9 +57,10 @@ struct SignupConsentView: View {
         }
     }
 
-    // Name field — shown to all new users. Pre-filled from OAuth metadata
-    // (Google/Apple) when available; otherwise the user types their name.
-    // Email/magic-link users have no OAuth name at all.
+    // Name field — required, since Apple Sign-In often hides the name
+    // ("Hide My Email" / "Hide My Name" defaults) and email/magic-link
+    // sign-ins have no OAuth name to fall back on. Pre-filled from
+    // OAuth metadata when available; required to continue when not.
     private var nameSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("YOUR NAME")
@@ -84,6 +85,12 @@ struct SignupConsentView: View {
                 enteredName = name
             }
         }
+    }
+
+    /// Trimmed name — empty after trim disables Continue, so a user
+    /// can't proceed by typing whitespace.
+    private var trimmedName: String {
+        enteredName.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private var roleSection: some View {
@@ -183,14 +190,14 @@ struct SignupConsentView: View {
                 await appState.auth.completeSignupConsent(
                     userRoles: Array(selectedRoles),
                     emailMarketingOptIn: emailMarketingOptIn,
-                    displayName: enteredName.isEmpty ? nil : enteredName
+                    displayName: trimmedName
                 )
                 // needsSignupConsent flips to false inside the call,
                 // RootView swaps to AppRouter automatically.
                 isSubmitting = false
             }
         }
-        .disabled(isSubmitting)
+        .disabled(isSubmitting || trimmedName.isEmpty)
     }
 }
 
