@@ -220,10 +220,17 @@ struct SettingsSheet: View {
                     Text("About")
                 }
 
-                // Legal — Apple App Store 5.1.1 requires Privacy
-                // Policy + Terms of Service to be reachable in-app,
-                // not just on first signup.
+                // Help & Legal
                 Section {
+                    Link(destination: URL(string: "https://www.seatbee.app/help")!) {
+                        HStack {
+                            Text("Help Centre")
+                            Spacer()
+                            Image(systemName: "arrow.up.right")
+                                .font(.system(size: 12))
+                                .foregroundStyle(Color.sbWarm)
+                        }
+                    }
                     Link(destination: URL(string: "https://seatbee.app/privacy")!) {
                         HStack {
                             Text("Privacy Policy")
@@ -243,7 +250,7 @@ struct SettingsSheet: View {
                         }
                     }
                 } header: {
-                    Text("Legal")
+                    Text("Help & Legal")
                 }
 
                 // Sign out + Delete account
