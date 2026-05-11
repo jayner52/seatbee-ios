@@ -298,7 +298,19 @@ struct DashboardView: View {
         let expired = appState.isActivePlanExpired
         let daysLeft = appState.daysRemaining(for: plan)
 
-        if tier == .free || expired {
+        if plan.isDemo {
+            HStack(spacing: 6) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 11, weight: .semibold))
+                Text("Sample")
+                    .font(SBFont.bodySmallBold)
+            }
+            .foregroundStyle(Color.sbGoldDk)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(Color.sbChampagne)
+            .clipShape(Capsule())
+        } else if tier == .free || expired {
             // Free / expired → tappable upgrade chip.
             Button {
                 appState.showUpgrade = true
