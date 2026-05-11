@@ -50,8 +50,42 @@ final class AuthService {
             let session = try await supabase.auth.session
             currentUser = session.user
             Task { await recordPageViewPing() }
+            Task { await backfillSignupPlatformIfMissing() }
         } catch {
             currentUser = nil
+        }
+    }
+
+    /// Backfill `profiles.signup_platform = 'ios'` for users whose
+    /// column is null. The original write in `writeIOSSignupProfileIfNew`
+    /// is gated by `accountAgeSec < 60`, so users who signed up before
+    /// the column was wired (or whose first-write failed transiently)
+    /// stay null forever and don't get the iOS badge in the admin
+    /// dashboard. This top-up runs on every session restore but only
+    /// writes when the value is currently null — so a user who legit
+    /// signed up on web and later signed in on iOS keeps their 'web'
+    /// signup_platform. Failure (offline, RLS, column missing) is silent.
+    private func backfillSignupPlatformIfMissing() async {
+        guard let user = currentUser else { return }
+        struct Row: Decodable { let signup_platform: String? }
+        do {
+            let row: Row = try await supabase
+                .from("profiles")
+                .select("signup_platform")
+                .eq("id", value: user.id.uuidString)
+                .single()
+                .execute()
+                .value
+            guard row.signup_platform == nil else { return }
+            struct Patch: Encodable { let signup_platform: String }
+            try await supabase
+                .from("profiles")
+                .update(Patch(signup_platform: "ios"))
+                .eq("id", value: user.id.uuidString)
+                .execute()
+        } catch {
+            // Don't surface — backfill is best-effort, not load-bearing
+            print("[Auth] signup_platform backfill skipped: \(error)")
         }
     }
 
@@ -134,19 +168,38 @@ final class AuthService {
             user_roles: [],
             full_name: nameToStore
         )
-        do {
-            try await supabase
-                .from("profiles")
-                .update(payload)
-                .eq("id", value: user.id.uuidString)
-                .execute()
-            print("[Auth] iOS profile signup row written for \(user.email ?? user.id.uuidString)")
-        } catch {
-            // Never block sign-up on a profile write — the user is still
-            // authenticated and can use the app. The Settings sheet's
-            // role/marketing toggles can backfill later.
-            print("[Auth] iOS profile write failed: \(error)")
+        // Race: Supabase's auth.users → profiles trigger creates the
+        // initial profile row asynchronously. iOS sign-in is fast
+        // enough (especially Apple) that this .update() can fire
+        // before the row exists, matching zero rows and silently
+        // doing nothing — no error thrown, just no write. Symptom:
+        // newly-signed-up iOS users land in the admin dashboard with
+        // null signup_platform / tos_agreed_at / etc. forever.
+        //
+        // Retry up to 4 times at 300ms intervals so the trigger has
+        // a ~1.2s window to land. .select() returns the affected
+        // rows so we can detect the zero-row case and retry.
+        struct ResponseRow: Decodable { let id: String }
+        for attempt in 0..<4 {
+            do {
+                let rows: [ResponseRow] = try await supabase
+                    .from("profiles")
+                    .update(payload)
+                    .eq("id", value: user.id.uuidString)
+                    .select("id")
+                    .execute()
+                    .value
+                if !rows.isEmpty {
+                    print("[Auth] iOS profile signup row written for \(user.email ?? user.id.uuidString) on attempt \(attempt + 1)")
+                    return
+                }
+                print("[Auth] iOS profile write affected 0 rows (attempt \(attempt + 1)/4) — profiles trigger probably hasn't landed yet")
+            } catch {
+                print("[Auth] iOS profile write attempt \(attempt + 1) failed: \(error)")
+            }
+            try? await Task.sleep(nanoseconds: 300_000_000)
         }
+        print("[Auth] iOS profile write failed after 4 attempts — backfillSignupPlatformIfMissing will catch it on next session")
     }
 
     /// Subset of profiles columns iOS reads in Settings. Mirrors the
