@@ -169,13 +169,18 @@ final class AuthService {
         // Google/OAuth metadata already in userMetadata.
         let nameToStore: String? = appleFullName ?? displayName
 
+        // `profiles.name` is the canonical name column (not `full_name`,
+        // which doesn't exist on this schema). Web's admin endpoint reads
+        // it via `authNameMap[id]?.full_name || p.name` — OAuth providers
+        // fill auth.users metadata, but email-magic-link users only have
+        // the value we write here.
         struct ProfilePayload: Encodable {
             let signup_platform: String
             let signup_source: String
             let tos_agreed_at: String
             let email_marketing_opt_in: Bool
             let user_roles: [String]
-            let full_name: String?
+            let name: String?
         }
         let payload = ProfilePayload(
             signup_platform: "ios",
@@ -183,7 +188,7 @@ final class AuthService {
             tos_agreed_at: ISO8601DateFormatter().string(from: Date()),
             email_marketing_opt_in: true,
             user_roles: [],
-            full_name: nameToStore
+            name: nameToStore
         )
         // Race: Supabase's auth.users → profiles trigger creates the
         // initial profile row asynchronously. iOS sign-in is fast
@@ -228,7 +233,7 @@ final class AuthService {
 
     /// Fetches the active user's profile row. Returns nil when there
     /// is no signed-in user or the row doesn't exist (legacy / pre-trigger).
-    /// Intentionally omits full_name — fetched separately via loadFullName()
+    /// Intentionally omits name — fetched separately via loadFullName()
     /// so a missing column never breaks role/marketing loading.
     func loadProfile() async -> UserProfile? {
         guard let user = currentUser else { return nil }
@@ -247,33 +252,33 @@ final class AuthService {
         }
     }
 
-    /// Fetches full_name from the profiles table. Separate from loadProfile
-    /// so a missing column (before migration) never breaks role/marketing loading.
+    /// Fetches `name` from the profiles table. Separate from loadProfile
+    /// so a transient failure never breaks role/marketing loading.
     func loadFullName() async -> String? {
         guard let user = currentUser else { return nil }
-        struct NameRow: Decodable { let full_name: String? }
+        struct NameRow: Decodable { let name: String? }
         do {
             let row: NameRow = try await supabase
                 .from("profiles")
-                .select("full_name")
+                .select("name")
                 .eq("id", value: user.id.uuidString)
                 .single()
                 .execute()
                 .value
-            return row.full_name
+            return row.name
         } catch {
-            // Column may not exist yet — fail silently, use OAuth metadata instead.
+            // Fail silently — falls back to OAuth metadata in the UI.
             return nil
         }
     }
 
     func updateDisplayName(_ name: String) async {
         guard let user = currentUser, !name.trimmingCharacters(in: .whitespaces).isEmpty else { return }
-        struct Payload: Encodable { let full_name: String }
+        struct Payload: Encodable { let name: String }
         do {
             try await supabase
                 .from("profiles")
-                .update(Payload(full_name: name))
+                .update(Payload(name: name))
                 .eq("id", value: user.id.uuidString)
                 .execute()
         } catch {
@@ -321,13 +326,13 @@ final class AuthService {
         struct ConsentPayload: Encodable {
             let user_roles: [String]
             let email_marketing_opt_in: Bool
-            let full_name: String?
+            let name: String?
         }
         let nameToStore = displayName.flatMap { $0.trimmingCharacters(in: .whitespaces).isEmpty ? nil : $0 }
         let payload = ConsentPayload(
             user_roles: userRoles,
             email_marketing_opt_in: emailMarketingOptIn,
-            full_name: nameToStore
+            name: nameToStore
         )
         do {
             try await supabase
