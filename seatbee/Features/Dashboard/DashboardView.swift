@@ -156,17 +156,15 @@ struct DashboardView: View {
 
             Spacer()
 
-            if !plans.isEmpty {
-                Button {
-                    appState.showOnboarding = true
-                } label: {
-                    Image(systemName: "plus")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(Color.sbGoldDk)
-                        .frame(width: 36, height: 36)
-                        .background(Color.sbChampagne)
-                        .clipShape(Circle())
-                }
+            Button {
+                appState.showOnboarding = true
+            } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(Color.sbGoldDk)
+                    .frame(width: 36, height: 36)
+                    .background(Color.sbChampagne)
+                    .clipShape(Circle())
             }
 
             Button {
