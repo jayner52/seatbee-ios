@@ -67,20 +67,35 @@ final class AuthService {
     /// signup_platform. Failure (offline, RLS, column missing) is silent.
     private func backfillSignupPlatformIfMissing() async {
         guard let user = currentUser else { return }
-        struct Row: Decodable { let signup_platform: String? }
+        struct Row: Decodable {
+            let signup_platform: String?
+            let signup_source: String?
+        }
         do {
             let row: Row = try await supabase
                 .from("profiles")
-                .select("signup_platform")
+                .select("signup_platform, signup_source")
                 .eq("id", value: user.id.uuidString)
                 .single()
                 .execute()
                 .value
-            guard row.signup_platform == nil else { return }
-            struct Patch: Encodable { let signup_platform: String }
+            // Only patch null columns — a user who legit signed up on web
+            // and later signed in on iOS keeps their original web platform
+            // + utm-derived source.
+            let patchPlatform = row.signup_platform == nil
+            let patchSource = row.signup_source == nil
+            guard patchPlatform || patchSource else { return }
+            struct Patch: Encodable {
+                let signup_platform: String?
+                let signup_source: String?
+            }
+            let patch = Patch(
+                signup_platform: patchPlatform ? "ios" : nil,
+                signup_source: patchSource ? "app_store" : nil
+            )
             try await supabase
                 .from("profiles")
-                .update(Patch(signup_platform: "ios"))
+                .update(patch)
                 .eq("id", value: user.id.uuidString)
                 .execute()
         } catch {
@@ -156,6 +171,7 @@ final class AuthService {
 
         struct ProfilePayload: Encodable {
             let signup_platform: String
+            let signup_source: String
             let tos_agreed_at: String
             let email_marketing_opt_in: Bool
             let user_roles: [String]
@@ -163,6 +179,7 @@ final class AuthService {
         }
         let payload = ProfilePayload(
             signup_platform: "ios",
+            signup_source: "app_store",
             tos_agreed_at: ISO8601DateFormatter().string(from: Date()),
             email_marketing_opt_in: true,
             user_roles: [],
