@@ -15,6 +15,12 @@ struct SignupConsentView: View {
     @State private var emailMarketingOptIn = true   // matches web default
     @State private var isSubmitting = false
     @State private var enteredName = ""
+    /// Tracks whether the user has manually edited the name field. While
+    /// false, the effective name is derived from `displayName` on every
+    /// render — so if displayName arrives a few hundred ms after first
+    /// render (unlikely but possible during session decode), the name
+    /// section can still hide and the Continue gate stays passable.
+    @State private var nameWasEdited = false
 
     // Web parity: role IDs must match App.jsx line 22633 exactly.
     private static let roleOptions: [(id: String, label: String, icon: String)] = [
@@ -49,19 +55,23 @@ struct SignupConsentView: View {
             }
             .background(Color.sbIvory)
         }
-        .onAppear {
-            // Pre-fill enteredName at the view level (not just inside the
-            // nameSection's onAppear) so the Continue gate has a populated
-            // value even when the name section itself is hidden.
-            if let name = appState.auth.displayName, !name.isEmpty {
-                enteredName = name
-            }
-        }
+    }
+
+    /// The name we'll save on Continue. Derived from OAuth metadata
+    /// when the user hasn't manually typed; from `enteredName` once
+    /// they have. Re-evaluated on every render, so a late-arriving
+    /// `displayName` from the auth session decode flow still flows
+    /// through correctly.
+    private var effectiveName: String {
+        if nameWasEdited { return enteredName }
+        return appState.auth.displayName ?? enteredName
     }
 
     /// True when we already know the user's name from the OAuth provider
-    /// (or any pre-fill source). Drives whether to show the name section.
+    /// (and the user hasn't manually overridden it). Drives whether to
+    /// show the name section.
     private var hasPrefilledName: Bool {
+        guard !nameWasEdited else { return false }
         if let name = appState.auth.displayName, !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return true
         }
@@ -101,13 +111,17 @@ struct SignupConsentView: View {
                 )
                 .textContentType(.name)
                 .autocorrectionDisabled()
+                // First keystroke flips the manual-edit flag so further
+                // displayName changes (e.g. an async metadata refresh)
+                // can't overwrite what the user is typing.
+                .onChange(of: enteredName) { nameWasEdited = true }
         }
     }
 
-    /// Trimmed name — empty after trim disables Continue, so a user
-    /// can't proceed by typing whitespace.
+    /// Trimmed effective name — drives both the Continue gate and the
+    /// payload saved to the profile.
     private var trimmedName: String {
-        enteredName.trimmingCharacters(in: .whitespacesAndNewlines)
+        effectiveName.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private var roleSection: some View {
