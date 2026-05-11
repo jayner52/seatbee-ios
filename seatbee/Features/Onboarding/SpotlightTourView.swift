@@ -23,7 +23,7 @@ extension View {
                 Color.clear
                     .preference(
                         key: SpotlightPreferenceKey.self,
-                        value: [SpotlightItem(id: id, rect: geo.frame(in: .named("spotlight")))]
+                        value: [SpotlightItem(id: id, rect: geo.frame(in: .global))]
                     )
             }
         )
