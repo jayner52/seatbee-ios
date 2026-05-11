@@ -586,7 +586,10 @@ struct EventPassesView: View {
                     .fixedSize(horizontal: false, vertical: true)
 
                 Button {
-                    appState.showUpgrade = true
+                    dismiss()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                        appState.showUpgrade = true
+                    }
                     HapticEngine.selection()
                 } label: {
                     HStack(spacing: 6) {
