@@ -2,7 +2,6 @@ import SwiftUI
 
 struct AppRouter: View {
     @Environment(AppState.self) private var appState
-    @State private var showSpotlightTour = false
     @State private var spotlightRects: [String: CGRect] = [:]
 
     var body: some View {
@@ -30,9 +29,9 @@ struct AppRouter: View {
             SBTabBar(selectedTab: $state.selectedTab)
 
             // Spotlight tour overlay (renders ON TOP of real UI)
-            if showSpotlightTour {
+            if state.showSpotlightTour {
                 SpotlightTourOverlay(
-                    isShowing: $showSpotlightTour,
+                    isShowing: $state.showSpotlightTour,
                     spotlightRects: spotlightRects
                 )
                 .ignoresSafeArea()
@@ -56,7 +55,7 @@ struct AppRouter: View {
         .onAppear {
             if !UserDefaults.standard.bool(forKey: "seatbee.hasSeenFeatureTour") {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                    showSpotlightTour = true
+                    appState.showSpotlightTour = true
                 }
             }
         }

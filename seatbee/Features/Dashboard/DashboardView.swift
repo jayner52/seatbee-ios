@@ -67,9 +67,10 @@ struct DashboardView: View {
                     // the sample plan visible below for exploration.
                     if !isLoading && hasNoRealPlans && loadError == nil {
                         VStack(spacing: 16) {
-                            Image(systemName: "sparkles")
-                                .font(.system(size: 28))
-                                .foregroundStyle(Color.sbGold)
+                            Image("SeatbeeLogo")
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(width: 48, height: 48)
                                 .scaleEffect(ctaAppeared ? 1 : 0.6)
                                 .opacity(ctaAppeared ? 1 : 0)
 
