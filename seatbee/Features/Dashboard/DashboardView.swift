@@ -38,8 +38,9 @@ struct DashboardView: View {
             ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: SBSpacing.sectionGapLarge) {
-                    // Greeting
+                    // Greeting — also serves as the scroll-to-top anchor for the tour
                     greeting
+                        .id("dashboard-top")
 
                     // Error state
                     if let loadError {
@@ -156,6 +157,10 @@ struct DashboardView: View {
                 if newId == "tour_sample", let id = samplePlan?.id {
                     withAnimation(.easeInOut(duration: 0.4)) {
                         proxy.scrollTo(id, anchor: .center)
+                    }
+                } else if newId == "tour_settings" {
+                    withAnimation(.easeInOut(duration: 0.4)) {
+                        proxy.scrollTo("dashboard-top", anchor: .top)
                     }
                 }
             }
