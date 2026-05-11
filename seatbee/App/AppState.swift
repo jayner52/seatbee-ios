@@ -4,6 +4,9 @@ import SwiftUI
 final class AppState {
     var selectedTab: SBTab = .plans
     var showSpotlightTour = false
+    /// The spotlightId of the currently active tour step. DashboardView
+    /// observes this to scroll off-screen elements into view.
+    var spotlightStepId: String = ""
     /// The plan the rest of the app reads + mutates. didSet auto-pushes
     /// the *previous* value to the undo stack on every change, so the
     /// 70+ existing `appState.activePlan = …` mutation sites all become

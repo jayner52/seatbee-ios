@@ -43,6 +43,7 @@ struct TourStep {
 struct SpotlightTourOverlay: View {
     @Binding var isShowing: Bool
     let spotlightRects: [String: CGRect]
+    @Environment(AppState.self) private var appState
 
     @State private var step = 0
     @State private var appeared = false
@@ -91,6 +92,7 @@ struct SpotlightTourOverlay: View {
         .animation(.easeInOut(duration: 0.3), value: step)
         .onAppear {
             withAnimation(.easeOut(duration: 0.4)) { appeared = true }
+            appState.spotlightStepId = steps[step].spotlightId
         }
         .onTapGesture {
             advance()
@@ -165,6 +167,7 @@ struct SpotlightTourOverlay: View {
     private func advance() {
         if step < steps.count - 1 {
             step += 1
+            appState.spotlightStepId = steps[step].spotlightId
         } else {
             completeTour()
         }

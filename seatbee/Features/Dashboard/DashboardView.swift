@@ -35,6 +35,7 @@ struct DashboardView: View {
 
     var body: some View {
         NavigationStack {
+            ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: SBSpacing.sectionGapLarge) {
                     // Greeting
@@ -151,7 +152,15 @@ struct DashboardView: View {
             .refreshable {
                 await loadPlans()
             }
-        }
+            .onChange(of: appState.spotlightStepId) { _, newId in
+                if newId == "tour_sample", let id = samplePlan?.id {
+                    withAnimation(.easeInOut(duration: 0.4)) {
+                        proxy.scrollTo(id, anchor: .center)
+                    }
+                }
+            }
+        } // ScrollViewReader
+        } // NavigationStack
         .task {
             await loadPlans()
             // Refresh pass inventory so tier gates anywhere in the app
