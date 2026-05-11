@@ -50,8 +50,42 @@ final class AuthService {
             let session = try await supabase.auth.session
             currentUser = session.user
             Task { await recordPageViewPing() }
+            Task { await backfillSignupPlatformIfMissing() }
         } catch {
             currentUser = nil
+        }
+    }
+
+    /// Backfill `profiles.signup_platform = 'ios'` for users whose
+    /// column is null. The original write in `writeIOSSignupProfileIfNew`
+    /// is gated by `accountAgeSec < 60`, so users who signed up before
+    /// the column was wired (or whose first-write failed transiently)
+    /// stay null forever and don't get the iOS badge in the admin
+    /// dashboard. This top-up runs on every session restore but only
+    /// writes when the value is currently null — so a user who legit
+    /// signed up on web and later signed in on iOS keeps their 'web'
+    /// signup_platform. Failure (offline, RLS, column missing) is silent.
+    private func backfillSignupPlatformIfMissing() async {
+        guard let user = currentUser else { return }
+        struct Row: Decodable { let signup_platform: String? }
+        do {
+            let row: Row = try await supabase
+                .from("profiles")
+                .select("signup_platform")
+                .eq("id", value: user.id.uuidString)
+                .single()
+                .execute()
+                .value
+            guard row.signup_platform == nil else { return }
+            struct Patch: Encodable { let signup_platform: String }
+            try await supabase
+                .from("profiles")
+                .update(Patch(signup_platform: "ios"))
+                .eq("id", value: user.id.uuidString)
+                .execute()
+        } catch {
+            // Don't surface — backfill is best-effort, not load-bearing
+            print("[Auth] signup_platform backfill skipped: \(error)")
         }
     }
 
