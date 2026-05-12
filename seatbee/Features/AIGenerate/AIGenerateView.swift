@@ -224,6 +224,11 @@ struct AIGenerateView: View {
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 40)
             }
+            Text("Stay on this screen until generation completes.")
+                .font(SBFont.small)
+                .foregroundStyle(Color.sbWarm2)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 48)
             Spacer()
         }
     }
@@ -1132,6 +1137,7 @@ struct AIGenerateView: View {
         }
 
         phase = .generating
+        appState.isGeneratingSeating = true
         resultMessage = nil
         fellBackToRoundRobin = false
         lastResult = nil
@@ -1158,6 +1164,7 @@ struct AIGenerateView: View {
             // "Seated 114 of 108" overshoot.
             resultMessage = "Seated \(guestsSeated) of \(activeGuestCount) guests."
             HapticEngine.success()
+            appState.isGeneratingSeating = false
             phase = .complete
 
             // Post-generate AI Insight (web parity App.jsx:13229).
@@ -1171,13 +1178,15 @@ struct AIGenerateView: View {
             }
         } catch let error as SeatService.SeatError {
             HapticEngine.error()
+            appState.isGeneratingSeating = false
             resultMessage = error.localizedDescription
             lastErrorRetryable = error.isRetryable
             phase = .error
         } catch is CancellationError {
-            // Task cancelled — not a real error.
+            appState.isGeneratingSeating = false
         } catch {
             HapticEngine.error()
+            appState.isGeneratingSeating = false
             resultMessage = error.localizedDescription
             // Unknown errors might be transient — let the user retry.
             lastErrorRetryable = true
