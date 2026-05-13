@@ -183,66 +183,30 @@ struct EventPassesView: View {
     }
 
     private func availablePassRow(_ pass: EventPass) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 12) {
-                Image(systemName: "ticket")
-                    .foregroundStyle(Color.sbGoldDk)
-                    .frame(width: 22)
+        // Gift-this-pass affordance and the SEAT-XXXX-XXXX display were
+        // removed for App Store 3.1.1 compliance — anti-steering means
+        // iOS can't surface flows that hand out codes redeemable outside
+        // Apple's IAP system. Pass gifting lives on web only.
+        HStack(spacing: 12) {
+            Image(systemName: "ticket")
+                .foregroundStyle(Color.sbGoldDk)
+                .frame(width: 22)
 
-                VStack(alignment: .leading, spacing: 2) {
-                    if let exp = pass.expiresAt {
-                        Text("Expires \(exp.formatted(date: .abbreviated, time: .omitted))")
-                            .font(SBFont.bodySmallBold)
-                            .foregroundStyle(pass.isExpiringSoon ? Color.sbError : Color.sbCharcoal)
-                    } else {
-                        Text("No expiry")
-                            .font(SBFont.bodySmallBold)
-                            .foregroundStyle(Color.sbCharcoal)
-                    }
-                    if let code = pass.giftCode {
-                        Text(code)
-                            .font(.system(size: 11, weight: .medium, design: .monospaced))
-                            .foregroundStyle(Color.sbWarm)
-                    }
-                }
-
-                Spacer()
-
-                applyButton(for: pass)
-            }
-            // Secondary action — Gift this pass. Web parity (App.jsx
-            // ~24700: "Gift This Pass" button reveals a share panel).
-            // iOS uses a SwiftUI Menu with two paths so the user can:
-            //   - Send link → iOS share sheet (iMessage / WhatsApp /
-            //     Email / Copy Link). The recipient taps the link and
-            //     lands on web's gift welcome modal.
-            //   - Copy code → just the SEAT-XXXX-XXXX onto the
-            //     clipboard, ready to paste into a chat. The
-            //     recipient pastes it into "Redeem a Gift Code" on
-            //     iOS, never following a link to web. Avoids the
-            //     iOS-installed-but-link-goes-to-web round-trip.
-            if let code = pass.giftCode {
-                Menu {
-                    Button {
-                        shareGiftLink(code: code, packType: pass.packType)
-                    } label: {
-                        Label("Send link", systemImage: "square.and.arrow.up")
-                    }
-                    Button {
-                        copyGiftCode(code)
-                    } label: {
-                        Label("Copy code", systemImage: "doc.on.doc")
-                    }
-                } label: {
-                    HStack(spacing: 5) {
-                        Image(systemName: "gift")
-                            .font(.system(size: 11, weight: .semibold))
-                        Text("Gift this pass")
-                            .font(SBFont.caption)
-                    }
-                    .foregroundStyle(Color.sbGoldDk)
+            VStack(alignment: .leading, spacing: 2) {
+                if let exp = pass.expiresAt {
+                    Text("Expires \(exp.formatted(date: .abbreviated, time: .omitted))")
+                        .font(SBFont.bodySmallBold)
+                        .foregroundStyle(pass.isExpiringSoon ? Color.sbError : Color.sbCharcoal)
+                } else {
+                    Text("No expiry")
+                        .font(SBFont.bodySmallBold)
+                        .foregroundStyle(Color.sbCharcoal)
                 }
             }
+
+            Spacer()
+
+            applyButton(for: pass)
         }
         .padding(.vertical, 4)
     }
@@ -396,36 +360,16 @@ struct EventPassesView: View {
                         }
                     }
                     Spacer()
-                    if !gift.isClaimed, let code = gift.giftCode {
-                        // Re-share affordance for unclaimed gifts in
-                        // case the recipient lost the link. Same two
-                        // options as the primary Gift menu — Send link
-                        // OR Copy code. No revoke (web doesn't support
-                        // that either).
-                        Menu {
-                            Button {
-                                shareGiftLink(code: code, packType: gift.packType)
-                            } label: {
-                                Label("Send link", systemImage: "square.and.arrow.up")
-                            }
-                            Button {
-                                copyGiftCode(code)
-                            } label: {
-                                Label("Copy code", systemImage: "doc.on.doc")
-                            }
-                        } label: {
-                            Image(systemName: "ellipsis.circle")
-                                .font(.system(size: 16))
-                                .foregroundStyle(Color.sbGoldDk)
-                        }
-                    }
+                    // Re-share affordance removed for App Store 3.1.1
+                    // compliance. Users who need to re-send a code go
+                    // to web. iOS shows this section as read-only history.
                 }
                 .padding(.vertical, 4)
             }
         } header: {
             Text("Gifted")
         } footer: {
-            Text("Once you've gifted a pass, the recipient can claim it with the SEAT code on either iOS or web. Gifts can't be revoked.")
+            Text("Gifts you've sent appear here. Once claimed, the pass moves to the recipient's account.")
                 .font(SBFont.caption)
         }
     }
@@ -435,42 +379,6 @@ struct EventPassesView: View {
         case "pro_pass_single": return PlanTier.proPass.displayName
         case "signature_pass":  return PlanTier.signaturePass.displayName
         default:                return PlanTier.eventPass.displayName
-        }
-    }
-
-    // MARK: - Send a gift (system share sheet)
-
-    /// Copies just the SEAT-XXXX-XXXX code onto the system clipboard.
-    /// Used when the sender wants to paste only the code into a chat
-    /// (not the whole "Claim it at..." link), so the recipient can
-    /// type it into "Redeem a Gift Code" inside iOS without ever
-    /// following a link to web. Side-steps the iOS-app-installed-
-    /// but-link-still-goes-to-web round-trip.
-    private func copyGiftCode(_ code: String) {
-        UIPasteboard.general.string = code
-        HapticEngine.success()
-        alertMessage = AlertMessage(
-            title: "Code Copied",
-            body: "\(code) is on your clipboard. Paste it into a message — the recipient can redeem it inside the iOS app or at seatbee.app."
-        )
-    }
-
-    /// Open the iOS share sheet pre-filled with the gift link + a
-    /// short message. Web parity URL: `https://seatbee.app/?gift=CODE`.
-    /// We deliberately use the system share sheet (not an in-app
-    /// channel picker) so iMessage / WhatsApp / Mail / Copy Link all
-    /// work in one tap, and the user picks whichever they actually use.
-    private func shareGiftLink(code: String, packType: String) {
-        let tierName = passTierDisplay(for: packType)
-        let url = URL(string: "https://seatbee.app/?gift=\(code)")
-        let message = "I'm gifting you a \(tierName) on Seatbee 🐝\n\nClaim it at the link below — code: \(code)"
-
-        var items: [Any] = [message]
-        if let url { items.append(url) }
-        let activityVC = UIActivityViewController(activityItems: items, applicationActivities: nil)
-        if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-           let root = scene.windows.first?.rootViewController {
-            (root.presentedViewController ?? root).present(activityVC, animated: true)
         }
     }
 
