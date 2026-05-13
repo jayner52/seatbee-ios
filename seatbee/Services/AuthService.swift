@@ -157,13 +157,16 @@ final class AuthService {
     // Gated by `accountAgeSec < 60` so re-auth on returning sessions never
     // resets the user's later settings choices. Mirrors useAuth.jsx
     // `isNewUser` check (~60 s window).
-    private func writeIOSSignupProfileIfNew(appleFullName: String? = nil) async {
+    private func writeIOSSignupProfileIfNew(appleFullName: String? = nil, skipConsent: Bool = false) async {
         guard let user = currentUser else { return }
         let ageSec = Date().timeIntervalSince(user.createdAt)
         guard ageSec < 60 else { return }
-        // Detected as a brand-new signup → ungate the consent sheet so
-        // the user sees role / marketing / TOS questions next.
-        await MainActor.run { self.needsSignupConsent = true }
+        // For Apple sign-ins we skip the consent sheet (Guideline 4 requires
+        // we never re-ask for name/email after SIWA). Google and email
+        // sign-ups still see the sheet.
+        if !skipConsent {
+            await MainActor.run { self.needsSignupConsent = true }
+        }
 
         // Prefer Apple credential name (first-auth only), fall back to
         // Google/OAuth metadata already in userMetadata.
@@ -376,7 +379,11 @@ final class AuthService {
                 let parts = [fn.givenName, fn.familyName].compactMap { $0 }.filter { !$0.isEmpty }
                 return parts.isEmpty ? nil : parts.joined(separator: " ")
             }()
-            await writeIOSSignupProfileIfNew(appleFullName: appleName)
+            // App Store Guideline 4: Apple sign-in must not ask the user
+            // for name or email afterwards. Skip SignupConsentView entirely
+            // and auto-complete consent with defaults. The user can change
+            // roles and marketing prefs from Settings later.
+            await writeIOSSignupProfileIfNew(appleFullName: appleName, skipConsent: true)
             Task { await recordPageViewPing() }
         } catch is CancellationError {
             // Task cancelled — not a real error.

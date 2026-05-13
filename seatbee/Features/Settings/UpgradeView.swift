@@ -294,50 +294,83 @@ struct UpgradeView: View {
 
     // MARK: - CTA Button with Shimmer
 
+    private var productsAvailable: Bool {
+        storeKit.product(for: selectedProduct) != nil
+    }
+
     private var ctaButton: some View {
-        Button { purchase() } label: {
-            ZStack {
-                // Base gradient
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(
-                        LinearGradient(
-                            colors: [Color.sbGold, Color.sbGoldDk],
-                            startPoint: .leading,
-                            endPoint: .trailing
+        VStack(spacing: 8) {
+            Button { purchase() } label: {
+                ZStack {
+                    // Base gradient — grey when unavailable
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(
+                            productsAvailable
+                                ? LinearGradient(colors: [Color.sbGold, Color.sbGoldDk], startPoint: .leading, endPoint: .trailing)
+                                : LinearGradient(colors: [Color.sbWarm2, Color.sbWarm2], startPoint: .leading, endPoint: .trailing)
                         )
-                    )
-                    .frame(height: 56)
-                    .shadow(color: Color.sbGold.opacity(0.4), radius: 16, x: 0, y: 8)
+                        .frame(height: 56)
+                        .shadow(color: productsAvailable ? Color.sbGold.opacity(0.4) : Color.clear, radius: 16, x: 0, y: 8)
 
-                // Shimmer overlay
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(
-                        LinearGradient(
-                            colors: [.clear, .white.opacity(0.25), .clear],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-                    .frame(height: 56)
-                    .offset(x: shimmerOffset)
-                    .mask(RoundedRectangle(cornerRadius: 16).frame(height: 56))
-
-                // Content
-                HStack(spacing: 10) {
-                    if isPurchasing {
-                        ProgressView().tint(.white)
-                    } else {
-                        Image(systemName: "sparkles")
-                            .font(.system(size: 16, weight: .semibold))
+                    // Shimmer overlay — only when products loaded
+                    if productsAvailable {
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(
+                                LinearGradient(
+                                    colors: [.clear, .white.opacity(0.25), .clear],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .frame(height: 56)
+                            .offset(x: shimmerOffset)
+                            .mask(RoundedRectangle(cornerRadius: 16).frame(height: 56))
                     }
-                    Text(isPurchasing ? "Processing..." : "Unlock \(selectedProduct.displayName)")
-                        .font(SBFont.inter(16, weight: .bold))
+
+                    // Content
+                    HStack(spacing: 10) {
+                        if isPurchasing {
+                            ProgressView().tint(.white)
+                        } else if storeKit.isLoading {
+                            ProgressView().tint(.white)
+                            Text("Loading prices...")
+                                .font(SBFont.inter(16, weight: .bold))
+                        } else if !productsAvailable {
+                            Image(systemName: "exclamationmark.triangle")
+                                .font(.system(size: 16, weight: .semibold))
+                            Text("Unavailable")
+                                .font(SBFont.inter(16, weight: .bold))
+                        } else {
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 16, weight: .semibold))
+                            Text("Unlock \(selectedProduct.displayName)")
+                                .font(SBFont.inter(16, weight: .bold))
+                        }
+                    }
+                    .foregroundStyle(.white)
                 }
-                .foregroundStyle(.white)
+            }
+            .buttonStyle(.plain)
+            .disabled(isPurchasing || !productsAvailable)
+
+            // Hint when products fail to load
+            if !storeKit.isLoading && !productsAvailable {
+                Text("Could not connect to the App Store. Check your connection and try again.")
+                    .font(SBFont.caption)
+                    .foregroundStyle(Color.sbWarm)
+                    .multilineTextAlignment(.center)
+
+                Button {
+                    Task { await storeKit.fetchProducts() }
+                } label: {
+                    Text("Retry")
+                        .font(SBFont.inter(13, weight: .semibold))
+                        .foregroundStyle(Color.sbGoldDk)
+                        .underline()
+                }
+                .buttonStyle(.plain)
             }
         }
-        .buttonStyle(.plain)
-        .disabled(isPurchasing)
     }
 
     // MARK: - What's Included
@@ -505,7 +538,7 @@ struct UpgradeView: View {
 
     private func purchase() {
         guard let product = storeKit.product(for: selectedProduct) else {
-            storeKit.purchaseError = "Products are still loading. Please try again in a moment."
+            storeKit.purchaseError = "Unable to load this product from the App Store. Please check your connection and try again."
             return
         }
         isPurchasing = true
