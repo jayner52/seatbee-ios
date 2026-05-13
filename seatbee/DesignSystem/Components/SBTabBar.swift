@@ -34,6 +34,7 @@ enum SBTab: Int, CaseIterable {
 
 struct SBTabBar: View {
     @Binding var selectedTab: SBTab
+    @Environment(AppState.self) private var appState
 
     var body: some View {
         VStack(spacing: 0) {
@@ -59,7 +60,9 @@ struct SBTabBar: View {
     }
 
     private func tabItem(_ tab: SBTab) -> some View {
-        Button {
+        let locked = appState.isGeneratingSeating && tab != .ai
+        return Button {
+            guard !locked else { return }
             withAnimation(.seatbee) {
                 selectedTab = tab
             }
@@ -67,11 +70,11 @@ struct SBTabBar: View {
             VStack(spacing: 4) {
                 Image(systemName: tab.icon)
                     .font(.system(size: 22, weight: .regular))
-                    .foregroundStyle(tabColor(tab))
+                    .foregroundStyle(locked ? Color.sbWarm2.opacity(0.4) : tabColor(tab))
 
                 Text(tab.label.uppercased())
                     .font(SBFont.capsLabel)
-                    .foregroundStyle(tabColor(tab))
+                    .foregroundStyle(locked ? Color.sbWarm2.opacity(0.4) : tabColor(tab))
                     .letterSpacing(0.5)
             }
             .frame(maxWidth: .infinity)
@@ -94,4 +97,5 @@ struct SBTabBar: View {
         SBTabBar(selectedTab: .constant(.edit))
     }
     .background(Color.sbIvory)
+    .environment(AppState())
 }

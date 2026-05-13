@@ -70,6 +70,10 @@ final class AppState {
     // this flag in onChange.
     var pendingShowRules = false
 
+    // True while /api/seat is in-flight. SBTabBar uses this to block
+    // navigation away from the AI tab during generation.
+    var isGeneratingSeating = false
+
     // Last AI generation result, keyed by plan ID so it auto-invalidates
     // when the user switches plans. Survives tab navigation within a session.
     var lastGenResult: (planId: String, result: SeatService.GenerateResult)?
