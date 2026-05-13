@@ -16,11 +16,6 @@ struct EventPassesView: View {
     /// applying spinner — we don't track per-pass loading state up
     /// here anymore.
     @State private var pickingPlanForPass: EventPass?
-    /// Redeem-a-gift-code form state. Submission goes to web's
-    /// /api/redeem-gift-code; on success the pass lands in the user's
-    /// inventory and they pick a plan via the normal Apply flow.
-    @State private var giftCodeInput = ""
-    @State private var redeemingGiftCode = false
 
     private struct AlertMessage: Identifiable {
         let id = UUID()
@@ -36,11 +31,6 @@ struct EventPassesView: View {
             // user reads their counts. Was at the bottom; users
             // weren't reaching it.
             buyMoreSection
-            // Redeem-a-gift-code stays near the top so users
-            // arriving from the new Settings → "Redeem a Gift Code"
-            // entry point can act immediately without scrolling
-            // past their inventory.
-            redeemGiftCodeSection
             availableSection
             if !redeemedPasses.isEmpty { redeemedSection }
             if !giftedPasses.isEmpty { giftedSection }
@@ -437,91 +427,6 @@ struct EventPassesView: View {
         } footer: {
             Text("Once you've gifted a pass, the recipient can claim it with the SEAT code on either iOS or web. Gifts can't be revoked.")
                 .font(SBFont.caption)
-        }
-    }
-
-    // MARK: - Redeem a gift code
-
-    private var redeemGiftCodeSection: some View {
-        Section {
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Got a SEAT-XXXX-XXXX code from someone? Enter it below to add the pass to your inventory.")
-                    .font(SBFont.caption)
-                    .foregroundStyle(Color.sbWarm)
-
-                HStack(spacing: 8) {
-                    TextField("SEAT-XXXX-XXXX", text: $giftCodeInput)
-                        .font(.system(size: 13, weight: .medium, design: .monospaced))
-                        .textInputAutocapitalization(.characters)
-                        .autocorrectionDisabled()
-                        .padding(.vertical, 8)
-                        .padding(.horizontal, 10)
-                        .background(Color.sbIvory2)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-
-                    Button {
-                        Task { await submitGiftCode() }
-                    } label: {
-                        if redeemingGiftCode {
-                            ProgressView()
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 6)
-                        } else {
-                            Text("Redeem")
-                                .font(SBFont.label)
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 8)
-                                .background(canSubmitGiftCode ? Color.sbGoldDk : Color.sbWarm2)
-                                .clipShape(Capsule())
-                        }
-                    }
-                    .buttonStyle(.borderless)
-                    .disabled(!canSubmitGiftCode)
-                }
-            }
-            .padding(.vertical, 4)
-        } header: {
-            Text("Redeem a Gift Code")
-        }
-    }
-
-    /// Loose validation — server is authoritative, this just stops
-    /// users from tapping Redeem with an empty / obviously-wrong input.
-    private var canSubmitGiftCode: Bool {
-        !redeemingGiftCode &&
-        giftCodeInput.trimmingCharacters(in: .whitespaces).count >= 4
-    }
-
-    private func submitGiftCode() async {
-        let code = giftCodeInput.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !code.isEmpty else { return }
-        redeemingGiftCode = true
-        defer { redeemingGiftCode = false }
-        do {
-            let result = try await appState.passes.redeemGiftCode(code)
-            HapticEngine.success()
-            // Refresh inventory so the new pass shows up under
-            // Available immediately.
-            await appState.refreshPasses()
-            giftCodeInput = ""
-            let body: String = {
-                if result.alreadyOwned == true {
-                    return result.message ?? "You already own this pass."
-                }
-                let tierName = passTierDisplay(for: result.passType)
-                if let gifter = result.gifterName, !gifter.isEmpty {
-                    return "\(tierName) added to your inventory — gifted by \(gifter). Tap Apply to use it on an event."
-                }
-                return result.message ?? "\(tierName) added to your inventory. Tap Apply to use it on an event."
-            }()
-            alertMessage = AlertMessage(title: "Pass Redeemed", body: body)
-        } catch let err as PassesService.PassesError {
-            HapticEngine.error()
-            alertMessage = AlertMessage(title: "Couldn't redeem code", body: err.localizedDescription)
-        } catch {
-            HapticEngine.error()
-            alertMessage = AlertMessage(title: "Couldn't redeem code", body: error.localizedDescription)
         }
     }
 
