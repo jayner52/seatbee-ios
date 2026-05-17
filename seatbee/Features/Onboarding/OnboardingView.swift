@@ -380,6 +380,27 @@ struct OnboardingView: View {
             // already returns their value so this is a no-op.
             if !eventNameEdited { eventName = newValue }
         }
+        // Onboarding lives inside AppRouter's fullScreenCover, which
+        // visually covers the upgrade sheet attached on AppRouter. Bind
+        // the same flag locally so tapping a tile's Buy button actually
+        // presents UpgradeView (StoreKit IAP) — Apple flagged this as a
+        // non-functioning Buy button in App Review (Guideline 2.1(b)).
+        .sheet(
+            isPresented: Binding(
+                get: { appState.showUpgrade },
+                set: { appState.showUpgrade = $0 }
+            )
+        ) {
+            UpgradeView().environment(appState)
+        }
+        // When a purchase completes the user's pass inventory changes —
+        // refresh so the tier tiles flip from "Buy" to "N available" and
+        // can be tapped to apply without leaving onboarding.
+        .onChange(of: appState.showUpgrade) { _, isShown in
+            if !isShown {
+                Task { await appState.refreshPasses() }
+            }
+        }
     }
 
     private var progressDots: some View {
