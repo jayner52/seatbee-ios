@@ -51,6 +51,7 @@ final class AuthService {
             currentUser = session.user
             Task { await recordPageViewPing() }
             Task { await backfillSignupPlatformIfMissing() }
+            Task { await recordIOSSignIn() }
         } catch {
             currentUser = nil
         }
@@ -101,6 +102,28 @@ final class AuthService {
         } catch {
             // Don't surface — backfill is best-effort, not load-bearing
             print("[Auth] signup_platform backfill skipped: \(error)")
+        }
+    }
+
+    /// Stamp `profiles.last_ios_sign_in_at` with the current time so the
+    /// admin dashboard can answer "this user signed up on web — are they
+    /// also using iOS?". Mirrors the web client's last_web_sign_in_at
+    /// write in src/hooks/useAuth.jsx. Fire-and-forget — failure (offline,
+    /// column missing on a stale DB, RLS) is silent and never blocks the
+    /// sign-in or session restore.
+    private func recordIOSSignIn() async {
+        guard let userId = currentUser?.id.uuidString else { return }
+        struct Patch: Encodable { let last_ios_sign_in_at: String }
+        let patch = Patch(last_ios_sign_in_at: ISO8601DateFormatter().string(from: Date()))
+        do {
+            try await supabase
+                .from("profiles")
+                .update(patch)
+                .eq("id", value: userId)
+                .execute()
+        } catch {
+            // Best-effort — informational only.
+            print("[Auth] last_ios_sign_in_at write skipped: \(error)")
         }
     }
 
@@ -385,6 +408,7 @@ final class AuthService {
             // roles and marketing prefs from Settings later.
             await writeIOSSignupProfileIfNew(appleFullName: appleName, skipConsent: true)
             Task { await recordPageViewPing() }
+            Task { await recordIOSSignIn() }
         } catch is CancellationError {
             // Task cancelled — not a real error.
         } catch let e {
@@ -415,6 +439,7 @@ final class AuthService {
             currentUser = session.user
             await writeIOSSignupProfileIfNew()
             Task { await recordPageViewPing() }
+            Task { await recordIOSSignIn() }
         } catch is CancellationError {
             // Task cancelled — not a real error.
         } catch let e {
@@ -455,6 +480,7 @@ final class AuthService {
             currentUser = session.user
             await writeIOSSignupProfileIfNew()
             Task { await recordPageViewPing() }
+            Task { await recordIOSSignIn() }
         } catch {
             self.error = "Failed to complete sign in"
         }
