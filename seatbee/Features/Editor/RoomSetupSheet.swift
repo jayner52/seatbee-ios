@@ -764,6 +764,22 @@ struct TraceShapeSheet: View {
     @State private var panOffset: CGSize = .zero
     @State private var lastPanOffset: CGSize = .zero
 
+    // Floor-plan image independent transform. Lets users reposition and
+    // scale the reference image to align it with the polygon without
+    // changing the polygon itself. Matches web RoomShapeEditor behaviour
+    // (imageZoom / imageOffset states in App.jsx).
+    @State private var imageScale: CGFloat = 1.0
+    @State private var lastImageScale: CGFloat = 1.0
+    @State private var imageTranslation: CGSize = .zero
+    @State private var lastImageTranslation: CGSize = .zero
+    /// When true, drag + pinch gestures move/scale the image instead of
+    /// panning/zooming the polygon canvas. Toggled by the "Align Image" button.
+    @State private var imageMode: Bool = false
+
+    // AI trace state
+    @State private var isAiTracing: Bool = false
+    @State private var aiTraceError: String? = nil
+
     private var unitLabel: String { RoomScale.unitLabel(for: measurementUnit) }
     private var pixelsPerUnit: Double { RoomScale.factor(for: measurementUnit) }
 
@@ -868,13 +884,25 @@ struct TraceShapeSheet: View {
         return ZStack {
             // Floor-plan reference image (when provided) sits beneath
             // everything at half-opacity so corners + edges read clearly.
+            // Independent scale + translation let the user align the image
+            // to the polygon without changing the polygon shape.
             if let img = floorPlanImage {
                 Image(uiImage: img)
                     .resizable()
-                    .aspectRatio(contentMode: .fill)
+                    .aspectRatio(contentMode: .fit)
                     .frame(width: imageRect.width, height: imageRect.height)
-                    .clipped()
-                    .opacity(0.5)
+                    .scaleEffect(imageScale)
+                    .offset(imageTranslation)
+                    .opacity(imageMode ? 0.7 : 0.45)
+                    .overlay(
+                        // Dashed border in image-align mode so users know it's active
+                        Group {
+                            if imageMode {
+                                RoundedRectangle(cornerRadius: 4)
+                                    .strokeBorder(Color.sbGoldDk.opacity(0.6), style: StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
+                            }
+                        }
+                    )
                     .position(x: imageRect.midX, y: imageRect.midY)
                     .allowsHitTesting(false)
             }
@@ -917,11 +945,13 @@ struct TraceShapeSheet: View {
             Color.clear
                 .contentShape(Rectangle())
                 .onTapGesture(count: 2) { location in
+                    guard !imageMode else { return }
                     if let edgeIndex = nearestEdgeIndex(to: location, layout: layout, threshold: 28) {
                         toggleArcOnWall(edgeIndex: edgeIndex)
                     }
                 }
                 .onTapGesture { location in
+                    guard !imageMode else { return }
                     if let edgeIndex = nearestEdgeIndex(to: location, layout: layout, threshold: 28) {
                         insertCorner(after: edgeIndex, at: location, layout: layout)
                     }
@@ -929,31 +959,51 @@ struct TraceShapeSheet: View {
                 .simultaneousGesture(
                     DragGesture(minimumDistance: 10)
                         .onChanged { value in
-                            panOffset = CGSize(
-                                width: lastPanOffset.width + value.translation.width,
-                                height: lastPanOffset.height + value.translation.height
-                            )
+                            if imageMode {
+                                imageTranslation = CGSize(
+                                    width: lastImageTranslation.width + value.translation.width,
+                                    height: lastImageTranslation.height + value.translation.height
+                                )
+                            } else {
+                                panOffset = CGSize(
+                                    width: lastPanOffset.width + value.translation.width,
+                                    height: lastPanOffset.height + value.translation.height
+                                )
+                            }
                         }
-                        .onEnded { _ in lastPanOffset = panOffset }
+                        .onEnded { _ in
+                            if imageMode { lastImageTranslation = imageTranslation }
+                            else { lastPanOffset = panOffset }
+                        }
                 )
                 .simultaneousGesture(
                     MagnificationGesture()
                         .onChanged { value in
-                            userZoom = max(1.0, min(8.0, lastZoom * value))
+                            if imageMode {
+                                imageScale = max(0.2, min(5.0, lastImageScale * value))
+                            } else {
+                                userZoom = max(1.0, min(8.0, lastZoom * value))
+                            }
                         }
-                        .onEnded { _ in lastZoom = userZoom }
+                        .onEnded { _ in
+                            if imageMode { lastImageScale = imageScale }
+                            else { lastZoom = userZoom }
+                        }
                 )
 
             // Corner handles. Drawn last so they sit above the tap layer.
+            // Disabled in image-align mode so dragging moves the image, not corners.
             ForEach(displayedPoints.indices, id: \.self) { i in
                 let screenPos = roomToScreen(displayedPoints[i], layout: layout)
                 cornerHandle(index: i, isDragging: draggingIndex == i)
                     .position(screenPos)
-                    .gesture(cornerDragGesture(for: i, layout: layout))
+                    .gesture(imageMode ? nil : cornerDragGesture(for: i, layout: layout))
                     .onLongPressGesture {
+                        guard !imageMode else { return }
                         if points.count > 3 { pendingDelete = i }
                         else { HapticEngine.error() }
                     }
+                    .opacity(imageMode ? 0.4 : 1.0)
             }
 
             // Arc apex handles — one per curved wall. The handle is the
@@ -1044,10 +1094,10 @@ struct TraceShapeSheet: View {
 
     // MARK: Bottom toolbar
     //
-    // Two rows. Top row = transforms that change the polygon as a
-    // whole (scale ±5%, rotate ±15°) — web parity with App.jsx
-    // RoomEditorModal phase 2 (scalePts / rotatePts). Bottom row =
-    // mirror toggles + reset that already shipped before scale.
+    // Row 1: polygon scale + rotate.
+    // Row 2: flip toggles + reset.
+    // Row 3 (floor plan only): image alignment mode toggle, image
+    //   scale, and AI Trace — matches web RoomShapeEditor feature set.
 
     private var toolbar: some View {
         VStack(spacing: 8) {
@@ -1083,10 +1133,142 @@ struct TraceShapeSheet: View {
                     HapticEngine.error()
                 }
             }
+
+            // Image alignment row — only visible when a floor plan is loaded.
+            if floorPlanImage != nil {
+                Divider().padding(.horizontal, 4)
+                HStack(spacing: 10) {
+                    toolButton(
+                        label: imageMode ? "Shape" : "Image",
+                        icon: imageMode ? "skew" : "arrow.up.and.down.and.arrow.left.and.right",
+                        isOn: imageMode
+                    ) {
+                        imageMode.toggle()
+                        HapticEngine.selection()
+                    }
+                    toolButton(label: "Img -", icon: "minus.circle", isOn: false) {
+                        imageScale = max(0.2, imageScale * 0.85)
+                        lastImageScale = imageScale
+                        HapticEngine.selection()
+                    }
+                    toolButton(label: "Img +", icon: "plus.circle", isOn: false) {
+                        imageScale = min(5.0, imageScale * 1.18)
+                        lastImageScale = imageScale
+                        HapticEngine.selection()
+                    }
+                    toolButton(
+                        label: isAiTracing ? "Tracing…" : "AI Trace",
+                        icon: isAiTracing ? "ellipsis.circle" : "cpu",
+                        isOn: false
+                    ) {
+                        Task { await runAiTrace() }
+                    }
+                    .disabled(isAiTracing)
+                    .opacity(isAiTracing ? 0.5 : 1)
+                }
+
+                if let err = aiTraceError {
+                    Text(err)
+                        .font(SBFont.caption)
+                        .foregroundStyle(Color.sbWarm)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 8)
+                }
+            }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .background(Color.sbIvory2)
+    }
+
+    // MARK: AI Trace
+    //
+    // Sends the floor-plan image to /api/ai (parseFloorPlan action),
+    // which uses Claude vision to detect the outer room boundary and
+    // return corner percentages (0-100 on each axis). We convert those
+    // to room pixel coordinates and replace the current polygon.
+    // Mirrors web RoomShapeEditor handleAutoTrace() in App.jsx.
+    private func runAiTrace() async {
+        guard let img = floorPlanImage,
+              let jpegData = img.jpegData(compressionQuality: 0.82) else { return }
+
+        await MainActor.run {
+            isAiTracing = true
+            aiTraceError = nil
+        }
+
+        let base64 = jpegData.base64EncodedString()
+        let dataURL = "data:image/jpeg;base64,\(base64)"
+        let unit = measurementUnit ?? "imperial"
+        let unitName = unit.lowercased() == "metric" ? "metres" : "feet"
+
+        let systemPrompt = """
+        You are a floor plan analysis assistant. Trace the outer room boundary of this floor plan.
+        Use the percentage coordinate system (x: 0=left 100=right, y: 0=top 100=bottom).
+        Return ONLY valid JSON — no markdown, no explanation:
+        {
+          "polygon": {
+            "corners": [{"x": <0-100>, "y": <0-100>}, ...],
+            "confidence": "high|medium|low"
+          },
+          "dimensions": {
+            "width": <room width in \(unitName) if readable, else null>,
+            "height": <room height in \(unitName) if readable, else null>,
+            "confidence": "high|medium|low"
+          }
+        }
+        Trace only the outermost walls. Include 4-16 corners depending on room complexity.
+        """
+
+        do {
+            let aiService = AIService()
+            let responseText = try await aiService.call(
+                action: .parseFloorPlan,
+                systemPrompt: systemPrompt,
+                userMessage: dataURL
+            )
+
+            // Strip markdown fences if present, then parse JSON
+            let cleaned = responseText
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .replacingOccurrences(of: "```json", with: "")
+                .replacingOccurrences(of: "```", with: "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+
+            if let data = cleaned.data(using: .utf8),
+               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let polygon = json["polygon"] as? [String: Any],
+               let corners = polygon["corners"] as? [[String: Any]],
+               corners.count >= 3 {
+
+                let newPoints = corners.compactMap { corner -> RoomPoint? in
+                    guard let xPct = corner["x"] as? Double,
+                          let yPct = corner["y"] as? Double else { return nil }
+                    return RoomPoint(
+                        x: (xPct / 100.0 * roomWidth).rounded(),
+                        y: (yPct / 100.0 * roomHeight).rounded()
+                    )
+                }
+
+                if newPoints.count >= 3 {
+                    await MainActor.run {
+                        points = newPoints
+                        imageMode = false
+                        HapticEngine.success()
+                    }
+                } else {
+                    await MainActor.run { aiTraceError = "Couldn't read enough corners — try tracing manually." }
+                }
+            } else {
+                await MainActor.run { aiTraceError = "AI couldn't parse this floor plan. Try a clearer image." }
+            }
+        } catch AIService.AIError.tierRestricted {
+            await MainActor.run { aiTraceError = "AI Trace requires a Pro pass." }
+        } catch {
+            await MainActor.run { aiTraceError = "Trace failed — check your connection and try again." }
+        }
+
+        await MainActor.run { isAiTracing = false }
     }
 
     /// Scale every polygon point about the centroid by `factor`.
