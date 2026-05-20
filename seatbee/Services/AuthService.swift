@@ -324,6 +324,12 @@ final class AuthService {
     /// Called by SignupConsentView's Continue button. Pushes the user's
     /// role + marketing-opt-in choices into the profiles row and clears
     /// the consent gate so the rest of the app loads.
+    ///
+    /// Uses the same retry-with-select pattern as writeIOSSignupProfileIfNew()
+    /// because this fires within seconds of signup — the Supabase auth trigger
+    /// that creates the profiles row can still be in flight, causing a silent
+    /// zero-row update. Without retry, roles were silently lost for users who
+    /// completed consent quickly.
     func completeSignupConsent(userRoles: [String], emailMarketingOptIn: Bool, displayName: String? = nil) async {
         guard let user = currentUser else { return }
         struct ConsentPayload: Encodable {
@@ -337,17 +343,30 @@ final class AuthService {
             email_marketing_opt_in: emailMarketingOptIn,
             name: nameToStore
         )
-        do {
-            try await supabase
-                .from("profiles")
-                .update(payload)
-                .eq("id", value: user.id.uuidString)
-                .execute()
-        } catch {
-            // Don't block onboarding on a profile write — user can still
-            // edit role/marketing from Settings later.
-            print("[Auth] consent save failed: \(error)")
+        struct ResponseRow: Decodable { let id: String }
+        for attempt in 0..<4 {
+            do {
+                let rows: [ResponseRow] = try await supabase
+                    .from("profiles")
+                    .update(payload)
+                    .eq("id", value: user.id.uuidString)
+                    .select("id")
+                    .execute()
+                    .value
+                if !rows.isEmpty {
+                    print("[Auth] consent saved for \(user.email ?? user.id.uuidString) on attempt \(attempt + 1)")
+                    await MainActor.run { self.needsSignupConsent = false }
+                    return
+                }
+                print("[Auth] consent write affected 0 rows (attempt \(attempt + 1)/4) — profiles trigger probably hasn't landed yet")
+            } catch {
+                print("[Auth] consent save attempt \(attempt + 1) failed: \(error)")
+            }
+            try? await Task.sleep(nanoseconds: 300_000_000)
         }
+        // All retries exhausted — clear the gate anyway so the user
+        // isn't stuck. They can edit roles from Settings later.
+        print("[Auth] consent save failed after 4 attempts — clearing gate, roles editable in Settings")
         await MainActor.run { self.needsSignupConsent = false }
     }
 
