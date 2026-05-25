@@ -285,10 +285,14 @@ struct UpgradeView: View {
     }
 
     private func fallbackPrice(_ p: SeatbeeProduct) -> String {
+        // Shown only while StoreKit is loading the live product prices from
+        // App Store Connect. These must match whatever IAP tier Shayan
+        // configures there — keep in lockstep with the web prices in
+        // ~/Desktop/Seated/api/create-checkout.js PACK_PRICES.
         switch p {
-        case .eventPass: return "$69.99"
-        case .signaturePass: return "$119.99"
-        case .grandPass: return "$249.99"
+        case .eventPass: return "$29"
+        case .signaturePass: return "$49"
+        case .grandPass: return "$149"
         }
     }
 
