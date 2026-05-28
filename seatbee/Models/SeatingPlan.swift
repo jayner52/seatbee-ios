@@ -370,6 +370,14 @@ struct Guest: Identifiable, Codable {
         return name
     }
 
+    /// Full name, ignoring any custom display override.
+    var fullName: String {
+        if let first = firstName, !first.isEmpty, let last = lastName, !last.isEmpty {
+            return "\(first) \(last)"
+        }
+        return name
+    }
+
     var initials: String {
         let parts = displayName.split(separator: " ")
         if parts.count >= 2 {
