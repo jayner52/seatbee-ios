@@ -4,17 +4,24 @@ import StoreKit
 struct UpgradeView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.openURL) private var openURL
     @State private var storeKit = StoreKitService()
-    @State private var selectedProduct: SeatbeeProduct = .eventPass
     @State private var isPurchasing = false
     @State private var showSuccess = false
     @State private var shimmerOffset: CGFloat = -200
     @State private var appearAnimation = false
 
+    private var product: SeatbeeProduct { .proMonthly }
+
     private var daysUntilWedding: Int? {
         guard let date = appState.activePlan?.eventDate else { return nil }
         let days = Calendar.current.dateComponents([.day], from: Date(), to: date).day
         return days.flatMap { $0 > 0 ? $0 : nil }
+    }
+
+    private var isAlreadyEntitled: Bool {
+        if let sub = appState.userSubscription, sub.isProEntitled { return true }
+        return storeKit.hasActiveSubscription
     }
 
     var body: some View {
@@ -35,7 +42,6 @@ struct UpgradeView: View {
 
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 0) {
-                    // Close button
                     HStack {
                         Spacer()
                         Button { dismiss() } label: {
@@ -50,44 +56,37 @@ struct UpgradeView: View {
                     .padding(.horizontal, 20)
                     .padding(.top, 16)
 
-                    // Hero
                     heroSection
                         .opacity(appearAnimation ? 1 : 0)
                         .offset(y: appearAnimation ? 0 : 20)
 
-                    // Plans
-                    planSelector
+                    proCard
                         .padding(.top, 32)
+                        .padding(.horizontal, 20)
                         .opacity(appearAnimation ? 1 : 0)
                         .offset(y: appearAnimation ? 0 : 30)
 
-                    // CTA
                     ctaButton
                         .padding(.top, 24)
                         .padding(.horizontal, 20)
 
-                    // Error
                     errorBanner
                         .padding(.top, 8)
                         .padding(.horizontal, 20)
 
-                    // What's included
                     whatsIncluded
                         .padding(.top, 28)
                         .padding(.horizontal, 20)
 
-                    // Trust
                     trustSignals
                         .padding(.top, 24)
 
-                    // Restore + legal
                     restoreAndLegal
                         .padding(.top, 16)
                         .padding(.bottom, 50)
                 }
             }
 
-            // Success overlay
             if showSuccess { successOverlay }
         }
         .onAppear {
@@ -99,8 +98,8 @@ struct UpgradeView: View {
         .onChange(of: storeKit.purchaseSuccess) { _, success in
             if success {
                 Task {
+                    await appState.refreshSubscription()
                     await appState.refreshActivePlan()
-                    await appState.refreshPasses()
                 }
                 withAnimation(.seatbeeSpring) { showSuccess = true }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { dismiss() }
@@ -112,7 +111,6 @@ struct UpgradeView: View {
 
     private var heroSection: some View {
         VStack(spacing: 20) {
-            // Floating logo with glow
             ZStack {
                 Circle()
                     .fill(Color.sbGold.opacity(0.15))
@@ -137,11 +135,10 @@ struct UpgradeView: View {
             }
             .multilineTextAlignment(.center)
 
-            Text("One purchase · No subscription · Yours forever")
+            Text("Cancel anytime · No commitment")
                 .font(SBFont.inter(14, weight: .medium))
                 .foregroundStyle(Color.sbWarm)
 
-            // Wedding countdown
             if let days = daysUntilWedding {
                 HStack(spacing: 8) {
                     Image(systemName: "heart.fill")
@@ -166,199 +163,92 @@ struct UpgradeView: View {
         .padding(.top, 8)
     }
 
-    // MARK: - Plan Cards
+    // MARK: - Pro Card
 
-    private var planSelector: some View {
-        VStack(spacing: 12) {
-            ForEach(SeatbeeProduct.allCases, id: \.rawValue) { product in
-                planCard(product)
+    private var proCard: some View {
+        let storeProduct = storeKit.product(for: product)
+
+        return VStack(spacing: 0) {
+            // Gold accent header
+            HStack(spacing: 10) {
+                Image(systemName: "crown.fill")
+                    .font(.system(size: 12, weight: .bold))
+                Text("SEATBEE PRO")
+                    .font(.system(size: 11, weight: .heavy, design: .rounded))
+                    .tracking(1.5)
             }
-        }
-        .padding(.horizontal, 20)
-    }
-
-    private func planCard(_ seatbeeProduct: SeatbeeProduct) -> some View {
-        let isSelected = selectedProduct == seatbeeProduct
-        let isPopular = seatbeeProduct == .eventPass
-        let storeProduct = storeKit.product(for: seatbeeProduct)
-
-        return Button {
-            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                selectedProduct = seatbeeProduct
-            }
-            HapticEngine.selection()
-        } label: {
-            VStack(spacing: 0) {
-                // "MOST POPULAR" ribbon
-                if isPopular {
-                    Text("MOST POPULAR")
-                        .font(.system(size: 10, weight: .heavy, design: .rounded))
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 6)
-                        .background(
-                            LinearGradient(colors: [Color.sbSage, Color.sbSage.opacity(0.8)], startPoint: .leading, endPoint: .trailing)
-                        )
-                }
-
-                HStack(spacing: 16) {
-                    // Icon — each tier has its own accent color
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(
-                                isSelected
-                                    ? LinearGradient(colors: tierColors(seatbeeProduct), startPoint: .topLeading, endPoint: .bottomTrailing)
-                                    : LinearGradient(colors: [tierAccent(seatbeeProduct).opacity(0.1), tierAccent(seatbeeProduct).opacity(0.05)], startPoint: .topLeading, endPoint: .bottomTrailing)
-                            )
-                            .frame(width: 48, height: 48)
-
-                        Image(systemName: seatbeeProduct == .grandPass ? "crown.fill" : (seatbeeProduct == .signaturePass ? "star.fill" : "sparkles"))
-                            .font(.system(size: 20))
-                            .foregroundStyle(isSelected ? .white : tierAccent(seatbeeProduct))
-                    }
-
-                    // Details
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(seatbeeProduct.displayName)
-                            .font(SBFont.bodySemibold)
-                            .foregroundStyle(Color.sbCharcoal)
-
-                        Text("Up to \(seatbeeProduct.guestLimit) guests")
-                            .font(SBFont.caption)
-                            .foregroundStyle(Color.sbWarm)
-                    }
-
-                    Spacer()
-
-                    // Price
-                    VStack(alignment: .trailing, spacing: 2) {
-                        Text(storeProduct?.displayPrice ?? fallbackPrice(seatbeeProduct))
-                            .font(SBFont.fraunces(22, weight: .medium))
-                            .foregroundStyle(isSelected ? Color.sbGoldDk : Color.sbCharcoal)
-
-                        Text("one-time")
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(Color.sbWarm)
-                    }
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 16)
-            }
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 8)
             .background(
-                RoundedRectangle(cornerRadius: isPopular ? 16 : 14)
-                    .fill(isSelected ? Color.sbChampagne.opacity(0.35) : Color.white)
+                LinearGradient(colors: [Color.sbGold, Color.sbGoldDk], startPoint: .leading, endPoint: .trailing)
             )
-            .clipShape(RoundedRectangle(cornerRadius: isPopular ? 16 : 14))
-            .overlay(
-                RoundedRectangle(cornerRadius: isPopular ? 16 : 14)
-                    .strokeBorder(
-                        isSelected ? tierAccent(seatbeeProduct) : Color.sbLine,
-                        lineWidth: isSelected ? 2.5 : 1
-                    )
-            )
-            .shadow(
-                color: isSelected ? tierAccent(seatbeeProduct).opacity(0.2) : Color.clear,
-                radius: isSelected ? 12 : 0,
-                x: 0,
-                y: isSelected ? 6 : 0
-            )
-            .scaleEffect(isSelected ? 1.02 : 1.0)
+
+            VStack(spacing: 18) {
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                    Text(storeProduct?.displayPrice ?? "$9.99")
+                        .font(SBFont.fraunces(40, weight: .medium))
+                        .foregroundStyle(Color.sbCharcoal)
+
+                    Text("/ month")
+                        .font(SBFont.inter(15, weight: .medium))
+                        .foregroundStyle(Color.sbWarm)
+                }
+                .padding(.top, 18)
+
+                VStack(spacing: 10) {
+                    proFeatureRow(icon: "person.3.fill", text: "Up to 1,000 seated guests")
+                    proFeatureRow(icon: "sparkles", text: "AI seating generation")
+                    proFeatureRow(icon: "doc.viewfinder", text: "AI floor plan analysis")
+                    proFeatureRow(icon: "rectangle.on.rectangle", text: "Unlimited plans")
+                    proFeatureRow(icon: "clock.arrow.circlepath", text: "Cancel anytime in Settings")
+                }
+                .padding(.horizontal, 4)
+            }
+            .padding(.horizontal, 22)
+            .padding(.bottom, 22)
         }
-        .buttonStyle(.plain)
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .strokeBorder(Color.sbGold.opacity(0.5), lineWidth: 1.5)
+        )
+        .shadow(color: Color.sbGold.opacity(0.18), radius: 16, x: 0, y: 8)
     }
 
-    // Per-tier accent colors — breaks the gold monotone
-    private func tierAccent(_ p: SeatbeeProduct) -> Color {
-        switch p {
-        case .eventPass: return Color.sbSage
-        case .signaturePass: return Color.sbBlush
-        case .grandPass: return Color.sbGold
+    private func proFeatureRow(icon: String, text: String) -> some View {
+        HStack(spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(Color.sbGold.opacity(0.12))
+                    .frame(width: 28, height: 28)
+                Image(systemName: icon)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Color.sbGoldDk)
+            }
+            Text(text)
+                .font(SBFont.inter(14, weight: .medium))
+                .foregroundStyle(Color.sbCharcoal)
+            Spacer()
         }
     }
 
-    private func tierColors(_ p: SeatbeeProduct) -> [Color] {
-        switch p {
-        case .eventPass: return [Color.sbSage, Color.sbSage.opacity(0.8)]
-        case .signaturePass: return [Color.sbBlush, Color.sbBlush.opacity(0.8)]
-        case .grandPass: return [Color.sbGold, Color.sbGoldDk]
-        }
-    }
-
-    private func fallbackPrice(_ p: SeatbeeProduct) -> String {
-        // Shown only while StoreKit is loading the live product prices from
-        // App Store Connect. These must match whatever IAP tier Shayan
-        // configures there — keep in lockstep with the web prices in
-        // ~/Desktop/Seated/api/create-checkout.js PACK_PRICES.
-        switch p {
-        case .eventPass: return "$29"
-        case .signaturePass: return "$49"
-        case .grandPass: return "$149"
-        }
-    }
-
-    // MARK: - CTA Button with Shimmer
+    // MARK: - CTA
 
     private var productsAvailable: Bool {
-        storeKit.product(for: selectedProduct) != nil
+        storeKit.product(for: product) != nil
     }
 
     private var ctaButton: some View {
         VStack(spacing: 8) {
-            Button { purchase() } label: {
-                ZStack {
-                    // Base gradient — grey when unavailable
-                    RoundedRectangle(cornerRadius: 16)
-                        .fill(
-                            productsAvailable
-                                ? LinearGradient(colors: [Color.sbGold, Color.sbGoldDk], startPoint: .leading, endPoint: .trailing)
-                                : LinearGradient(colors: [Color.sbWarm2, Color.sbWarm2], startPoint: .leading, endPoint: .trailing)
-                        )
-                        .frame(height: 56)
-                        .shadow(color: productsAvailable ? Color.sbGold.opacity(0.4) : Color.clear, radius: 16, x: 0, y: 8)
-
-                    // Shimmer overlay — only when products loaded
-                    if productsAvailable {
-                        RoundedRectangle(cornerRadius: 16)
-                            .fill(
-                                LinearGradient(
-                                    colors: [.clear, .white.opacity(0.25), .clear],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                            )
-                            .frame(height: 56)
-                            .offset(x: shimmerOffset)
-                            .mask(RoundedRectangle(cornerRadius: 16).frame(height: 56))
-                    }
-
-                    // Content
-                    HStack(spacing: 10) {
-                        if isPurchasing {
-                            ProgressView().tint(.white)
-                        } else if storeKit.isLoading {
-                            ProgressView().tint(.white)
-                            Text("Loading prices...")
-                                .font(SBFont.inter(16, weight: .bold))
-                        } else if !productsAvailable {
-                            Image(systemName: "exclamationmark.triangle")
-                                .font(.system(size: 16, weight: .semibold))
-                            Text("Unavailable")
-                                .font(SBFont.inter(16, weight: .bold))
-                        } else {
-                            Image(systemName: "sparkles")
-                                .font(.system(size: 16, weight: .semibold))
-                            Text("Unlock \(selectedProduct.displayName)")
-                                .font(SBFont.inter(16, weight: .bold))
-                        }
-                    }
-                    .foregroundStyle(.white)
-                }
+            if isAlreadyEntitled {
+                manageSubscriptionButton
+            } else {
+                subscribeButton
             }
-            .buttonStyle(.plain)
-            .disabled(isPurchasing || !productsAvailable)
 
-            // Hint when products fail to load
-            if !storeKit.isLoading && !productsAvailable {
+            if !storeKit.isLoading && !productsAvailable && !isAlreadyEntitled {
                 Text("Could not connect to the App Store. Check your connection and try again.")
                     .font(SBFont.caption)
                     .foregroundStyle(Color.sbWarm)
@@ -377,6 +267,90 @@ struct UpgradeView: View {
         }
     }
 
+    private var subscribeButton: some View {
+        Button { purchase() } label: {
+            ZStack {
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(
+                        productsAvailable
+                            ? LinearGradient(colors: [Color.sbGold, Color.sbGoldDk], startPoint: .leading, endPoint: .trailing)
+                            : LinearGradient(colors: [Color.sbWarm2, Color.sbWarm2], startPoint: .leading, endPoint: .trailing)
+                    )
+                    .frame(height: 56)
+                    .shadow(color: productsAvailable ? Color.sbGold.opacity(0.4) : Color.clear, radius: 16, x: 0, y: 8)
+
+                if productsAvailable {
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(
+                            LinearGradient(
+                                colors: [.clear, .white.opacity(0.25), .clear],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .frame(height: 56)
+                        .offset(x: shimmerOffset)
+                        .mask(RoundedRectangle(cornerRadius: 16).frame(height: 56))
+                }
+
+                HStack(spacing: 10) {
+                    if isPurchasing {
+                        ProgressView().tint(.white)
+                    } else if storeKit.isLoading {
+                        ProgressView().tint(.white)
+                        Text("Loading…")
+                            .font(SBFont.inter(16, weight: .bold))
+                    } else if !productsAvailable {
+                        Image(systemName: "exclamationmark.triangle")
+                            .font(.system(size: 16, weight: .semibold))
+                        Text("Unavailable")
+                            .font(SBFont.inter(16, weight: .bold))
+                    } else {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 16, weight: .semibold))
+                        Text("Subscribe — \(storeKit.product(for: product)?.displayPrice ?? "$9.99") / month")
+                            .font(SBFont.inter(16, weight: .bold))
+                    }
+                }
+                .foregroundStyle(.white)
+            }
+        }
+        .buttonStyle(.plain)
+        .disabled(isPurchasing || !productsAvailable)
+    }
+
+    private var manageSubscriptionButton: some View {
+        VStack(spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: "checkmark.seal.fill")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(Color.sbSage)
+                Text("You're a Pro subscriber")
+                    .font(SBFont.inter(15, weight: .semibold))
+                    .foregroundStyle(Color.sbCharcoal)
+            }
+
+            Button {
+                // System-managed subscription page. iOS deep-links to the
+                // user's active subscriptions list.
+                if let url = URL(string: "itms-apps://apps.apple.com/account/subscriptions") {
+                    openURL(url)
+                }
+            } label: {
+                Text("Manage Subscription")
+                    .font(SBFont.inter(15, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 52)
+                    .background(
+                        LinearGradient(colors: [Color.sbGold, Color.sbGoldDk], startPoint: .leading, endPoint: .trailing)
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
     // MARK: - What's Included
 
     private var whatsIncluded: some View {
@@ -388,7 +362,7 @@ struct UpgradeView: View {
 
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
                 featureItem(icon: "sparkles", title: "AI Seating", subtitle: "Auto-arrange guests", tint: Color.sbGold)
-                featureItem(icon: "person.3.fill", title: "\(selectedProduct.guestLimit) Guests", subtitle: "Seated capacity", tint: Color.sbSage)
+                featureItem(icon: "person.3.fill", title: "1,000 Guests", subtitle: "Seated capacity", tint: Color.sbSage)
                 featureItem(icon: "doc.viewfinder", title: "Floor Plan AI", subtitle: "Scan your venue", tint: Color.sbBlush)
                 featureItem(icon: "rectangle.on.rectangle", title: "Arrangements", subtitle: "Multiple layouts", tint: Color(hex: "8B9DC3"))
                 featureItem(icon: "doc.text", title: "PDF Export", subtitle: "Print-ready charts", tint: Color(hex: "DDA0DD"))
@@ -424,9 +398,9 @@ struct UpgradeView: View {
         HStack(spacing: 0) {
             trustBadge(icon: "lock.shield.fill", label: "Secure")
             dividerLine
-            trustBadge(icon: "clock.arrow.circlepath", label: "No renewal")
+            trustBadge(icon: "clock.arrow.circlepath", label: "Cancel anytime")
             dividerLine
-            trustBadge(icon: "gift.fill", label: "Giftable")
+            trustBadge(icon: "creditcard", label: "Apple billed")
             dividerLine
             trustBadge(icon: "globe", label: "Web + iOS")
         }
@@ -462,6 +436,7 @@ struct UpgradeView: View {
             Button {
                 Task {
                     await storeKit.restorePurchases()
+                    await appState.refreshSubscription()
                     await appState.refreshPasses()
                 }
             } label: {
@@ -472,9 +447,14 @@ struct UpgradeView: View {
             }
             .buttonStyle(.plain)
 
-            Text("Manage your subscription in Settings")
-                .font(.system(size: 11))
+            // Apple HIG requires legal copy near the auto-renewable
+            // subscription CTA. Renewal is automatic at the end of each
+            // billing period unless canceled at least 24h before renewal.
+            Text("Auto-renews monthly until canceled in Settings. Payment charged to your Apple ID.")
+                .font(.system(size: 10))
                 .foregroundStyle(Color.sbWarm2)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 32)
         }
     }
 
@@ -517,7 +497,7 @@ struct UpgradeView: View {
                         .symbolEffect(.bounce, value: showSuccess)
                 }
 
-                Text("Welcome to\n\(selectedProduct.displayName)!")
+                Text("Welcome to\nSeatbee Pro!")
                     .font(SBFont.fraunces(28, weight: .medium))
                     .foregroundStyle(Color.sbCharcoal)
                     .multilineTextAlignment(.center)
@@ -541,13 +521,13 @@ struct UpgradeView: View {
     // MARK: - Purchase
 
     private func purchase() {
-        guard let product = storeKit.product(for: selectedProduct) else {
+        guard let storeProduct = storeKit.product(for: product) else {
             storeKit.purchaseError = "Unable to load this product from the App Store. Please check your connection and try again."
             return
         }
         isPurchasing = true
         Task {
-            _ = await storeKit.purchase(product)
+            _ = await storeKit.purchase(storeProduct)
             isPurchasing = false
         }
     }

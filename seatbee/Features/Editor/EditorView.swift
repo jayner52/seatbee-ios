@@ -1576,7 +1576,7 @@ struct EditorView: View {
               var p = appState.activePlan,
               let ti = p.tables.firstIndex(where: { $0.id == tableId }) else { return }
         // Same tier gate as assignGuestToNextEmpty — every seat-assignment
-        // path on the free plan must respect the 100-guest cap.
+        // path must respect the active plan's seated-guest cap.
         guard appState.canSeatGuest(guest.id) else {
             HapticEngine.error()
             dismissSheetsAndShowUpgrade()

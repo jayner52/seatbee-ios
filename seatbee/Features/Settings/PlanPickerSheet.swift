@@ -259,7 +259,8 @@ struct PlanPickerSheet: View {
 
     private func guestLimit(for tier: PlanTier) -> String {
         switch tier {
-        case .free: return "100"
+        case .free: return "50"
+        case .pro: return "1,000"
         case .eventPass: return "250"
         case .signaturePass: return "500"
         case .proPass: return "1,000"

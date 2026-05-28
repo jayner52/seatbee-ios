@@ -152,4 +152,65 @@ final class DatabaseService {
             .eq("id", value: id)
             .execute()
     }
+
+    // MARK: - User Subscription
+    //
+    // Cross-app shared shape (PARITY.md). Web's Stripe webhook (or our
+    // /api/apple-iap handler) writes these columns to `profiles`. iOS
+    // reads but never writes — same contract as legacy pass columns.
+    //
+    // Defensive: if the backend hasn't yet shipped the subscription
+    // columns (Phase 1 of the migration), the select fails or returns
+    // nulls. We catch and return nil so `AppState.activePlanTier` can
+    // fall back to the legacy pass chain without surfacing an error.
+
+    func fetchUserSubscription() async throws -> UserSubscription? {
+        let session = try await client.auth.session
+        let userId = session.user.id.uuidString
+
+        // Timestamps decoded as String (mirrors SeatingPlanDTO pattern) so
+        // we don't depend on a particular JSONDecoder dateDecodingStrategy.
+        struct Row: Decodable {
+            let subscription_status: String?
+            let subscription_renews_at: String?
+            let subscription_provider: String?
+            let subscription_id: String?
+        }
+
+        do {
+            let row: Row = try await client
+                .from("profiles")
+                .select("subscription_status, subscription_renews_at, subscription_provider, subscription_id")
+                .eq("id", value: userId)
+                .single()
+                .execute()
+                .value
+
+            // Backend has the columns but they're null → no subscription
+            // on file. Resolution chain falls through to legacy.
+            guard let rawStatus = row.subscription_status else {
+                return nil
+            }
+
+            return UserSubscription(
+                status: SubscriptionStatus.from(rawStatus),
+                renewsAt: row.subscription_renews_at.flatMap(Self.parseISODate),
+                provider: SubscriptionProvider.from(row.subscription_provider),
+                subscriptionId: row.subscription_id
+            )
+        } catch {
+            // Most likely cause: web hasn't shipped Phase 1 yet, so the
+            // columns don't exist. Quiet fallthrough — the legacy pass
+            // chain still works.
+            print("[Seatbee] fetchUserSubscription: \(error.localizedDescription) — falling back to legacy pass chain")
+            return nil
+        }
+    }
+
+    private static func parseISODate(_ string: String) -> Date? {
+        let iso = ISO8601DateFormatter()
+        if let date = iso.date(from: string) { return date }
+        iso.formatOptions.insert(.withFractionalSeconds)
+        return iso.date(from: string)
+    }
 }

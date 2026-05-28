@@ -4,12 +4,30 @@ import StoreKit
 // MARK: - Product IDs
 
 enum SeatbeeProduct: String, CaseIterable {
+    // NEW (2026-05-28): single subscription replaces all three one-time passes.
+    // Configured as an auto-renewable subscription in App Store Connect at $9.99/mo.
+    case proMonthly = "com.shayan.seatbee.pro_monthly"
+
+    // LEGACY one-time passes. Kept in the enum so any in-flight transactions
+    // from users who purchased pre-migration still finish + verify cleanly.
+    // Not shown in UpgradeView anymore — see UpgradeView for the post-migration UI.
     case eventPass = "com.shayan.seatbee.event_pass"
     case signaturePass = "com.shayan.seatbee.signature_pass"
     case grandPass = "com.shayan.seatbee.grand_pass"
 
+    /// True if this product is the live subscription. Used to gate
+    /// subscription-specific UI (manage-subscription link, renewal copy)
+    /// off legacy one-time pass behaviour.
+    var isSubscription: Bool {
+        switch self {
+        case .proMonthly: return true
+        case .eventPass, .signaturePass, .grandPass: return false
+        }
+    }
+
     var tier: PlanTier {
         switch self {
+        case .proMonthly: return .pro
         case .eventPass: return .eventPass
         case .signaturePass: return .signaturePass
         case .grandPass: return .proPass
@@ -18,6 +36,7 @@ enum SeatbeeProduct: String, CaseIterable {
 
     var displayName: String {
         switch self {
+        case .proMonthly: return "Seatbee Pro"
         case .eventPass: return "Event Pass"
         case .signaturePass: return "Signature Pass"
         case .grandPass: return "Grand Event Pass"
@@ -26,6 +45,7 @@ enum SeatbeeProduct: String, CaseIterable {
 
     var guestLimit: Int {
         switch self {
+        case .proMonthly: return 1000
         case .eventPass: return 250
         case .signaturePass: return 500
         case .grandPass: return 1000
@@ -34,6 +54,14 @@ enum SeatbeeProduct: String, CaseIterable {
 
     var features: [String] {
         switch self {
+        case .proMonthly:
+            return [
+                "Up to 1,000 seated guests",
+                "AI seating generation",
+                "AI floor plan analysis",
+                "Unlimited plans",
+                "Cancel anytime",
+            ]
         case .eventPass:
             return ["250 seated guests", "AI seating generation", "AI floor plan analysis", "6-month access"]
         case .signaturePass:
@@ -54,11 +82,21 @@ final class StoreKitService {
     var purchaseError: String?
     var purchaseSuccess = false
 
+    /// True when the user has an active auto-renewable subscription entitlement
+    /// from StoreKit (currentEntitlements). Refreshed by the transaction listener
+    /// and by `restorePurchases`. Used as a client-side fallback when the
+    /// backend hasn't yet propagated the subscription status — the source of
+    /// truth is still `profiles.subscription_status` on Supabase.
+    var hasActiveSubscription = false
+
     private var transactionListener: Task<Void, Never>?
 
     init() {
         transactionListener = listenForTransactions()
-        Task { await fetchProducts() }
+        Task {
+            await fetchProducts()
+            await refreshSubscriptionEntitlement()
+        }
     }
 
     deinit {
@@ -92,12 +130,16 @@ final class StoreKitService {
             switch result {
             case .success(let verification):
                 let transaction = try checkVerified(verification)
-                // Verify server-side and create pass in Supabase
+                // Verify server-side and create pass/subscription in Supabase
                 let verified = await verifyWithServer(transaction: transaction, productID: product.id)
                 if verified {
                     await transaction.finish()
                     purchasedProductIDs.insert(product.id)
                     purchaseSuccess = true
+                    // Subscription entitlement is now active; refresh our flag.
+                    if product.id == SeatbeeProduct.proMonthly.rawValue {
+                        hasActiveSubscription = true
+                    }
                     print("[StoreKit] Purchase successful: \(product.id)")
                     return true
                 } else {
@@ -133,7 +175,9 @@ final class StoreKitService {
         isLoading = true
         do {
             try await AppStore.sync()
-            // Check current entitlements
+            // Check current entitlements — this covers both legacy one-time
+            // passes still in the user's history AND the active subscription.
+            await refreshSubscriptionEntitlement()
             for await result in Transaction.currentEntitlements {
                 if let transaction = try? checkVerified(result) {
                     purchasedProductIDs.insert(transaction.productID)
@@ -148,6 +192,25 @@ final class StoreKitService {
         isLoading = false
     }
 
+    /// Walk `Transaction.currentEntitlements` and set `hasActiveSubscription`
+    /// based on whether the user holds an unexpired pro_monthly entitlement.
+    /// Idempotent — safe to call from launch, after purchase, after restore.
+    func refreshSubscriptionEntitlement() async {
+        var active = false
+        for await result in Transaction.currentEntitlements {
+            guard let transaction = try? checkVerified(result) else { continue }
+            if transaction.productID == SeatbeeProduct.proMonthly.rawValue {
+                // For auto-renewables, currentEntitlements only includes the
+                // entitlement while it's active (revocationDate==nil and not
+                // past expirationDate). Presence alone is sufficient.
+                if transaction.revocationDate == nil {
+                    active = true
+                }
+            }
+        }
+        await MainActor.run { self.hasActiveSubscription = active }
+    }
+
     // MARK: - Transaction Listener
 
     private func listenForTransactions() -> Task<Void, Never> {
@@ -158,6 +221,11 @@ final class StoreKitService {
                     await transaction.finish()
                     await MainActor.run {
                         self.purchasedProductIDs.insert(transaction.productID)
+                    }
+                    // Renewal / cancellation events for the subscription —
+                    // recompute the entitlement flag.
+                    if transaction.productID == SeatbeeProduct.proMonthly.rawValue {
+                        await self.refreshSubscriptionEntitlement()
                     }
                 }
             }
@@ -178,7 +246,8 @@ final class StoreKitService {
     // MARK: - Server-Side Verification
 
     /// Sends the transaction to our Vercel endpoint for server-side verification.
-    /// The endpoint verifies with Apple and creates the event_pass in Supabase.
+    /// The endpoint verifies with Apple and creates the event_pass (legacy)
+    /// OR updates `profiles.subscription_status` (pro_monthly) in Supabase.
     @discardableResult
     private func verifyWithServer(transaction: Transaction, productID: String) async -> Bool {
         guard let url = URL(string: AppConfig.aiAPIBaseURL.replacingOccurrences(of: "/api/ai", with: "/api/apple-iap")) else {
