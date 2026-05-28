@@ -830,7 +830,7 @@ struct GuestsView: View {
                 SBAvatar(name: guest.displayName, size: 36)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(guest.displayName)
+                    Text(guest.fullName)
                         .font(SBFont.bodySmallBold)
                         .foregroundStyle(Color.sbCharcoal)
 
