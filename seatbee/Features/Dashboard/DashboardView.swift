@@ -174,6 +174,10 @@ struct DashboardView: View {
             // column is null but a pass IS applied (web's fallback path)
             // get treated as free on iOS.
             await appState.refreshPasses()
+            // Subscription state (post-2026-05-28 pricing migration) is
+            // the new primary source of tier truth. Falls through quietly
+            // if the backend hasn't yet shipped the columns.
+            await appState.refreshSubscription()
         }
         .sheet(isPresented: $showEditPlan) {
             EditPlanSheet()
@@ -406,6 +410,7 @@ struct DashboardView: View {
         case .eventPass:     return (Color.sbChampagne,             Color.sbGoldDk)
         case .signaturePass: return (Color.sbChampagne2,            Color.sbGoldDk)
         case .proPass:       return (Color.sbCharcoal.opacity(0.10), Color.sbCharcoal)
+        case .pro:           return (Color.sbGold.opacity(0.15),    Color.sbGoldDk)
         case .free:          return (Color.sbChampagne,             Color.sbGoldDk)
         }
     }
@@ -515,6 +520,7 @@ struct DashboardView: View {
             let tier = plan.resolvedTier(against: appState.userPasses)
             switch tier {
             case .free:           return ("FREE",      Color.sbWarm,    Color.sbWarm.opacity(0.10))
+            case .pro:            return ("PRO",       Color.white,     Color.sbGoldDk)
             case .eventPass:      return ("EVENT",     Color.sbGoldDk,  Color.sbChampagne)
             case .signaturePass:  return ("SIGNATURE", Color.white,     Color.sbGoldDk)
             case .proPass:        return ("GRAND",     Color.white,     Color.sbCharcoal)

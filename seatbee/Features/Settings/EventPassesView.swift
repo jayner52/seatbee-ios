@@ -435,6 +435,7 @@ struct EventPassesView: View {
     private func tierAccent(_ tier: PlanTier) -> Color {
         switch tier {
         case .free:           return Color.sbWarm
+        case .pro:            return Color.sbGoldDk
         case .eventPass:      return Color.sbCharcoal
         case .signaturePass:  return Color.sbGoldDk
         case .proPass:        return Color.sbPlum

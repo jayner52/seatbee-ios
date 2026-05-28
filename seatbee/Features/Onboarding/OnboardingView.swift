@@ -532,9 +532,9 @@ struct OnboardingView: View {
 
     private var passApplicationHelpText: String {
         if appState.userPasses.passes.contains(where: { $0.isAvailable }) {
-            return "Tap a pass you own to apply it. Skip to start free, up to 100 seated guests."
+            return "Tap a pass you own to apply it. Skip to start free, up to 50 seated guests."
         }
-        return "You don't have any passes yet. Skip to start free (up to 100 seated), or tap Buy to upgrade — passes unlock larger events, AI seating, and watermark-free exports."
+        return "Start free, up to 50 seated guests. Subscribe to Seatbee Pro for unlimited AI seating and up to 1,000 guests."
     }
 
     /// One tile per tier. If the user has at least one pass of this
@@ -635,6 +635,7 @@ struct OnboardingView: View {
         case .eventPass:      return Color.sbCharcoal
         case .signaturePass:  return Color.sbGoldDk
         case .proPass:        return Color.sbPlum
+        case .pro:            return Color.sbGoldDk
         case .free:           return Color.sbWarm
         }
     }
@@ -647,6 +648,7 @@ struct OnboardingView: View {
         case .eventPass:      return Color.sbCharcoal.opacity(0.08)
         case .signaturePass:  return Color.sbChampagne
         case .proPass:        return Color.sbPlumLt
+        case .pro:            return Color.sbChampagne
         case .free:           return Color.sbIvory2
         }
     }
@@ -657,7 +659,8 @@ struct OnboardingView: View {
             case .eventPass:      return "250 guests"
             case .signaturePass:  return "500 guests"
             case .proPass:        return "1,000 guests"
-            case .free:           return "100 guests"
+            case .pro:            return "1,000 guests"
+            case .free:           return "50 guests"
             }
         }()
         if count == 0 {
@@ -724,18 +727,19 @@ struct OnboardingView: View {
     private var largeRoomPromptTitle: String {
         switch roomPreset {
         case .ballroom, .grand: return "Hosting a big crowd?"
-        default:                return "Seating more than 100 guests?"
+        default:                return "Seating more than 50 guests?"
         }
     }
 
     private var largeRoomPromptBody: String {
+        // Free plans cap at 50 seated guests; Seatbee Pro ($9.99/mo) seats
+        // up to 1,000 and unlocks AI seating. Big-room presets warrant a
+        // stronger nudge.
         switch roomPreset {
-        case .grand:
-            return "A Grand Pass seats up to 1,000. Free plans cap at 100 seated guests."
-        case .ballroom:
-            return "A Signature Pass seats up to 500 — Grand goes to 1,000. Free plans cap at 100 seated guests."
+        case .grand, .ballroom:
+            return "Seatbee Pro seats up to 1,000 with AI seating. Free plans cap at 50 seated guests."
         default:
-            return "An Event Pass seats up to 250 guests. Free plans cap at 100 seated guests."
+            return "Seatbee Pro seats up to 1,000 with AI seating, for $9.99/mo. Free plans cap at 50 seated guests."
         }
     }
 

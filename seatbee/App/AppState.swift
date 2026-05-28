@@ -59,6 +59,15 @@ final class AppState {
     var loadingPasses = false
     var passesLastFetched: Date?
 
+    // Subscription state (2026-05-28 pricing migration). Source of truth is
+    // `profiles.subscription_status` on Supabase. iOS reads but never writes
+    // — Stripe (web) and `/api/apple-iap` (iOS) own the writes. nil during
+    // initial load / for users on backend that hasn't yet shipped the columns;
+    // resolution falls back to legacy pass chain in that case.
+    var userSubscription: UserSubscription?
+    var loadingSubscription = false
+    var subscriptionLastFetched: Date?
+
     // One-shot per session: have we already shown the 80%-of-free-cap nudge?
     // Reset on new session (new app launch). Mirrors web's `limitToastFired`
     // ref at App.jsx:6211.
@@ -120,19 +129,48 @@ final class AppState {
         }
     }
 
-    /// Active plan's effective tier — mirrors web's resolution chain
-    /// (App.jsx:6155-6191 + api/passes.js:250). Web learned the hard way
-    /// that plan.tier alone isn't authoritative: collaborated plans, plans
-    /// with stale tier columns, and plans where the pass was applied via
-    /// promo all rely on the fallback paths below.
+    /// Refresh the user's subscription state from the `profiles` table.
+    /// Safe to call on app foreground and after sign-in. Silently falls
+    /// back to nil if the backend hasn't yet shipped the subscription
+    /// columns — `activePlanTier` then resolves via the legacy pass chain.
+    func refreshSubscription() async {
+        guard auth.currentUser != nil else {
+            userSubscription = nil
+            return
+        }
+        loadingSubscription = true
+        defer { loadingSubscription = false }
+        do {
+            userSubscription = try await database.fetchUserSubscription()
+            subscriptionLastFetched = Date()
+        } catch {
+            // Backend may not have shipped the columns yet — quiet fallthrough.
+            print("[AppState] refreshSubscription error: \(error.localizedDescription)")
+        }
+    }
+
+    /// Active plan's effective tier. As of 2026-05-28 the resolution chain
+    /// is subscription-first: a user with an active subscription is .pro on
+    /// every plan they own. The legacy per-plan pass chain stays as a
+    /// fallback so users with unexpired one-time passes (purchased before
+    /// the subscription migration) keep their entitlement to expiry, per
+    /// Apple's policy on previously-paid content.
     ///
     /// Resolution order:
+    ///   0. userSubscription.isProEntitled → .pro
     ///   1. plan.tier if set to a paid tier AND not expired
     ///   2. plan.eventPassExpiresAt in the future → assume event_pass
     ///   3. userPasses contains a redeemed pass tied to this plan ID and
     ///      not expired → use that pass's tier (catches signature/grand)
     ///   4. free
     var activePlanTier: PlanTier {
+        // 0. Subscription on the user profile is the new source of truth.
+        //    Unlocks Pro across every plan they own regardless of per-plan
+        //    pass state.
+        if let sub = userSubscription, sub.isProEntitled {
+            return .pro
+        }
+
         guard let plan = activePlan else { return .free }
 
         // 1. Direct tier column, respecting expiry.
@@ -174,7 +212,11 @@ final class AppState {
     /// True if the active plan was on a paid tier (per any of the
     /// resolution paths above) but its pass is now in the past. Used to
     /// distinguish "expired" from "never had a pass" in error messages.
+    /// A user with an active subscription is never "expired" — they have
+    /// open-ended Pro entitlement.
     var isActivePlanExpired: Bool {
+        if let sub = userSubscription, sub.isProEntitled { return false }
+
         guard let plan = activePlan else { return false }
         let raw = plan.tier ?? "free"
         let everHadPaidTier = raw != "free"
