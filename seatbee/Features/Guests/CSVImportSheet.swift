@@ -279,15 +279,23 @@ struct CSVImportSheet: View {
         }
         defer { url.stopAccessingSecurityScopedResource() }
 
-        do {
-            let text = try String(contentsOf: url, encoding: .utf8)
-            rawText = text
-            // The .onChange on the TextEditor handles auto-parsing,
-            // but file uploads bypass that path — explicit call here.
-            parseAuto()
-        } catch {
-            errorMessage = "Failed to read file: \(error.localizedDescription)"
+        // Try UTF-8 first; fall back to Windows-1252 then ISO Latin-1 for
+        // CSVs exported by Windows Excel which often uses legacy encodings.
+        let text: String
+        if let utf8 = try? String(contentsOf: url, encoding: .utf8), !utf8.contains("\u{FFFD}") {
+            text = utf8
+        } else if let cp1252 = try? String(contentsOf: url, encoding: .windowsCP1252) {
+            text = cp1252
+        } else if let latin1 = try? String(contentsOf: url, encoding: .isoLatin1) {
+            text = latin1
+        } else {
+            errorMessage = "Failed to read file: unsupported encoding"
+            return
         }
+        rawText = text
+        // The .onChange on the TextEditor handles auto-parsing,
+        // but file uploads bypass that path — explicit call here.
+        parseAuto()
     }
 
     // MARK: - Parsing
