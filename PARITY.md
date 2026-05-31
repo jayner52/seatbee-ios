@@ -125,6 +125,14 @@ These are the source of truth for Pro entitlement going forward. Web's Stripe we
 
 iOS reads them via `DatabaseService.fetchUserSubscription()` and resolves them in `AppState.activePlanTier` BEFORE the legacy pass chain. Users on backend that hasn't yet shipped these columns: iOS catches the decode error quietly and falls through to the legacy chain.
 
+### Last-editor tracking columns (top-level on `seating_plans` row, post-2026-05-31)
+
+`last_edited_by_id` (UUID, references `auth.users(id)`), `last_edited_by_email` (text), `last_edited_by_name` (text).
+
+Web reads these to render the "Edited by Emily, 2m ago" indicator in the account header and to detect collaborator conflicts in its polling loop (so it shows a "Keep mine / Use theirs" modal instead of silently overwriting unsynced local edits when two people edit a plan at once). **Both iOS and web MUST write these columns on every INSERT and UPDATE** — otherwise the web client sees stale editor info after an iOS edit and may mis-attribute changes (e.g., treat an iOS edit as a self-edit because the previous web editor's ID is still in the row).
+
+iOS populates them in `DatabaseService.createPlan` and `DatabaseService.savePlanData` using `session.user.id.uuidString`, `session.user.email`, and the name resolution chain from `AuthService.displayName` (`userMetadata.full_name` → `userMetadata.name` → email local-part).
+
 ### Guest
 
 Core: `id`, `name`, `firstName`, `lastName`, `email`, `categories` (array of category-IDs), `dietary` (free text), `notes`, `rsvp` (`yes`/`no`/`pending`/`unknown`), `side` (`bride`/`groom`/`both`/`none`), `vip`, `accessibility`, `plusOne`, `party` (party ID/name string), `display`

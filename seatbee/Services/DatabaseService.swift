@@ -57,6 +57,22 @@ final class DatabaseService {
             includeMaybes: nil
         )
 
+        // Last-editor tracking. The web app reads these columns to show
+        // "Edited by Emily, 2m ago" and to detect collaborator conflicts
+        // (so a web user's pending edits aren't silently overwritten when
+        // someone edits from iOS). Web added the same fields on every
+        // INSERT/UPDATE in commit 44970cd. If iOS doesn't match, web users
+        // will see stale editor info after iOS edits and may hit false
+        // conflict modals. See PARITY.md.
+        let lastEditedById = session.user.id.uuidString
+        let lastEditedByEmail = session.user.email ?? ""
+        var metaFullName: String? = nil
+        if case .string(let n) = session.user.userMetadata["full_name"], !n.isEmpty { metaFullName = n }
+        var metaName: String? = nil
+        if case .string(let n) = session.user.userMetadata["name"], !n.isEmpty { metaName = n }
+        let emailLocalPart = (session.user.email ?? "").split(separator: "@").first.map(String.init)
+        let lastEditedByName = metaFullName ?? metaName ?? emailLocalPart ?? ""
+
         struct CreatePlanPayload: Codable {
             let name: String
             let event_type: String
@@ -65,6 +81,9 @@ final class DatabaseService {
             let event_date: String?
             let event_venue_name: String?
             let seated_guest_count: Int
+            let last_edited_by_id: String
+            let last_edited_by_email: String
+            let last_edited_by_name: String
         }
 
         let payload = CreatePlanPayload(
@@ -74,7 +93,10 @@ final class DatabaseService {
             data: planData,
             event_date: eventDate,
             event_venue_name: venue,
-            seated_guest_count: guests?.count ?? 0
+            seated_guest_count: guests?.count ?? 0,
+            last_edited_by_id: lastEditedById,
+            last_edited_by_email: lastEditedByEmail,
+            last_edited_by_name: lastEditedByName
         )
 
         let response: SeatingPlanDTO = try await client
@@ -99,6 +121,17 @@ final class DatabaseService {
         if plan.isDemo { return }
 
         let planData = plan.toPlanData()
+        let session = try await client.auth.session
+
+        // Last-editor tracking — see createPlan for context.
+        let lastEditedById = session.user.id.uuidString
+        let lastEditedByEmail = session.user.email ?? ""
+        var metaFullName: String? = nil
+        if case .string(let n) = session.user.userMetadata["full_name"], !n.isEmpty { metaFullName = n }
+        var metaName: String? = nil
+        if case .string(let n) = session.user.userMetadata["name"], !n.isEmpty { metaName = n }
+        let emailLocalPart = (session.user.email ?? "").split(separator: "@").first.map(String.init)
+        let lastEditedByName = metaFullName ?? metaName ?? emailLocalPart ?? ""
 
         struct SavePayload: Codable {
             let data: PlanDataDTO
@@ -108,6 +141,9 @@ final class DatabaseService {
             let event_venue_name: String?
             let event_date: String?
             let event_type: String?
+            let last_edited_by_id: String
+            let last_edited_by_email: String
+            let last_edited_by_name: String
         }
 
         let dateFormatter = DateFormatter()
@@ -120,7 +156,10 @@ final class DatabaseService {
             seated_guest_count: plan.guests.count,
             event_venue_name: plan.venue,
             event_date: plan.eventDate.map { dateFormatter.string(from: $0) },
-            event_type: plan.eventType.rawValue
+            event_type: plan.eventType.rawValue,
+            last_edited_by_id: lastEditedById,
+            last_edited_by_email: lastEditedByEmail,
+            last_edited_by_name: lastEditedByName
         )
 
         try await client
