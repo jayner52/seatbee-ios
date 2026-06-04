@@ -141,13 +141,21 @@ struct UserSubscription: Codable, Equatable {
 
     static let none = UserSubscription(status: .none, renewsAt: nil, provider: nil, subscriptionId: nil)
 
-    /// The user is currently entitled to Pro features. `active` is
-    /// straightforward; `canceled` keeps entitlement until renews_at
-    /// (Apple/Stripe both work this way — user keeps what they paid for).
-    /// `past_due` keeps entitlement during the payment-retry grace window.
+    /// The user is currently entitled to Pro features. `active`/`past_due`
+    /// keep entitlement for real providers (Apple/Stripe). Grace (comped,
+    /// backend-seeded) is time-boxed to renews_at — same as `canceled` — so
+    /// backfilled grace users lapse to free after their window instead of
+    /// staying Pro forever. `canceled` keeps entitlement through renews_at
+    /// (user keeps what they paid for).
     var isProEntitled: Bool {
         switch status {
-        case .active, .pastDue: return true
+        case .active, .pastDue:
+            // Grace is a time-boxed comp: entitled only until renews_at.
+            if provider == .grace {
+                guard let renewsAt else { return false }
+                return Date() < renewsAt
+            }
+            return true
         case .canceled:
             // Canceled but paid through renews_at — still entitled until then.
             guard let renewsAt else { return false }
