@@ -485,49 +485,10 @@ struct OnboardingView: View {
     // currently-selected pass clears the selection.
 
     private var passApplicationSection: some View {
-        let avail = appState.userPasses.passes.filter { $0.isAvailable }
-        let byTier: [PlanTier: [EventPass]] = Dictionary(
-            grouping: avail,
-            by: { $0.tier }
-        )
-
-        return VStack(alignment: .leading, spacing: 8) {
-            sectionLabel("APPLY AN EVENT PASS? (OPTIONAL)")
-            Text(passApplicationHelpText)
-                .font(SBFont.caption)
-                .foregroundStyle(Color.sbWarm)
-
-            VStack(spacing: 8) {
-                passTierTile(.eventPass,    available: byTier[.eventPass] ?? [])
-                passTierTile(.signaturePass, available: byTier[.signaturePass] ?? [])
-                passTierTile(.proPass,       available: byTier[.proPass] ?? [])
-            }
-
-            // Active-selection footnote — mirrors web's wizard banner
-            // (App.jsx ~line 20233) so users see what'll be applied
-            // without scrolling back to the tile.
-            if let pendingPassId,
-               let selected = avail.first(where: { $0.id == pendingPassId }) {
-                HStack(spacing: 6) {
-                    Image(systemName: "checkmark.seal.fill")
-                        .foregroundStyle(Color.sbSage)
-                        .font(.system(size: 12))
-                    Text("\(selected.tier.displayName) will be applied to this event.")
-                        .font(SBFont.caption)
-                        .foregroundStyle(Color.sbCharcoal)
-                    Spacer()
-                    Button("Remove") {
-                        self.pendingPassId = nil
-                        HapticEngine.selection()
-                    }
-                    .font(SBFont.caption)
-                    .foregroundStyle(Color.sbGoldDk)
-                }
-                .padding(10)
-                .background(Color.sbChampagne.opacity(0.5))
-                .clipShape(RoundedRectangle(cornerRadius: SBRadius.small))
-            }
-        }
+        // Event passes are retired — onboarding no longer offers pass
+        // application. The model is simply Free vs Seatbee Pro; the
+        // large-room nudge below handles the upsell.
+        EmptyView()
     }
 
     private var passApplicationHelpText: String {
@@ -683,7 +644,6 @@ struct OnboardingView: View {
             || roomPreset == .ballroom
             || roomPreset == .grand
         let alreadySelected = pendingPassId != nil
-        let hasAnyPass = appState.userPasses.passes.contains(where: { $0.isAvailable })
 
         if isLargeRoom && !alreadySelected {
             HStack(alignment: .top, spacing: 10) {
@@ -699,21 +659,11 @@ struct OnboardingView: View {
                         .font(SBFont.caption)
                         .foregroundStyle(Color.sbCharcoal2)
                         .fixedSize(horizontal: false, vertical: true)
-                    HStack(spacing: 8) {
-                        if hasAnyPass {
-                            Button("Apply a pass") {
-                                step = 1
-                                HapticEngine.selection()
-                            }
-                            .font(SBFont.bodySmallBold)
-                            .foregroundStyle(Color.sbGoldDk)
-                        }
-                        Button(hasAnyPass ? "Buy more" : "Get a pass") {
-                            appState.showUpgrade = true
-                        }
-                        .font(SBFont.bodySmallBold)
-                        .foregroundStyle(hasAnyPass ? Color.sbWarm : Color.sbGoldDk)
+                    Button("Upgrade to Seatbee Pro") {
+                        appState.showUpgrade = true
                     }
+                    .font(SBFont.bodySmallBold)
+                    .foregroundStyle(Color.sbGoldDk)
                     .padding(.top, 2)
                 }
                 Spacer()

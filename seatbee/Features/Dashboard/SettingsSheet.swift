@@ -63,48 +63,34 @@ struct SettingsSheet: View {
                     Text("Account")
                 }
 
-                // Event Passes
+                // Seatbee Pro — opens the subscription paywall / manage screen.
+                // (Replaced the legacy "Event Passes" route; passes are retired.)
                 if appState.auth.currentUser != nil {
+                    let isPaid = appState.activePlanTier != .free
                     Section {
-                        NavigationLink {
-                            EventPassesView()
-                                .environment(appState)
+                        Button {
+                            appState.showUpgrade = true
                         } label: {
                             HStack(spacing: 12) {
-                                Image(systemName: "ticket")
+                                Image(systemName: "crown")
                                     .foregroundStyle(Color.sbGoldDk)
                                     .frame(width: 24)
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text("Event Passes")
+                                    Text(isPaid ? "Seatbee Pro" : "Upgrade to Seatbee Pro")
                                         .foregroundStyle(Color.sbCharcoal)
-                                    if appState.activePlanTier != .free {
-                                        Text("This plan: \(appState.activePlanTier.displayName)")
-                                            .font(SBFont.caption)
-                                            .foregroundStyle(Color.sbGoldDk)
-                                    }
-                                }
-                                Spacer()
-                                if appState.userPasses.summary.available > 0 {
-                                    Text("\(appState.userPasses.summary.available) available")
+                                    Text(isPaid ? "Manage your subscription" : "$9.99/mo · up to 1,000 guests")
                                         .font(SBFont.caption)
                                         .foregroundStyle(Color.sbGoldDk)
-                                        .padding(.horizontal, 8)
-                                        .padding(.vertical, 3)
-                                        .background(Color.sbGold.opacity(0.15))
-                                        .clipShape(Capsule())
                                 }
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(Color.sbWarm)
                             }
                         }
-                        // The "Upgrade Plan" tile that used to live here
-                        // was removed — it pointed at web's pricing page
-                        // and read as a duplicate route next to Event
-                        // Passes (applying a pass IS how a plan
-                        // upgrades on iOS). The Redeem-a-Gift-Code flow
-                        // lives inside Event Passes itself, surfaced at
-                        // the top of that view; no need for a separate
-                        // top-level tile cluttering Settings.
+                        .buttonStyle(.plain)
                     } header: {
-                        Text("Passes")
+                        Text("Plan")
                     }
                 }
 
