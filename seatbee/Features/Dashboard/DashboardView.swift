@@ -173,10 +173,6 @@ struct DashboardView: View {
             // user redeemed on web. Without this, plans where the tier
             // column is null but a pass IS applied (web's fallback path)
             // get treated as free on iOS.
-            await appState.refreshPasses()
-            // Subscription state (post-2026-05-28 pricing migration) is
-            // the new primary source of tier truth. Falls through quietly
-            // if the backend hasn't yet shipped the columns.
             await appState.refreshSubscription()
         }
         .sheet(isPresented: $showEditPlan) {
@@ -517,7 +513,7 @@ struct DashboardView: View {
             if plan.isDemo {
                 return ("SAMPLE", Color.sbCharcoal, Color.sbChampagne2)
             }
-            let tier = plan.resolvedTier(against: appState.userPasses)
+            let tier = appState.userSubscription?.isProEntitled == true ? PlanTier.pro : plan.resolvedTier()
             switch tier {
             case .free:           return ("FREE",      Color.sbWarm,    Color.sbWarm.opacity(0.10))
             case .pro:            return ("PRO",       Color.white,     Color.sbGoldDk)

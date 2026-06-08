@@ -50,14 +50,8 @@ final class AppState {
     let auth = AuthService()
     let database = DatabaseService()
     let ai = AIService()
-    let passes = PassesService()
     let seat = SeatService()
     let undoManager = SBUndoManager()
-
-    // Pass inventory (web purchases — Apple IAP comes in Phase 2)
-    var userPasses: PassesResponse = .empty
-    var loadingPasses = false
-    var passesLastFetched: Date?
 
     // Subscription state (2026-05-28 pricing migration). Source of truth is
     // `profiles.subscription_status` on Supabase. iOS reads but never writes
@@ -110,25 +104,6 @@ final class AppState {
         }
     }
 
-    /// Refresh the user's pass inventory from /api/passes.
-    /// Safe to call on app foreground and after sign-in.
-    func refreshPasses() async {
-        guard auth.currentUser != nil else {
-            userPasses = .empty
-            return
-        }
-        loadingPasses = true
-        defer { loadingPasses = false }
-        do {
-            userPasses = try await passes.fetchPasses()
-            passesLastFetched = Date()
-        } catch {
-            // Silent fail on background refresh — UI screens that need passes
-            // can surface their own error if a manual refresh fails.
-            print("[AppState] refreshPasses error: \(error.localizedDescription)")
-        }
-    }
-
     /// Refresh the user's subscription state from the `profiles` table.
     /// Safe to call on app foreground and after sign-in. Silently falls
     /// back to nil if the backend hasn't yet shipped the subscription
@@ -149,57 +124,24 @@ final class AppState {
         }
     }
 
-    /// Active plan's effective tier. As of 2026-05-28 the resolution chain
-    /// is subscription-first: a user with an active subscription is .pro on
-    /// every plan they own. The legacy per-plan pass chain stays as a
-    /// fallback so users with unexpired one-time passes (purchased before
-    /// the subscription migration) keep their entitlement to expiry, per
-    /// Apple's policy on previously-paid content.
-    ///
+    /// Active plan's effective tier.
     /// Resolution order:
-    ///   0. userSubscription.isProEntitled → .pro
-    ///   1. plan.tier if set to a paid tier AND not expired
-    ///   2. plan.eventPassExpiresAt in the future → assume event_pass
-    ///   3. userPasses contains a redeemed pass tied to this plan ID and
-    ///      not expired → use that pass's tier (catches signature/grand)
-    ///   4. free
+    ///   0. userSubscription.isProEntitled → .pro (subscription is the source of truth)
+    ///   1. plan.tier column if set to a paid tier AND not expired (legacy pass holders)
+    ///   2. free
     var activePlanTier: PlanTier {
-        // 0. Subscription on the user profile is the new source of truth.
-        //    Unlocks Pro across every plan they own regardless of per-plan
-        //    pass state.
         if let sub = userSubscription, sub.isProEntitled {
             return .pro
         }
-
         guard let plan = activePlan else { return .free }
-
-        // 1. Direct tier column, respecting expiry.
         let raw = plan.tier ?? "free"
         if raw != "free" {
             if let exp = plan.eventPassExpiresAt, Date() > exp {
-                // Paid tier but pass has expired — fall through to other
-                // signals before giving up to free.
+                // Paid tier but pass has expired.
             } else {
                 return PlanTier.from(raw)
             }
         }
-
-        // 2. event_pass_expires_at fallback (web's api/passes.js:250).
-        if let exp = plan.eventPassExpiresAt, Date() < exp {
-            return .eventPass
-        }
-
-        // 3. Cross-reference user's pass inventory (web's effect at
-        //    App.jsx:6155-6191) — most reliable for plans applied via
-        //    promo or where the tier column is stale.
-        if let pass = userPasses.passes.first(where: { p in
-            p.status == "redeemed"
-            && p.redeemedForPlanId == plan.id
-            && (p.expiresAt.map { Date() < $0 } ?? true)
-        }) {
-            return pass.tier
-        }
-
         return .free
     }
 
@@ -209,55 +151,23 @@ final class AppState {
         TierLimits.limits(for: activePlanTier)
     }
 
-    /// True if the active plan was on a paid tier (per any of the
-    /// resolution paths above) but its pass is now in the past. Used to
-    /// distinguish "expired" from "never had a pass" in error messages.
-    /// A user with an active subscription is never "expired" — they have
-    /// open-ended Pro entitlement.
+    /// True if the active plan was on a legacy paid tier but its pass has now expired.
+    /// Used to distinguish "expired" from "never had a pass" in gating messages.
+    /// A user with an active subscription is never "expired".
     var isActivePlanExpired: Bool {
         if let sub = userSubscription, sub.isProEntitled { return false }
-
         guard let plan = activePlan else { return false }
         let raw = plan.tier ?? "free"
-        let everHadPaidTier = raw != "free"
-            || plan.eventPassExpiresAt != nil
-            || userPasses.passes.contains { $0.status == "redeemed" && $0.redeemedForPlanId == plan.id }
-        guard everHadPaidTier else { return false }
-
-        // If any future-dated signal exists, not expired.
-        if let exp = plan.eventPassExpiresAt, Date() < exp { return false }
-        if userPasses.passes.contains(where: { p in
-            p.status == "redeemed"
-            && p.redeemedForPlanId == plan.id
-            && (p.expiresAt.map { Date() < $0 } ?? false)
-        }) {
-            return false
-        }
-        return true
+        guard raw != "free" else { return false }
+        if let exp = plan.eventPassExpiresAt { return Date() > exp }
+        return false
     }
 
-    /// Effective expiry date for a plan's pass, mirroring the
-    /// resolution chain used by `activePlanTier`. Required because
-    /// the `event_pass_expires_at` column on `seating_plans` was added
-    /// part-way through the web app's life — older redemptions, admin
-    /// overrides (web's `admin.js:5583`), and some legacy promo paths
-    /// set `tier` without backfilling the column. We fall back to the
-    /// user's pass inventory (which is the source of truth and always
-    /// has `expires_at`).
-    ///
-    /// Resolution order:
-    ///   1. plan.eventPassExpiresAt if set
-    ///   2. user's redeemed pass tied to this plan ID, if any
-    ///   3. plan.eventPassPurchasedAt + 180 days (matches web's
-    ///      TIER_LIMITS expiry for all paid tiers)
-    ///   4. nil — no expiry knowable; UI hides the days-left badge
+    /// Expiry date for a legacy plan pass. Returns nil for subscription users
+    /// (open-ended entitlement) and for plans with no expiry on record.
     func effectivePassExpiry(for plan: SeatingPlan) -> Date? {
+        if let sub = userSubscription, sub.isProEntitled { return nil }
         if let exp = plan.eventPassExpiresAt { return exp }
-        if let pass = userPasses.passes.first(where: { p in
-            p.status == "redeemed" && p.redeemedForPlanId == plan.id
-        }), let exp = pass.expiresAt {
-            return exp
-        }
         if let purchased = plan.eventPassPurchasedAt {
             return Calendar.current.date(byAdding: .day, value: 180, to: purchased)
         }

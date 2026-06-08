@@ -85,14 +85,6 @@ struct OnboardingView: View {
     @State private var isCreating = false
     @State private var errorMessage: String?
 
-    // Pass-selector state (web parity — OnboardingWizard step 1).
-    // Stored in memory only until plan creation; after the plan
-    // exists in Supabase we redeem the pass against it via
-    // POST /api/passes. Web uses pendingPassRedemption on the store;
-    // iOS keeps it local to the view since it doesn't need to
-    // survive cross-component navigation the way web does.
-    @State private var pendingPassId: String?
-
     // MARK: - Local enums
 
     enum FileImportMode: Equatable { case csv, floorPlan }
@@ -393,14 +385,7 @@ struct OnboardingView: View {
         ) {
             UpgradeView().environment(appState)
         }
-        // When a purchase completes the user's pass inventory changes —
-        // refresh so the tier tiles flip from "Buy" to "N available" and
-        // can be tapped to apply without leaving onboarding.
-        .onChange(of: appState.showUpgrade) { _, isShown in
-            if !isShown {
-                Task { await appState.refreshPasses() }
-            }
-        }
+        .onChange(of: appState.showUpgrade) { _, _ in }
     }
 
     private var progressDots: some View {
@@ -491,161 +476,22 @@ struct OnboardingView: View {
         EmptyView()
     }
 
-    private var passApplicationHelpText: String {
-        if appState.userPasses.passes.contains(where: { $0.isAvailable }) {
-            return "Tap a pass you own to apply it. Skip to start free, up to 50 seated guests."
-        }
-        return "Start free, up to 50 seated guests. Subscribe to Seatbee Pro for unlimited AI seating and up to 1,000 guests."
-    }
-
-    /// One tile per tier. If the user has at least one pass of this
-    /// tier, the tile is selectable and shows the inventory count;
-    /// otherwise it shows a "Buy" affordance that bounces to web
-    /// pricing via the existing showUpgrade plumbing.
     @ViewBuilder
     private func passTierTile(_ tier: PlanTier, available: [EventPass]) -> some View {
-        let count = available.count
-        let owns = count > 0
-        // Pick the soonest-expiring pass of this tier when there are
-        // multiples — same heuristic web uses to pick which pass to
-        // burn first. Lets us assign a stable pendingPassId per tile
-        // even though the user has multiple of the tier.
-        let firstId = available
-            .sorted { (a, b) in (a.expiresAt ?? .distantFuture) < (b.expiresAt ?? .distantFuture) }
-            .first?.id
-        let isSelected = firstId.map { $0 == pendingPassId } ?? false
-        let _ = owns  // silence unused if nothing references it later
-
-        Button {
-            if owns {
-                if isSelected {
-                    pendingPassId = nil
-                } else {
-                    pendingPassId = firstId
-                }
-                HapticEngine.selection()
-            } else {
-                // No inventory — open the upgrade flow. AppRouter
-                // routes this to web pricing today (Apple IAP is
-                // Phase 2, Shayan).
-                appState.showUpgrade = true
-            }
-        } label: {
-            HStack(spacing: 12) {
-                // Key icon — same visual cue web uses (App.jsx ~20284):
-                // one icon for all tiers, tinted in the tier accent so
-                // the colour does the differentiating, not a letter.
-                Image(systemName: "key.fill")
-                    .font(.system(size: 22, weight: .semibold))
-                    .foregroundStyle(passAccent(tier))
-                    .frame(width: 36, height: 36)
-                    .rotationEffect(.degrees(-45))   // diagonal, like web SVG
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(tier.displayName)
-                        .font(SBFont.bodySmallBold)
-                        .foregroundStyle(passAccent(tier))
-                    Text(passTileSubtitle(tier, count: count))
-                        .font(SBFont.caption)
-                        .foregroundStyle(Color.sbWarm)
-                }
-
-                Spacer()
-
-                if owns {
-                    if isSelected {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 18))
-                            .foregroundStyle(passAccent(tier))
-                    } else {
-                        Text("\(count) available")
-                            .font(SBFont.capsLabel)
-                            .foregroundStyle(passAccent(tier))
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(passAccentTint(tier))
-                            .clipShape(Capsule())
-                    }
-                } else {
-                    Text("Buy")
-                        .font(SBFont.label)
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(passAccent(tier))
-                        .clipShape(Capsule())
-                }
-            }
-            .padding(12)
-            .background(isSelected ? passAccentTint(tier) : Color.sbIvory2)
-            .clipShape(RoundedRectangle(cornerRadius: SBRadius.button))
-            .overlay(
-                RoundedRectangle(cornerRadius: SBRadius.button)
-                    .strokeBorder(isSelected ? passAccent(tier) : Color.sbLine,
-                                  lineWidth: isSelected ? 2 : 1)
-            )
-        }
-        .buttonStyle(.plain)
-    }
-
-    /// Tier accent colour — matches web's text/border palette
-    /// (App.jsx ~20284 / index.css `--color-grand-rgb`). Charcoal for
-    /// Event (the entry tier), gold for Signature, plum for Grand.
-    private func passAccent(_ tier: PlanTier) -> Color {
-        switch tier {
-        case .eventPass:      return Color.sbCharcoal
-        case .signaturePass:  return Color.sbGoldDk
-        case .proPass:        return Color.sbPlum
-        case .pro:            return Color.sbGoldDk
-        case .free:           return Color.sbWarm
-        }
-    }
-
-    /// Light tint of the tier accent — used as the "available" pill
-    /// background and the selected-tile fill so each tier has its own
-    /// soft identity card without recoloring the whole row.
-    private func passAccentTint(_ tier: PlanTier) -> Color {
-        switch tier {
-        case .eventPass:      return Color.sbCharcoal.opacity(0.08)
-        case .signaturePass:  return Color.sbChampagne
-        case .proPass:        return Color.sbPlumLt
-        case .pro:            return Color.sbChampagne
-        case .free:           return Color.sbIvory2
-        }
-    }
-
-    private func passTileSubtitle(_ tier: PlanTier, count: Int) -> String {
-        let cap: String = {
-            switch tier {
-            case .eventPass:      return "250 guests"
-            case .signaturePass:  return "500 guests"
-            case .proPass:        return "1,000 guests"
-            case .pro:            return "1,000 guests"
-            case .free:           return "50 guests"
-            }
-        }()
-        if count == 0 {
-            return "\(cap) · No passes yet"
-        }
-        return cap
+        // Legacy — event passes are retired. This view is dead code kept
+        // to avoid breaking the passApplicationSection (which renders EmptyView).
+        EmptyView()
     }
 
     // MARK: - Large-room contextual nudge (Step 3)
 
-    /// Yellow soft-warning banner shown on the room-setup step when
-    /// the user picks Large / Ballroom / Grand AND hasn't already
-    /// chosen a pass on step 1. Intentionally not a gate — they can
-    /// continue and run a free plan, then hit the seating cap later.
-    /// "Apply a pass" jumps back to step 1; "Get a pass" opens web
-    /// pricing via the existing showUpgrade router.
     @ViewBuilder
     private var largeRoomPassNudge: some View {
         let isLargeRoom = roomPreset == .large
             || roomPreset == .ballroom
             || roomPreset == .grand
-        let alreadySelected = pendingPassId != nil
 
-        if isLargeRoom && !alreadySelected {
+        if isLargeRoom {
             HStack(alignment: .top, spacing: 10) {
                 Image("SeatbeeLogo")
                     .resizable()
@@ -800,13 +646,6 @@ struct OnboardingView: View {
             Spacer(minLength: 40)
         }
         .task(id: eventType) { regenerateCSVTemplate() }
-        // Refresh the user's pass inventory once when onboarding
-        // opens so the step-1 pass tiles show real counts. Without
-        // this, users who bought a pass on web would land on
-        // onboarding with a stale (likely empty) inventory and never
-        // see their passes offered. id: 0 keeps it as a one-shot
-        // (web's onboarding fetches once on mount too).
-        .task(id: 0) { await appState.refreshPasses() }
     }
 
     private var detectedSummary: some View {
@@ -1654,37 +1493,6 @@ struct OnboardingView: View {
                 }
 
                 try await appState.database.savePlanData(plan: plan)
-
-                // Apply the pre-selected pass (if any) BEFORE setting
-                // activePlan so the editor doesn't briefly show as
-                // free-tier and then upgrade. POST /api/passes is
-                // the same endpoint Settings → Event Passes →
-                // Apply uses; failures here are non-fatal — plan is
-                // already saved, user can re-apply via Settings.
-                if let passId = pendingPassId {
-                    do {
-                        let result = try await appState.passes.redeemPass(
-                            planId: plan.id,
-                            passId: passId
-                        )
-                        if let newTier = result.tier {
-                            plan.tier = newTier
-                        }
-                        if let exp = result.expiresAt {
-                            plan.eventPassExpiresAt = exp
-                        }
-                        // Refresh inventory so the redeemed pass
-                        // moves out of Available -> Redeemed in the
-                        // user's view next time they open Event
-                        // Passes.
-                        await appState.refreshPasses()
-                    } catch {
-                        // Non-fatal: log + continue. Plan is created;
-                        // user can apply manually if this races. Web
-                        // does the same (App.jsx ~line 4742).
-                        print("[Onboarding] Pass redeem failed: \(error.localizedDescription)")
-                    }
-                }
 
                 appState.activePlan = plan
                 HapticEngine.success()
