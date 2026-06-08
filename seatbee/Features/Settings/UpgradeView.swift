@@ -437,7 +437,6 @@ struct UpgradeView: View {
                 Task {
                     await storeKit.restorePurchases()
                     await appState.refreshSubscription()
-                    await appState.refreshPasses()
                 }
             } label: {
                 Text("Restore Purchases")

@@ -721,7 +721,7 @@ extension SeatingPlan {
     ///      most reliable for promo / signature / grand applied
     ///      via web.
     ///   4. Free.
-    func resolvedTier(against userPasses: PassesResponse) -> PlanTier {
+    func resolvedTier() -> PlanTier {
         let raw = tier ?? "free"
         if raw != "free" {
             if let exp = eventPassExpiresAt, Date() > exp {
@@ -729,16 +729,6 @@ extension SeatingPlan {
             } else {
                 return PlanTier.from(raw)
             }
-        }
-        if let exp = eventPassExpiresAt, Date() < exp {
-            return .eventPass
-        }
-        if let pass = userPasses.passes.first(where: { p in
-            p.status == "redeemed"
-            && p.redeemedForPlanId == id
-            && (p.expiresAt.map { Date() < $0 } ?? true)
-        }) {
-            return pass.tier
         }
         return .free
     }
