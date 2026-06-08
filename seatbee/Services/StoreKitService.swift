@@ -108,7 +108,12 @@ final class StoreKitService {
     func fetchProducts() async {
         isLoading = true
         do {
-            let productIDs = SeatbeeProduct.allCases.map(\.rawValue)
+            // Phaseout 2026-06-08: legacy one-time pass products are no
+            // longer shown in UI. Only fetch the live subscription so
+            // App Store Connect doesn't surface unused IDs in the cache.
+            // Legacy IDs stay defined on SeatbeeProduct for verification
+            // of any in-flight transactions from pre-migration purchases.
+            let productIDs = [SeatbeeProduct.proMonthly.rawValue]
             products = try await Product.products(for: productIDs)
             products.sort { ($0.price as NSDecimalNumber).doubleValue < ($1.price as NSDecimalNumber).doubleValue }
             print("[StoreKit] Fetched \(products.count) products")
