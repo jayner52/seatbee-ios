@@ -6,7 +6,11 @@ import StoreKit
 enum SeatbeeProduct: String, CaseIterable {
     // NEW (2026-05-28): single subscription replaces all three one-time passes.
     // Configured as an auto-renewable subscription in App Store Connect at $9.99/mo.
-    case proMonthly = "com.shayan.seatbee.pro_monthly"
+    // (2026-06-11) ID bumped to .v2: the original pro_monthly got stuck in a 3.1.1
+    // rejection loop and was deleted in App Store Connect — Apple never frees a
+    // deleted subscription's Product ID, so the old string is unusable forever.
+    // Must match ASC exactly (Apple ID 6779085944, group "Seatbee Pro").
+    case proMonthly = "com.shayan.seatbee.pro.monthly.v2"
 
     // LEGACY one-time passes. Kept in the enum so any in-flight transactions
     // from users who purchased pre-migration still finish + verify cleanly.
