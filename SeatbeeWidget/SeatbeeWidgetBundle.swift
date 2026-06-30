@@ -1,3 +1,10 @@
+//
+//  SeatbeeWidgetBundle.swift
+//  SeatbeeWidget
+//
+//  Created by Shayan Mirzazadeh on 2026-06-30.
+//
+
 import WidgetKit
 import SwiftUI
 
