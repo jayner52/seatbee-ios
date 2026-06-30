@@ -9,6 +9,9 @@
 /* Begin PBXBuildFile section */
 		262DDF052FA540DF00FE434A /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = AA000003AAAAAAAA00000003 /* Supabase */; };
 		262DDF062FA540DF00FE434A /* Kingfisher in Frameworks */ = {isa = PBXBuildFile; productRef = AA000004AAAAAAAA00000004 /* Kingfisher */; };
+		264026E92FF3FE35004BBCD1 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 264026E82FF3FE34004BBCD1 /* WidgetKit.framework */; };
+		264026EB2FF3FE35004BBCD1 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 264026EA2FF3FE35004BBCD1 /* SwiftUI.framework */; };
+		264026FA2FF3FE38004BBCD1 /* SeatbeeWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 264026E62FF3FE34004BBCD1 /* SeatbeeWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -26,12 +29,37 @@
 			remoteGlobalIDString = 262DDD872FA533AE00FE434A;
 			remoteInfo = seatbee;
 		};
+		264026F82FF3FE38004BBCD1 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 262DDD802FA533AE00FE434A /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 264026E52FF3FE34004BBCD1;
+			remoteInfo = SeatbeeWidgetExtension;
+		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		264026FB2FF3FE38004BBCD1 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				264026FA2FF3FE38004BBCD1 /* SeatbeeWidgetExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		262DDD882FA533AE00FE434A /* seatbee.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = seatbee.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		262DDD992FA533B200FE434A /* seatbeeTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = seatbeeTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		262DDDA32FA533B200FE434A /* seatbeeUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = seatbeeUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		264026E62FF3FE34004BBCD1 /* SeatbeeWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SeatbeeWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		264026E82FF3FE34004BBCD1 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		264026EA2FF3FE35004BBCD1 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		2640270D2FF400CF004BBCD1 /* SeatbeeWidgetExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SeatbeeWidgetExtension.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -41,6 +69,13 @@
 				Info.plist,
 			);
 			target = 262DDD872FA533AE00FE434A /* seatbee */;
+		};
+		264026FF2FF3FE38004BBCD1 /* Exceptions for "SeatbeeWidget" folder in "SeatbeeWidgetExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 264026E52FF3FE34004BBCD1 /* SeatbeeWidgetExtension */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -61,6 +96,14 @@
 		262DDDA62FA533B200FE434A /* seatbeeUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = seatbeeUITests;
+			sourceTree = "<group>";
+		};
+		264026EC2FF3FE35004BBCD1 /* SeatbeeWidget */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				264026FF2FF3FE38004BBCD1 /* Exceptions for "SeatbeeWidget" folder in "SeatbeeWidgetExtension" target */,
+			);
+			path = SeatbeeWidget;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -89,15 +132,27 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		264026E32FF3FE34004BBCD1 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				264026EB2FF3FE35004BBCD1 /* SwiftUI.framework in Frameworks */,
+				264026E92FF3FE35004BBCD1 /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		262DDD7F2FA533AD00FE434A = {
 			isa = PBXGroup;
 			children = (
+				2640270D2FF400CF004BBCD1 /* SeatbeeWidgetExtension.entitlements */,
 				262DDD8A2FA533AE00FE434A /* seatbee */,
 				262DDD9C2FA533B200FE434A /* seatbeeTests */,
 				262DDDA62FA533B200FE434A /* seatbeeUITests */,
+				264026EC2FF3FE35004BBCD1 /* SeatbeeWidget */,
+				264026E72FF3FE34004BBCD1 /* Frameworks */,
 				262DDD892FA533AE00FE434A /* Products */,
 			);
 			sourceTree = "<group>";
@@ -108,8 +163,18 @@
 				262DDD882FA533AE00FE434A /* seatbee.app */,
 				262DDD992FA533B200FE434A /* seatbeeTests.xctest */,
 				262DDDA32FA533B200FE434A /* seatbeeUITests.xctest */,
+				264026E62FF3FE34004BBCD1 /* SeatbeeWidgetExtension.appex */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		264026E72FF3FE34004BBCD1 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				264026E82FF3FE34004BBCD1 /* WidgetKit.framework */,
+				264026EA2FF3FE35004BBCD1 /* SwiftUI.framework */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -122,10 +187,12 @@
 				262DDD842FA533AE00FE434A /* Sources */,
 				262DDD852FA533AE00FE434A /* Frameworks */,
 				262DDD862FA533AE00FE434A /* Resources */,
+				264026FB2FF3FE38004BBCD1 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				264026F92FF3FE38004BBCD1 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				262DDD8A2FA533AE00FE434A /* seatbee */,
@@ -185,6 +252,28 @@
 			productReference = 262DDDA32FA533B200FE434A /* seatbeeUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		264026E52FF3FE34004BBCD1 /* SeatbeeWidgetExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 264026FE2FF3FE38004BBCD1 /* Build configuration list for PBXNativeTarget "SeatbeeWidgetExtension" */;
+			buildPhases = (
+				264026E22FF3FE34004BBCD1 /* Sources */,
+				264026E32FF3FE34004BBCD1 /* Frameworks */,
+				264026E42FF3FE34004BBCD1 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				264026EC2FF3FE35004BBCD1 /* SeatbeeWidget */,
+			);
+			name = SeatbeeWidgetExtension;
+			packageProductDependencies = (
+			);
+			productName = SeatbeeWidgetExtension;
+			productReference = 264026E62FF3FE34004BBCD1 /* SeatbeeWidgetExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -192,7 +281,7 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 2640;
+				LastSwiftUpdateCheck = 2660;
 				LastUpgradeCheck = 2640;
 				TargetAttributes = {
 					262DDD872FA533AE00FE434A = {
@@ -205,6 +294,9 @@
 					262DDDA22FA533B200FE434A = {
 						CreatedOnToolsVersion = 26.4.1;
 						TestTargetID = 262DDD872FA533AE00FE434A;
+					};
+					264026E52FF3FE34004BBCD1 = {
+						CreatedOnToolsVersion = 26.6;
 					};
 				};
 			};
@@ -229,6 +321,7 @@
 				262DDD872FA533AE00FE434A /* seatbee */,
 				262DDD982FA533B200FE434A /* seatbeeTests */,
 				262DDDA22FA533B200FE434A /* seatbeeUITests */,
+				264026E52FF3FE34004BBCD1 /* SeatbeeWidgetExtension */,
 			);
 		};
 /* End PBXProject section */
@@ -249,6 +342,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		262DDDA12FA533B200FE434A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		264026E42FF3FE34004BBCD1 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -279,6 +379,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		264026E22FF3FE34004BBCD1 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -291,6 +398,11 @@
 			isa = PBXTargetDependency;
 			target = 262DDD872FA533AE00FE434A /* seatbee */;
 			targetProxy = 262DDDA42FA533B200FE434A /* PBXContainerItemProxy */;
+		};
+		264026F92FF3FE38004BBCD1 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 264026E52FF3FE34004BBCD1 /* SeatbeeWidgetExtension */;
+			targetProxy = 264026F82FF3FE38004BBCD1 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -568,6 +680,70 @@
 			};
 			name = Release;
 		};
+		264026FC2FF3FE38004BBCD1 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = SeatbeeWidgetExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = L67AL7FS38;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = SeatbeeWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = SeatbeeWidget;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.shayan.seatbee.SeatbeeWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		264026FD2FF3FE38004BBCD1 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = SeatbeeWidgetExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = L67AL7FS38;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = SeatbeeWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = SeatbeeWidget;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.shayan.seatbee.SeatbeeWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -603,6 +779,15 @@
 			buildConfigurations = (
 				262DDDB52FA533B200FE434A /* Debug */,
 				262DDDB62FA533B200FE434A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		264026FE2FF3FE38004BBCD1 /* Build configuration list for PBXNativeTarget "SeatbeeWidgetExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				264026FC2FF3FE38004BBCD1 /* Debug */,
+				264026FD2FF3FE38004BBCD1 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

@@ -4,7 +4,18 @@ import Supabase
 
 @Observable
 final class AuthService {
-    var currentUser: User?
+    var currentUser: User? {
+        didSet {
+            // Keep the iOS metrics widget's admin token in sync with auth state:
+            // mint on sign-in / restored session (best-effort — non-admins get a
+            // 403 and no token), clear on sign-out. See WidgetTokenProvider.
+            if currentUser != nil {
+                Task { await WidgetTokenProvider.refreshIfNeeded() }
+            } else if oldValue != nil {
+                WidgetTokenProvider.clear()
+            }
+        }
+    }
     var isAuthenticated: Bool { currentUser != nil }
     var isLoading = false
     var error: String?

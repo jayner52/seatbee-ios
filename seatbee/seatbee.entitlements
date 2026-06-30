@@ -8,5 +8,13 @@
 	<array>
 		<string>Default</string>
 	</array>
+	<key>keychain-access-groups</key>
+	<array>
+		<!-- App's own group first = the default group, so the Supabase SDK's
+		     existing session keychain items are unaffected. -->
+		<string>$(AppIdentifierPrefix)com.shayan.seatbee</string>
+		<!-- Shared with the SeatbeeWidget extension for the widget token. -->
+		<string>$(AppIdentifierPrefix)com.shayan.seatbee.shared</string>
+	</array>
 </dict>
 </plist>
