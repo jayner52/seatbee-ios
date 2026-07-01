@@ -273,12 +273,19 @@ final class StoreKitService {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
 
+        // Tell the server if this purchase is in a free-trial (introductory)
+        // period. Production verification re-derives this from Apple, but in
+        // sandbox the server skips verification, so this flag is the source of
+        // truth there. The server writes provider='trial' during the trial.
+        let isTrial = transaction.offer?.paymentMode == .freeTrial
+
         let body: [String: Any] = [
             "transactionId": Int(transaction.id),
             "originalTransactionId": Int(transaction.originalID),
             "productId": productID,
             "environment": transaction.environment.rawValue,
             "purchaseDate": ISO8601DateFormatter().string(from: transaction.purchaseDate),
+            "isTrial": isTrial,
         ]
 
         do {
@@ -309,5 +316,38 @@ final class StoreKitService {
 
     func priceString(for product: Product) -> String {
         product.displayPrice
+    }
+
+    // MARK: - Introductory Offer (free trial)
+
+    /// A free-trial introductory offer the current user is eligible for.
+    /// nil when the product has no free-trial offer, or the user already used
+    /// their intro offer (Apple enforces one per subscription group).
+    struct FreeTrialOffer: Equatable {
+        let unitCount: Int
+        let unit: String   // "day" / "week" / "month" / "year"
+        /// e.g. "3-day" (for badges)
+        var durationText: String { "\(unitCount)-\(unit)" }
+        /// e.g. "3 days" (for sentences)
+        var pluralText: String { "\(unitCount) \(unit)\(unitCount == 1 ? "" : "s")" }
+    }
+
+    /// Resolves the eligible free-trial offer for a product, or nil.
+    /// Checks `isEligibleForIntroOffer` so returning-subscribers don't see it.
+    func freeTrialOffer(for product: Product) async -> FreeTrialOffer? {
+        guard let sub = product.subscription,
+              let offer = sub.introductoryOffer,
+              offer.paymentMode == .freeTrial else { return nil }
+        guard await sub.isEligibleForIntroOffer else { return nil }
+
+        let unit: String
+        switch offer.period.unit {
+        case .day: unit = "day"
+        case .week: unit = "week"
+        case .month: unit = "month"
+        case .year: unit = "year"
+        @unknown default: unit = "day"
+        }
+        return FreeTrialOffer(unitCount: offer.period.value, unit: unit)
     }
 }

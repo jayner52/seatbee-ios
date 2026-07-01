@@ -10,6 +10,8 @@ struct UpgradeView: View {
     @State private var showSuccess = false
     @State private var shimmerOffset: CGFloat = -200
     @State private var appearAnimation = false
+    /// The eligible free-trial offer, if any (nil until loaded / if ineligible).
+    @State private var trialOffer: StoreKitService.FreeTrialOffer?
 
     private var product: SeatbeeProduct { .proMonthly }
 
@@ -105,6 +107,17 @@ struct UpgradeView: View {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { dismiss() }
             }
         }
+        .task { await loadTrialOffer() }
+        .onChange(of: productsAvailable) { _, available in
+            if available { Task { await loadTrialOffer() } }
+        }
+    }
+
+    /// Load the eligible free-trial offer once the product is available.
+    private func loadTrialOffer() async {
+        guard let storeProduct = storeKit.product(for: product) else { return }
+        let offer = await storeKit.freeTrialOffer(for: storeProduct)
+        await MainActor.run { trialOffer = offer }
     }
 
     // MARK: - Hero
@@ -185,14 +198,36 @@ struct UpgradeView: View {
             )
 
             VStack(spacing: 18) {
-                HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    Text(storeProduct?.displayPrice ?? "$9.99")
-                        .font(SBFont.fraunces(40, weight: .medium))
-                        .foregroundStyle(Color.sbCharcoal)
+                VStack(spacing: 8) {
+                    if let trial = trialOffer {
+                        Text("\(trial.durationText.uppercased()) FREE TRIAL")
+                            .font(.system(size: 11, weight: .heavy, design: .rounded))
+                            .tracking(1.2)
+                            .foregroundStyle(Color.sbGoldDk)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 5)
+                            .background(
+                                Capsule()
+                                    .fill(Color.sbChampagne)
+                                    .overlay(Capsule().strokeBorder(Color.sbGold.opacity(0.35), lineWidth: 1))
+                            )
+                    }
 
-                    Text("/ month")
-                        .font(SBFont.inter(15, weight: .medium))
-                        .foregroundStyle(Color.sbWarm)
+                    HStack(alignment: .firstTextBaseline, spacing: 4) {
+                        Text(storeProduct?.displayPrice ?? "$9.99")
+                            .font(SBFont.fraunces(40, weight: .medium))
+                            .foregroundStyle(Color.sbCharcoal)
+
+                        Text("/ month")
+                            .font(SBFont.inter(15, weight: .medium))
+                            .foregroundStyle(Color.sbWarm)
+                    }
+
+                    if let trial = trialOffer {
+                        Text("Free for \(trial.pluralText), then \(storeProduct?.displayPrice ?? "$9.99")/month")
+                            .font(SBFont.inter(12, weight: .medium))
+                            .foregroundStyle(Color.sbWarm)
+                    }
                 }
                 .padding(.top, 18)
 
@@ -304,6 +339,11 @@ struct UpgradeView: View {
                         Image(systemName: "exclamationmark.triangle")
                             .font(.system(size: 16, weight: .semibold))
                         Text("Unavailable")
+                            .font(SBFont.inter(16, weight: .bold))
+                    } else if let trial = trialOffer {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 16, weight: .semibold))
+                        Text("Start \(trial.durationText) Free Trial")
                             .font(SBFont.inter(16, weight: .bold))
                     } else {
                         Image(systemName: "sparkles")
@@ -447,9 +487,10 @@ struct UpgradeView: View {
             .buttonStyle(.plain)
 
             // Apple HIG requires legal copy near the auto-renewable
-            // subscription CTA. Renewal is automatic at the end of each
-            // billing period unless canceled at least 24h before renewal.
-            Text("Auto-renews monthly until canceled in Settings. Payment charged to your Apple ID.")
+            // subscription CTA. When a free trial is offered, the trial terms
+            // must be disclosed too (length, price after, auto-renew).
+            Text(trialOffer.map { "\($0.durationText.capitalized) free trial, then \(storeKit.product(for: product)?.displayPrice ?? "$9.99")/month. Auto-renews until canceled in Settings. Payment charged to your Apple ID after the trial." }
+                 ?? "Auto-renews monthly until canceled in Settings. Payment charged to your Apple ID.")
                 .font(.system(size: 10))
                 .foregroundStyle(Color.sbWarm2)
                 .multilineTextAlignment(.center)
