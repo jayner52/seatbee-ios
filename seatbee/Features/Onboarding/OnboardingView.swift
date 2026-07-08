@@ -1680,7 +1680,7 @@ struct OnboardingView: View {
                 x: cx, y: cy, rotation: 0, locked: false,
                 color: colors[i % colors.count],
                 width: width, height: height, diameter: diameter,
-                sweetShape: nil, oneSide: nil, notes: nil
+                sweetShape: nil, oneSide: nil, notes: nil, roomId: nil
             ))
         }
 
@@ -1692,7 +1692,7 @@ struct OnboardingView: View {
                     x: dim.width / 2, y: 100, rotation: 0, locked: false,
                     color: "#C9A961",
                     width: 280, height: 50, diameter: nil,
-                    sweetShape: nil, oneSide: true, notes: nil
+                    sweetShape: nil, oneSide: true, notes: nil, roomId: nil
                 ))
             }
             if includeSweetheartTable {
@@ -1702,7 +1702,7 @@ struct OnboardingView: View {
                     x: dim.width / 2, y: 180, rotation: 0, locked: false,
                     color: "#D4A5A5",
                     width: 100, height: 60, diameter: nil,
-                    sweetShape: "heart", oneSide: nil, notes: nil
+                    sweetShape: "heart", oneSide: nil, notes: nil, roomId: nil
                 ))
             }
         }
@@ -1727,7 +1727,7 @@ struct OnboardingView: View {
                 id: "obj_\(type)_\(UUID().uuidString.prefix(6))",
                 type: type, name: item?.name ?? type.capitalized,
                 x: pos.x, y: pos.y, width: pos.w, height: pos.h, rotation: 0,
-                color: pos.color, category: nil, icon: item?.icon, isObstacle: false, locked: nil
+                color: pos.color, category: nil, icon: item?.icon, isObstacle: false, locked: nil, roomId: nil
             ))
         }
 

@@ -860,7 +860,9 @@ struct TableDrawerView: View {
             height: table.height,
             diameter: table.diameter,
             sweetShape: table.sweetShape,
-            oneSide: table.oneSide
+            oneSide: table.oneSide,
+            // Multi-room: duplicate stays in the source table's room
+            roomId: table.roomId
         )
         plan.tables.append(newTable)
         appState.activePlan = plan

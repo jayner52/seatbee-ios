@@ -65,6 +65,11 @@ struct SeatingPlan: Identifiable, Codable {
     // iOS reads linkToken + enabled to render the QR; everything else round-trips
     // unchanged so web-side styling / icebreakers survive an iOS save.
     var rawGuestQR: AnyCodable?
+    // Multi-room (2026-07-08): room-config array + active room id. iOS reads
+    // id/name for the room picker and filters the canvas by activeRoomId;
+    // per-room shape/floor-plan config round-trips unrendered. See PARITY.md.
+    var rawRooms: [[String: AnyCodable]]?
+    var activeRoomId: String?
 
     enum EventType: String, Codable, CaseIterable {
         case wedding
@@ -277,6 +282,10 @@ struct SeatTable: Identifiable, Codable {
     var sweetShape: String? // "heart"/"oval"/"diamond" for sweetheart
     var oneSide: Bool?      // head table one-side-only seating
     var notes: String?      // table-level free-text notes (kitchen, vendor, etc.)
+    // Multi-room (2026-07-08): which room this table lives in. nil = legacy
+    // single-room plan. Dropping this on round-trip glues every table into
+    // one room on web — see PARITY.md "Rooms".
+    var roomId: String?
 
     enum TableType: String, Codable, CaseIterable {
         case round
@@ -496,6 +505,8 @@ struct RoomObject: Identifiable, Codable {
     var icon: String?        // icon name from web
     var isObstacle: Bool?
     var locked: Bool?
+    // Multi-room (2026-07-08): same contract as SeatTable.roomId
+    var roomId: String?
 }
 
 // MARK: - AnyCodable (type-erased JSON value for passthrough)
@@ -584,7 +595,8 @@ extension SeatingPlan {
                     id: t.id, name: t.name, type: t.type.rawValue, seats: t.seats,
                     x: t.x, y: t.y, rotation: t.rotation, locked: t.locked, color: t.color,
                     width: t.width, height: t.height, diameter: t.diameter,
-                    sweetShape: t.sweetShape, oneSide: t.oneSide, notes: t.notes
+                    sweetShape: t.sweetShape, oneSide: t.oneSide, notes: t.notes,
+                    roomId: t.roomId
                 )
             },
             rules: rules.map { r in
@@ -601,7 +613,8 @@ extension SeatingPlan {
                     id: o.id, type: o.type, name: o.name, x: o.x, y: o.y,
                     width: o.width, height: o.height, rotation: o.rotation,
                     color: o.color, category: o.category, icon: o.icon, isObstacle: o.isObstacle,
-                    locked: o.locked
+                    locked: o.locked,
+                    roomId: o.roomId
                 )
             },
             categories: rawCategories,
@@ -612,7 +625,9 @@ extension SeatingPlan {
             floorPlanOpacity: rawFloorPlanOpacity,
             seatOrders: rawSeatOrders,
             guestQR: rawGuestQR,
-            includeMaybes: includeMaybes
+            includeMaybes: includeMaybes,
+            rooms: rawRooms,
+            activeRoomId: activeRoomId
         )
     }
 }

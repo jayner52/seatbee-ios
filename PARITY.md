@@ -45,7 +45,9 @@ User data in production was never at risk — RLS scopes iOS to the authenticate
 
 ### Plan data shape (top-level keys in JSONB)
 
-`event`, `guests`, `tables`, `rules`, `objects`, `categories`, `assignments`, `parties`, `groups`, `floorPlanImage`, `floorPlanOpacity`. Plus optional `genResults` (recomputable, intentionally not preserved).
+`event`, `guests`, `tables`, `rules`, `objects`, `categories`, `assignments`, `parties`, `groups`, `floorPlanImage`, `floorPlanOpacity`, `seatOrders`, `rooms`, `activeRoomId`. Plus optional `genResults` (recomputable, intentionally not preserved).
+
+> **`rooms` / `activeRoomId`** (added 2026-07-08, multi-room): `rooms` is an array of room-config objects (see "Rooms" in the field reference); `activeRoomId` is the id of the room whose canvas is showing. `tables`/`objects` stay FLAT at the top level — each entry carries a `roomId` tagging which room it belongs to. The shadow contract for older clients: `event.roomShape/roomWidth/roomHeight/customRoomPoints/roomFlipH/roomFlipV/roomZones` and top-level `floorPlanImage`/`pan`/`zoom` always describe the ACTIVE room at save time, so a client that ignores `rooms` still renders a coherent (single-room) view. Legacy plans without `rooms` are auto-migrated by the web on load: one room is created from `event` config and every table/object is tagged with its id. iOS models `rooms`/`activeRoomId` via `rawRooms`/`activeRoomId` on `SeatingPlan` and decodes `roomId` on `TableDTO`/`ObjectDTO` (PR `jayne/multi-room`).
 
 Each entity has a defined schema — see "Field reference" below.
 
@@ -143,7 +145,7 @@ Web-parity (preserved on iOS round-trip): `dietaryTags` (array of strings — dr
 
 Core: `id`, `name`, `type` (`round`/`rect`/`head`/`sweetheart`/`oval`), `seats`, `x`, `y`, `rotation`, `assignments` (handled separately, see below), `locked`, `color`
 
-Web-parity (preserved on iOS round-trip): `width`, `height` (rect/head/oval), `diameter` (round), `sweetShape` (`HEART`/`OVAL`/`DIAMOND` for sweetheart variants), `oneSide` (boolean for head table), `notes` (free-text per-table notes — kitchen, vendor, internal)
+Web-parity (preserved on iOS round-trip): `width`, `height` (rect/head/oval), `diameter` (round), `sweetShape` (`HEART`/`OVAL`/`DIAMOND` for sweetheart variants), `oneSide` (boolean for head table), `notes` (free-text per-table notes — kitchen, vendor, internal), `roomId` (string, multi-room 2026-07-08 — which room this table lives in; **dropping this on round-trip glues all tables into one room**)
 
 ### SeatingRule
 
@@ -160,9 +162,21 @@ iOS encodes/decodes via the `RuleType` enum which has matching `rawValue` string
 
 Core: `id`, `type`, `name`, `x`, `y`, `width`, `height`, `rotation`, `locked`
 
-Web-parity (preserved on iOS round-trip): `color`, `category` (e.g. "entertainment"/"food"/"services"), `icon` (icon name), `isObstacle` (boolean)
+Web-parity (preserved on iOS round-trip): `color`, `category` (e.g. "entertainment"/"food"/"services"), `icon` (icon name), `isObstacle` (boolean), `roomId` (string, multi-room 2026-07-08 — same contract as `SeatTable.roomId`)
 
 When `color` is missing on read, web `VObj` derives a fallback from the `VENUE_OBJECTS` definitions table. Don't rely on this at write time — always set the canonical color on save.
+
+### Rooms (multi-room, added 2026-07-08)
+
+`rooms` (top-level array in `data`), each entry:
+`id`, `name`, `roomShape`, `roomWidth`, `roomHeight`, `customRoomPoints`, `roomFlipH`, `roomFlipV`, `roomZones`, `floorPlanImage`, `floorPlanAnalysis`, `pan` (`{x,y}`), `zoom`
+
+Plus top-level `activeRoomId` (string).
+
+- Guest list, assignments, rules, categories, parties, groups are **global** — never per-room.
+- Room membership lives on the table/object (`roomId`), NOT nested inside `rooms` entries.
+- iOS models `rooms`/`activeRoomId` as raw passthrough (`rawRooms`/`activeRoomId` on `SeatingPlan`) and decodes `roomId` on `TableDTO`/`ObjectDTO`. iOS versions predating the multi-room PR drop `roomId`/`rooms` on save — the web's load-time migration recovers by re-tagging everything into one room (degraded but lossless for table data).
+- Web only writes `rooms[]` after snapshotting the live active-room config (`_snapshotActiveRoom` in `App.jsx`) so the array is never stale relative to `event.*`.
 
 ### Category
 
@@ -237,6 +251,7 @@ Map of `guestId → { tableId, seatIndex }`. iOS deconstructs this on read (assi
 | 2026-05-03 | `ObjectDTO` missing fields (`color`, `category`, `icon`, `isObstacle`) | iOS PR #4 |
 | 2026-05-03 | `PlanDataDTO` missing `groups`, `floorPlanImage`, `floorPlanOpacity` | iOS PR #4 |
 | 2026-05-03 | iOS `toPlanData` hardcoded `categories: nil`, `parties: nil` (wiped arrays on every save) | iOS PR #4 (now writes from raw passthrough fields) |
+| 2026-07-08 | Multi-room support: new `data.rooms[]` + `data.activeRoomId`, new `roomId` on every table/object. Web ships room tabs, per-room shape/floor-plan/viewport, room-scoped auto-seat + auto-arrange. Old iOS drops `roomId`/`rooms` on save (Codable ignores undeclared fields) — web auto-recovers by re-tagging into one room | Web direct-to-main `0d6af99` — `_hydrateRooms` migration at all 6 state-ingress points, `_snapshotActiveRoom` before every rooms[] persist. iOS PR `jayne/multi-room` — `roomId` on `TableDTO`/`ObjectDTO`/`SeatTable`/`RoomObject`, `rooms`/`activeRoomId` passthrough on `PlanDataDTO`/`SeatingPlan`, room picker + canvas filter in `EditorView` |
 | 2026-05-03 | Web rule evaluator silent on unknown types | Web direct-to-main commit `1423fdd` (now `console.warn`s) |
 | 2026-05-03 | Venue objects render as black rectangles when `color` field is missing | Web direct-to-main commit `968a70d` (`VObj` falls back to `VENUE_OBJECTS` defaults) |
 | 2026-05-03 | Web rendering crashed on missing `parties[].guestIds`, `guests[].dietaryTags`, `guests[].groupIds` | Web direct-to-main commits `9fd3ac4`, `4cbbdb8`, `7c46fa0`, `bc1893b` (defensive normalizers + UnitCard local guard) |

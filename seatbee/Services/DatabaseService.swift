@@ -54,7 +54,9 @@ final class DatabaseService {
             floorPlanOpacity: nil,
             seatOrders: nil,
             guestQR: nil,
-            includeMaybes: nil
+            includeMaybes: nil,
+            rooms: nil,
+            activeRoomId: nil
         )
 
         // Last-editor tracking. The web app reads these columns to show

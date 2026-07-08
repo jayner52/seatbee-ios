@@ -161,7 +161,9 @@ struct AddTableSheet: View {
             height: dims.height,
             diameter: dims.diameter,
             sweetShape: dims.sweetShape,
-            oneSide: dims.oneSide
+            oneSide: dims.oneSide,
+            // Multi-room: new tables land in the room currently on canvas
+            roomId: plan.activeRoomId
         )
 
         plan.tables.append(newTable)
