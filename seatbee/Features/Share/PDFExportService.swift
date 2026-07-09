@@ -137,7 +137,10 @@ final class PDFExportService {
             ctx.setLineWidth(0.7)
             ctx.addPath(cardPath.cgPath)
             ctx.drawPath(using: .fillStroke)
-            CanvasPDFRenderer.drawFloorPlan(in: ctx, rect: floorRect, plan: plan)
+            // Seat numbers on the overview — cross-references with the
+            // numbered dots on the per-table pages (web parity, Jovita's ask)
+            CanvasPDFRenderer.drawFloorPlan(in: ctx, rect: floorRect, plan: plan,
+                                            showSeatNumbers: true)
 
             // Footnote about seat numbering — matches web's planner PDF
             let noteAttrs: [NSAttributedString.Key: Any] = [

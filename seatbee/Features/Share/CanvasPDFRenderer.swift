@@ -27,8 +27,14 @@ enum CanvasPDFRenderer {
     /// share image — turning it on gives caterers / venues an actual
     /// "who sits where" reference; off keeps the plan readable as a
     /// pure room layout.
+    /// `showSeatNumbers` draws each seat's number just outside its dot,
+    /// pushed away from the table body. Used by the Planner View PDF's
+    /// page-1 overview so it cross-references with the numbered dots on
+    /// the per-table pages (same index) — day-of staff can resolve
+    /// "Table 2, seat 5" from the overview alone.
     static func drawFloorPlan(in ctx: CGContext, rect: CGRect, plan: SeatingPlan,
-                              showGuestNames: Bool = false) {
+                              showGuestNames: Bool = false,
+                              showSeatNumbers: Bool = false) {
         let bounds = computeWorldBounds(plan)
         guard bounds.width > 0, bounds.height > 0 else {
             drawEmptyMessage(in: ctx, rect: rect)
@@ -63,7 +69,8 @@ enum CanvasPDFRenderer {
         drawRoomOutline(plan: plan, ctx: ctx)
         for obj in plan.objects { drawRoomObject(obj, ctx: ctx) }
         for table in plan.tables {
-            drawTable(table, plan: plan, showGuestNames: showGuestNames, ctx: ctx)
+            drawTable(table, plan: plan, showGuestNames: showGuestNames,
+                      showSeatNumbers: showSeatNumbers, ctx: ctx)
         }
 
         ctx.restoreGState()
@@ -284,7 +291,8 @@ enum CanvasPDFRenderer {
 
     // MARK: - Tables
 
-    private static func drawTable(_ t: SeatTable, plan: SeatingPlan, showGuestNames: Bool, ctx: CGContext) {
+    private static func drawTable(_ t: SeatTable, plan: SeatingPlan, showGuestNames: Bool,
+                                  showSeatNumbers: Bool = false, ctx: CGContext) {
         let body = bodySize(for: t)
         // Top-left → centre conversion (see computeWorldBounds parity note).
         let center = CGPoint(x: CGFloat(t.x) + body.width / 2,
@@ -359,7 +367,36 @@ enum CanvasPDFRenderer {
             drawSeatGuestNames(table: t, plan: plan, body: body, center: center, ctx: ctx)
         }
 
+        // Seat numbers just outside each dot (planner PDF overview).
+        if showSeatNumbers {
+            drawSeatNumbers(table: t, body: body, center: center, ctx: ctx)
+        }
+
         ctx.restoreGState()
+    }
+
+    /// Seat index+1 drawn outward from every seat dot (filled AND empty —
+    /// empty seats are exactly what a planner points at when directing
+    /// guests). Same index as the numbered dots on the per-table pages.
+    private static func drawSeatNumbers(table: SeatTable, body: CGSize, center: CGPoint, ctx: CGContext) {
+        let positions = seatPositions(for: table, body: body, center: center)
+        guard !positions.isEmpty else { return }
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 7, weight: .bold),
+            .foregroundColor: UIColor(red: 0.545, green: 0.525, blue: 0.502, alpha: 1), // #8B8680 warm grey
+        ]
+        for (i, p) in positions.enumerated() {
+            let s = NSString(string: "\(i + 1)")
+            let size = s.size(withAttributes: attrs)
+            // Push away from the table centre — clear of the dot without
+            // colliding with the body. Numbers are 1-2 chars, no stagger needed.
+            let dx = p.x - center.x, dy = p.y - center.y
+            let dist = max(sqrt(dx * dx + dy * dy), 0.001)
+            let off: CGFloat = 8
+            let target = CGPoint(x: p.x + dx / dist * off, y: p.y + dy / dist * off)
+            s.draw(at: CGPoint(x: target.x - size.width / 2, y: target.y - size.height / 2),
+                   withAttributes: attrs)
+        }
     }
 
     private static func drawSeats(table: SeatTable, body: CGSize, center: CGPoint, ctx: CGContext) {
