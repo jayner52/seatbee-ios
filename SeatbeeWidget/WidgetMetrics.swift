@@ -3,21 +3,29 @@ import Foundation
 /// Decodes the slim payload from GET /api/admin?resource=widget-metrics.
 struct WidgetMetrics: Codable, Equatable {
     let revenueTodayCents: Int
+    let monthRevenueCents: Int
+    let totalRevenueCents: Int
     let mrrCents: Int
     let arrCents: Int
     let activeSubs: Int
     let newSubsToday: Int
     let newUsersToday: Int
+    let activeTrials: Int
+    let newTrialsToday: Int
     let asOf: String?
 
     /// Used for the widget gallery preview / placeholder.
     static let placeholder = WidgetMetrics(
         revenueTodayCents: 2997,
+        monthRevenueCents: 42897,
+        totalRevenueCents: 812400,
         mrrCents: 49950,
         arrCents: 599400,
         activeSubs: 50,
         newSubsToday: 3,
         newUsersToday: 17,
+        activeTrials: 8,
+        newTrialsToday: 2,
         asOf: nil
     )
 }

@@ -101,9 +101,10 @@ private struct SmallMetrics: View {
                 .minimumScaleFactor(0.5)
                 .lineLimit(1)
             Spacer(minLength: 0)
-            HStack(spacing: 12) {
+            HStack(spacing: 10) {
                 miniStat("MRR", MetricFormat.money(metrics.mrrCents))
                 miniStat("ARR", MetricFormat.money(metrics.arrCents))
+                miniStat("Trials", MetricFormat.plain(metrics.activeTrials))
             }
         }
         .widgetURL(SBWidgetStyle.deepLink)
@@ -128,11 +129,9 @@ private struct MediumMetrics: View {
             Header(stale: stale)
             LazyVGrid(columns: columns, alignment: .leading, spacing: 10) {
                 Tile(label: "Revenue today", value: MetricFormat.money(metrics.revenueTodayCents), accent: SBWidgetStyle.gold)
+                Tile(label: "This month", value: MetricFormat.money(metrics.monthRevenueCents))
                 Tile(label: "MRR", value: MetricFormat.money(metrics.mrrCents))
-                Tile(label: "New subs today", value: MetricFormat.delta(metrics.newSubsToday),
-                     accent: metrics.newSubsToday > 0 ? SBWidgetStyle.positive : SBWidgetStyle.value)
-                Tile(label: "New users today", value: MetricFormat.delta(metrics.newUsersToday),
-                     accent: metrics.newUsersToday > 0 ? SBWidgetStyle.positive : SBWidgetStyle.value)
+                Tile(label: "Active trials", value: MetricFormat.plain(metrics.activeTrials))
             }
             Spacer(minLength: 0)
         }
@@ -144,16 +143,19 @@ private struct LargeMetrics: View {
     let metrics: WidgetMetrics
     let stale: Bool
     let date: Date
-    private let columns = [GridItem(.flexible()), GridItem(.flexible())]
+    private let columns = [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Header(stale: stale)
-            LazyVGrid(columns: columns, alignment: .leading, spacing: 18) {
+            LazyVGrid(columns: columns, alignment: .leading, spacing: 16) {
                 Tile(label: "Revenue today", value: MetricFormat.money(metrics.revenueTodayCents), accent: SBWidgetStyle.gold)
+                Tile(label: "This month", value: MetricFormat.money(metrics.monthRevenueCents), accent: SBWidgetStyle.gold)
+                Tile(label: "Total revenue", value: MetricFormat.money(metrics.totalRevenueCents), accent: SBWidgetStyle.gold)
                 Tile(label: "MRR", value: MetricFormat.money(metrics.mrrCents))
                 Tile(label: "ARR", value: MetricFormat.money(metrics.arrCents))
                 Tile(label: "Active subs", value: MetricFormat.plain(metrics.activeSubs))
+                Tile(label: "Active trials", value: MetricFormat.plain(metrics.activeTrials))
                 Tile(label: "New subs today", value: MetricFormat.delta(metrics.newSubsToday),
                      accent: metrics.newSubsToday > 0 ? SBWidgetStyle.positive : SBWidgetStyle.value)
                 Tile(label: "New users today", value: MetricFormat.delta(metrics.newUsersToday),
