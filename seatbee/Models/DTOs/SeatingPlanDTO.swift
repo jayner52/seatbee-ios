@@ -103,7 +103,9 @@ struct SeatingPlanDTO: Codable {
             rawFloorPlanImage: d?.floorPlanImage,
             rawFloorPlanOpacity: d?.floorPlanOpacity,
             rawSeatOrders: d?.seatOrders,
-            rawGuestQR: d?.guestQR
+            rawGuestQR: d?.guestQR,
+            rawRooms: d?.rooms,
+            activeRoomId: d?.activeRoomId
         )
     }
 
@@ -137,6 +139,11 @@ struct PlanDataDTO: Codable {
     // Web parity (App.jsx:3899): top-level boolean controlling whether
     // unconfirmed/maybe guests are pulled into seating + exports.
     let includeMaybes: Bool?
+    // Multi-room (2026-07-08, see PARITY.md "Rooms"): room-config array +
+    // active room id. Raw passthrough — iOS reads id/name for the room
+    // picker; per-room shape/floor-plan config round-trips unrendered.
+    let rooms: [[String: AnyCodable]]?
+    let activeRoomId: String?
 }
 
 // MARK: - EventDataDTO
@@ -218,6 +225,8 @@ struct TableDTO: Codable {
     let sweetShape: String?
     let oneSide: Bool?
     let notes: String?
+    // Multi-room: dropping this on round-trip glues all tables into one room
+    let roomId: String?
 
     func toDomain() -> SeatTable {
         SeatTable(
@@ -236,7 +245,8 @@ struct TableDTO: Codable {
             diameter: diameter,
             sweetShape: sweetShape,
             oneSide: oneSide,
-            notes: notes
+            notes: notes,
+            roomId: roomId
         )
     }
 }
@@ -426,6 +436,8 @@ struct ObjectDTO: Codable {
     let icon: String?
     let isObstacle: Bool?
     let locked: Bool?
+    // Multi-room: same contract as TableDTO.roomId
+    let roomId: String?
 
     func toDomain() -> RoomObject {
         RoomObject(
@@ -441,7 +453,8 @@ struct ObjectDTO: Codable {
             category: category,
             icon: icon,
             isObstacle: isObstacle,
-            locked: locked
+            locked: locked,
+            roomId: roomId
         )
     }
 }

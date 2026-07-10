@@ -39,8 +39,27 @@ struct EditorView: View {
     // Selection tracking
 
     private var plan: SeatingPlan? { appState.activePlan }
-    private var tables: [SeatTable] { plan?.tables ?? [] }
-    private var objects: [RoomObject] { plan?.objects ?? [] }
+    // Multi-room: the canvas shows only the active room's tables/objects.
+    // nil roomId = legacy entry, rendered in whichever room is active (the
+    // web backfills roomId on its next load). Stats/guest-list reads stay
+    // on plan.tables — assignments are global across rooms (PARITY.md).
+    private var tables: [SeatTable] {
+        guard let p = plan else { return [] }
+        guard let activeId = p.activeRoomId, roomTabs.count > 1 else { return p.tables }
+        return p.tables.filter { $0.roomId == activeId || $0.roomId == nil }
+    }
+    private var objects: [RoomObject] {
+        guard let p = plan else { return [] }
+        guard let activeId = p.activeRoomId, roomTabs.count > 1 else { return p.objects }
+        return p.objects.filter { $0.roomId == activeId || $0.roomId == nil }
+    }
+    // Decoded id/name pairs from the rawRooms passthrough (config stays raw)
+    private var roomTabs: [(id: String, name: String)] {
+        (plan?.rawRooms ?? []).compactMap { dict in
+            guard let id = dict["id"]?.value as? String else { return nil }
+            return (id: id, name: (dict["name"]?.value as? String) ?? "Room")
+        }
+    }
     private var selectedTable: SeatTable? {
         tables.first { $0.id == selectedTableId }
     }
@@ -260,6 +279,41 @@ struct EditorView: View {
                 .minimumScaleFactor(0.7)
                 .layoutPriority(1)
                 .padding(.trailing, 4)
+
+            // Multi-room picker — only when the plan actually has 2+ rooms.
+            // Room add/rename/delete stays on web; iOS switches + renders.
+            if roomTabs.count > 1 {
+                Menu {
+                    ForEach(roomTabs, id: \.id) { room in
+                        Button {
+                            switchToRoom(room.id)
+                        } label: {
+                            if room.id == plan?.activeRoomId {
+                                Label(room.name, systemImage: "checkmark")
+                            } else {
+                                Text(room.name)
+                            }
+                        }
+                        .disabled(room.id == plan?.activeRoomId)
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(roomTabs.first { $0.id == plan?.activeRoomId }?.name ?? roomTabs[0].name)
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(Color.sbCharcoal)
+                            .lineLimit(1)
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(Color.sbWarm2)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 8)
+                    .background(.ultraThinMaterial)
+                    .clipShape(Capsule())
+                }
+                .accessibilityLabel("Switch room")
+                .accessibilityHint("Show a different room's tables on the canvas")
+            }
 
             Spacer(minLength: 4)
 
@@ -1247,6 +1301,18 @@ struct EditorView: View {
         return plan.guests.filter { isAttending($0) && !seatedIds.contains($0.id) }.count
     }
 
+    // Multi-room: switch the visible room. Persists activeRoomId so web
+    // opens on the same room. Refits the canvas because the new room's
+    // tables can live at completely different coordinates.
+    private func switchToRoom(_ roomId: String) {
+        guard var p = appState.activePlan, p.activeRoomId != roomId else { return }
+        p.activeRoomId = roomId
+        appState.activePlan = p
+        fitToken &+= 1
+        HapticEngine.selection()
+        Task { try? await appState.database.savePlanData(plan: p) }
+    }
+
     private func updateTablePosition(id: String, x: Double, y: Double) {
         guard var p = appState.activePlan,
               let idx = p.tables.firstIndex(where: { $0.id == id }) else { return }
@@ -1359,7 +1425,8 @@ struct EditorView: View {
             width: src.width, height: src.height,
             rotation: src.rotation,
             color: src.color, category: src.category, icon: src.icon,
-            isObstacle: src.isObstacle, locked: false
+            isObstacle: src.isObstacle, locked: false,
+            roomId: src.roomId
         )
         // Insert immediately after the source so the duplicate sits
         // one layer above the original.

@@ -340,7 +340,9 @@ struct VenueObjectsSheet: View {
             rotation: 0,
             color: def.color,
             icon: def.icon,
-            isObstacle: def.isObstacle ? true : nil
+            isObstacle: def.isObstacle ? true : nil,
+            // Multi-room: new objects land in the room currently on canvas
+            roomId: plan.activeRoomId
         )
         plan.objects.append(obj)
         appState.activePlan = plan
