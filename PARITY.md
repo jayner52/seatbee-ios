@@ -143,7 +143,9 @@ Web-parity (preserved on iOS round-trip): `dietaryTags` (array of strings — dr
 
 ### SeatTable
 
-Core: `id`, `name`, `type` (`round`/`rect`/`head`/`sweetheart`/`oval`), `seats`, `x`, `y`, `rotation`, `assignments` (handled separately, see below), `locked`, `color`
+Core: `id`, `name`, `type` (`round`/`rect`/`head`/`sweetheart`/`oval`/`serpentine`), `seats`, `x`, `y`, `rotation`, `assignments` (handled separately, see below), `locked`, `color`
+
+> ⚠️ **`serpentine` (and more curved types incoming) are web-only until iOS ships.** Web added `type:'serpentine'` on 2026-07-12 (an S-curved banquet; more curved shapes like a half-circle are planned). It reuses rect's `width`/`height`, so the only new shared surface is the `type` string. **Today iOS decodes unknown types via `TableType(rawValue:) ?? .round` (`SeatingPlanDTO.swift`, `SampleEventService.swift`) and re-saves as `round` → the curve is silently flattened on iOS open+save.** Fix, in safety order: (1) harden `TableType` with `.unknown(String)` mirroring `RuleType` (custom `rawValue`/`parse`/`init(from:)`/`encode`), and replace both `?? .round` sites with `parse()` — this alone stops the data loss; (2) add the real `case serpentine` + geometry. See Outstanding gaps.
 
 Web-parity (preserved on iOS round-trip): `width`, `height` (rect/head/oval), `diameter` (round), `sweetShape` (`HEART`/`OVAL`/`DIAMOND` for sweetheart variants), `oneSide` (boolean for head table), `notes` (free-text per-table notes — kitchen, vendor, internal), `roomId` (string, multi-room 2026-07-08 — which room this table lives in; **dropping this on round-trip glues all tables into one room**)
 
@@ -287,6 +289,7 @@ These are paper cuts in iOS UX that don't risk data loss. Listed in priority ord
 
 | Priority | Gap | Notes |
 |---|---|---|
+| **HIGH (data loss until iOS ships)** | Curved table types (`serpentine`, half-circle planned) not on iOS | Web added `type:'serpentine'` (2026-07-12). Current iOS flattens it to `round` on open+save (`TableType(rawValue:) ?? .round`), destroying the curve. **Two-part iOS fix, in this order:** (1) harden `TableType` → `.unknown(String)` (mirror `RuleType`) + replace the `?? .round` sites in `SeatingPlanDTO.swift` and `SampleEventService.swift` with a preserving `parse()` — stops the data loss immediately (unknown renders as rect, keeps raw type); (2) add `case serpentine` + mirror web's `serpentineGeometry()` (48 samples, sine-period centerline, per-edge arc-length seats) in `CanvasViewController` `bodySize`/`shapePath`/`seatPositions` + `AddTableSheet`/`TableDrawerView` pickers. Owner: Shayan (controls App Store release). |
 | MEDIUM | iOS Party model authoring (full Party object editing with priority/color/etc.) | Round-trip preserved via `rawParties`. iOS currently treats parties as `guest.party: String?` only — can read/preserve full objects, not author them. |
 | MEDIUM | `Guest.accessibility` type mismatch (web boolean vs iOS String?) | Both sides round-trip independently, but the type semantics differ. Decide which wins (probably web boolean since it's older). |
 | LOW | RoomObject icon/category/isObstacle UI on iOS | Round-trip preserved. iOS doesn't yet display the icon catalog or surface obstacle warnings. |
