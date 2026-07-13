@@ -287,12 +287,71 @@ struct SeatTable: Identifiable, Codable {
     // one room on web — see PARITY.md "Rooms".
     var roomId: String?
 
-    enum TableType: String, Codable, CaseIterable {
+    // Hardened from a plain String raw-value enum to a RuleType-style enum with
+    // `.unknown(String)` so a table type this build doesn't recognise (e.g. a new
+    // web shape shipped ahead of the App Store) is PRESERVED on round-trip instead
+    // of silently collapsing to `.round` and destroying the shape. See PARITY.md.
+    enum TableType: Codable, Equatable, Hashable {
         case round
         case rect
         case head
         case sweetheart
-        case oval     // ellipse-shaped table; seats distributed around perimeter
+        case oval          // ellipse — seats distributed around the perimeter
+        case serpentine    // S-curved banquet (web 2026-07-12)
+        case halfcircle    // crescent / half-round head table (web 2026-07-12)
+        case unknown(String)
+
+        var rawValue: String {
+            switch self {
+            case .round:        return "round"
+            case .rect:         return "rect"
+            case .head:         return "head"
+            case .sweetheart:   return "sweetheart"
+            case .oval:         return "oval"
+            case .serpentine:   return "serpentine"
+            case .halfcircle:   return "halfcircle"
+            case .unknown(let raw): return raw
+            }
+        }
+
+        var displayName: String {
+            switch self {
+            case .halfcircle:       return "Half-circle"
+            case .unknown(let raw): return raw.capitalized
+            default:                return rawValue.capitalized
+            }
+        }
+
+        /// Known shapes a user can pick — excludes `.unknown`.
+        static var selectableCases: [TableType] {
+            [.round, .oval, .rect, .head, .sweetheart, .serpentine, .halfcircle]
+        }
+
+        static func parse(_ raw: String?) -> TableType {
+            guard let raw = raw else { return .round }
+            switch raw {
+            case "round":       return .round
+            case "rect":        return .rect
+            case "head":        return .head
+            case "sweetheart":  return .sweetheart
+            case "oval":        return .oval
+            case "serpentine":  return .serpentine
+            case "halfcircle":  return .halfcircle
+            default:
+                print("[Seatbee] Unknown table type: '\(raw)' - preserving raw on round-trip, rendering as rect.")
+                return .unknown(raw)
+            }
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.singleValueContainer()
+            self = TableType.parse(try container.decode(String.self))
+        }
+
+        func encode(to encoder: Encoder) throws {
+            var container = encoder.singleValueContainer()
+            try container.encode(rawValue)
+        }
     }
 
     var filledCount: Int {

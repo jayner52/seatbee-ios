@@ -500,7 +500,7 @@ enum CanvasPDFRenderer {
                                        tableCenter c: CGPoint, offset: CGFloat,
                                        labelSize: CGSize) -> CGPoint {
         switch table.type {
-        case .round, .oval, .sweetheart:
+        case .round, .oval, .sweetheart, .serpentine, .halfcircle:
             let dx = p.x - c.x
             let dy = p.y - c.y
             let dist = sqrt(dx * dx + dy * dy)
@@ -511,7 +511,7 @@ enum CanvasPDFRenderer {
             let ny = dy / dist
             return CGPoint(x: p.x + nx * (offset + labelSize.height / 2),
                            y: p.y + ny * (offset + labelSize.height / 2))
-        case .rect, .head:
+        case .rect, .head, .unknown:
             // Head / rect seats sit in a single horizontal row above the
             // body. With 10 seats on a 400pt table the centres are only
             // ~40pt apart — labels at 9pt font easily run together into
@@ -546,6 +546,12 @@ enum CanvasPDFRenderer {
             return CGSize(width: CGFloat(t.width ?? 100), height: CGFloat(t.height ?? 60))
         case .oval:
             return CGSize(width: CGFloat(t.width ?? 120), height: CGFloat(t.height ?? 60))
+        case .serpentine:
+            return CGSize(width: CGFloat(t.width ?? 240), height: CGFloat(t.height ?? 38))
+        case .halfcircle:
+            return CGSize(width: CGFloat(t.width ?? 180), height: CGFloat(t.height ?? 90))
+        case .unknown:
+            return CGSize(width: CGFloat(t.width ?? 100), height: CGFloat(t.height ?? 50))
         }
     }
 
@@ -564,7 +570,98 @@ enum CanvasPDFRenderer {
             let rect = CGRect(x: c.x - body.width / 2, y: c.y - body.height / 2,
                               width: body.width, height: body.height)
             return UIBezierPath(ovalIn: rect)
+        case .serpentine:
+            return serpentinePath(width: body.width, height: body.height, center: c)
+        case .halfcircle:
+            return halfCirclePath(width: body.width, height: body.height, center: c)
+        case .unknown:
+            let rect = CGRect(x: c.x - body.width / 2, y: c.y - body.height / 2,
+                              width: body.width, height: body.height)
+            return UIBezierPath(roundedRect: rect, cornerRadius: 6)
         }
+    }
+
+    private static func serpentinePath(width W: CGFloat, height H: CGFloat, center c: CGPoint) -> UIBezierPath {
+        let amp = H * 0.45, half = H / 2, TAU = CGFloat.pi * 2, samples = 48
+        func at(_ u: CGFloat) -> (x: CGFloat, y: CGFloat, nx: CGFloat, ny: CGFloat) {
+            let x = -W/2 + u*W, y = amp * sin(TAU*u)
+            let tx = W, ty = amp * TAU * cos(TAU*u), tl = max(hypot(tx, ty), 0.0001)
+            return (x, y, -ty/tl, tx/tl)
+        }
+        let path = UIBezierPath()
+        for i in 0...samples {
+            let p = at(CGFloat(i)/CGFloat(samples))
+            let pt = CGPoint(x: c.x + p.x + p.nx*half, y: c.y + p.y + p.ny*half)
+            if i == 0 { path.move(to: pt) } else { path.addLine(to: pt) }
+        }
+        for i in stride(from: samples, through: 0, by: -1) {
+            let p = at(CGFloat(i)/CGFloat(samples))
+            path.addLine(to: CGPoint(x: c.x + p.x - p.nx*half, y: c.y + p.y - p.ny*half))
+        }
+        path.close()
+        return path
+    }
+
+    private static func serpentineSeats(width W: CGFloat, height H: CGFloat, n: Int, center c: CGPoint) -> [CGPoint] {
+        guard n > 0 else { return [] }
+        let amp = H * 0.45, half = H / 2, TAU = CGFloat.pi * 2, FINE = 192
+        func at(_ u: CGFloat) -> (x: CGFloat, y: CGFloat, nx: CGFloat, ny: CGFloat) {
+            let x = -W/2 + u*W, y = amp * sin(TAU*u)
+            let tx = W, ty = amp * TAU * cos(TAU*u), tl = max(hypot(tx, ty), 0.0001)
+            return (x, y, -ty/tl, tx/tl)
+        }
+        func place(_ k: Int, _ side: CGFloat) -> [CGPoint] {
+            guard k > 0 else { return [] }
+            var pts: [(x: CGFloat, y: CGFloat, d: CGFloat)] = []
+            var total: CGFloat = 0; var prev: (CGFloat, CGFloat)? = nil
+            for i in 0...FINE {
+                let p = at(CGFloat(i)/CGFloat(FINE))
+                let ex = p.x + side*p.nx*(half+14), ey = p.y + side*p.ny*(half+14)
+                if let pr = prev { total += hypot(ex-pr.0, ey-pr.1) }
+                pts.append((ex, ey, total)); prev = (ex, ey)
+            }
+            var out: [CGPoint] = []
+            for i in 0..<k {
+                let target = (CGFloat(i)+0.5)/CGFloat(k)*total
+                let sPt = pts.first(where: { $0.d >= target }) ?? pts[pts.count-1]
+                out.append(CGPoint(x: c.x + sPt.x, y: c.y + sPt.y))
+            }
+            return out
+        }
+        let topN = (n+1)/2, botN = n - topN
+        return place(topN, 1) + place(botN, -1)
+    }
+
+    private static func halfCirclePath(width W: CGFloat, height H: CGFloat, center c: CGPoint) -> UIBezierPath {
+        let rx = W/2, ry = H
+        func arc(_ t: CGFloat) -> CGPoint { let th = t * .pi; return CGPoint(x: rx*cos(th), y: -ry/2 + ry*sin(th)) }
+        let path = UIBezierPath()
+        path.move(to: CGPoint(x: c.x - rx, y: c.y - ry/2))
+        path.addLine(to: CGPoint(x: c.x + rx, y: c.y - ry/2))
+        let SAMP = 40
+        for i in 0...SAMP { let p = arc(CGFloat(i)/CGFloat(SAMP)); path.addLine(to: CGPoint(x: c.x + p.x, y: c.y + p.y)) }
+        path.close()
+        return path
+    }
+
+    private static func halfCircleSeats(width W: CGFloat, height H: CGFloat, n: Int, center c: CGPoint) -> [CGPoint] {
+        guard n > 0 else { return [] }
+        let rx = W/2, ry = H, FINE = 240
+        func arc(_ t: CGFloat) -> (x: CGFloat, y: CGFloat, th: CGFloat) { let th = t * .pi; return (rx*cos(th), -ry/2 + ry*sin(th), th) }
+        var pts: [(x: CGFloat, y: CGFloat, d: CGFloat, th: CGFloat)] = []
+        var total: CGFloat = 0; var prev: (CGFloat, CGFloat)? = nil
+        for i in 0...FINE {
+            let p = arc(CGFloat(i)/CGFloat(FINE))
+            if let pr = prev { total += hypot(p.x-pr.0, p.y-pr.1) }
+            pts.append((p.x, p.y, total, p.th)); prev = (p.x, p.y)
+        }
+        var out: [CGPoint] = []
+        for i in 0..<n {
+            let target = (CGFloat(i)+0.5)/CGFloat(n)*total
+            let sPt = pts.first(where: { $0.d >= target }) ?? pts[pts.count-1]
+            out.append(CGPoint(x: c.x + sPt.x + cos(sPt.th)*14, y: c.y + sPt.y + sin(sPt.th)*14))
+        }
+        return out
     }
 
     private static func sweetheartPath(shape: String?, body: CGSize, center c: CGPoint) -> UIBezierPath {
@@ -639,6 +736,18 @@ enum CanvasPDFRenderer {
             for i in 0..<bot {
                 seats.append(CGPoint(x: c.x - w / 2 + sp * CGFloat(i + 1), y: c.y + h / 2 + offset))
             }
+            return seats
+        case .serpentine:
+            return serpentineSeats(width: body.width, height: body.height, n: n, center: c)
+        case .halfcircle:
+            return halfCircleSeats(width: body.width, height: body.height, n: n, center: c)
+        case .unknown:
+            let w = body.width, h = body.height
+            let top = (n + 1) / 2, bot = n - top
+            let sp = w / CGFloat(max(top, bot) + 1)
+            var seats: [CGPoint] = []
+            for i in 0..<top { seats.append(CGPoint(x: c.x - w / 2 + sp * CGFloat(i + 1), y: c.y - h / 2 - offset)) }
+            for i in 0..<bot { seats.append(CGPoint(x: c.x - w / 2 + sp * CGFloat(i + 1), y: c.y + h / 2 + offset)) }
             return seats
         }
     }

@@ -1646,7 +1646,7 @@ class CanvasTableView: UIView {
             progressLayer.lineWidth = 2.5
             progressLayer.strokeStart = 0
             progressLayer.strokeEnd = 1
-        case .head, .sweetheart:
+        case .head, .sweetheart, .serpentine, .halfcircle, .unknown:
             progressLayer.isHidden = true
             progressLayer.path = nil
         }
@@ -1684,6 +1684,7 @@ class CanvasTableView: UIView {
             case .oval:         yOffset = c.y + 11
             case .rect, .head:  yOffset = c.y + 10
             case .sweetheart:   yOffset = c.y + 10  // unused
+            case .serpentine, .halfcircle, .unknown: yOffset = c.y + 10
             }
             countLabel.frame = CGRect(x: c.x - 28, y: yOffset, width: 56, height: 12)
         }
@@ -1728,6 +1729,15 @@ class CanvasTableView: UIView {
         case .oval:
             // Web default: 8ft × 4ft (=120×60 at scale 15) — see App.jsx:8453.
             return CGSize(width: CGFloat(table.width ?? 120), height: CGFloat(table.height ?? 60))
+        case .serpentine:
+            // Web default 16ft × 2.5ft (=240×37.5). height = band thickness.
+            return CGSize(width: CGFloat(table.width ?? 240), height: CGFloat(table.height ?? 38))
+        case .halfcircle:
+            // Web default 12ft × 6ft (=180×90). height = arc depth.
+            return CGSize(width: CGFloat(table.width ?? 180), height: CGFloat(table.height ?? 90))
+        case .unknown:
+            // Preserved-but-unrecognised type: render like a rect.
+            return CGSize(width: CGFloat(table.width ?? 100), height: CGFloat(table.height ?? 50))
         }
     }
 
@@ -1747,6 +1757,14 @@ class CanvasTableView: UIView {
             let rect = CGRect(x: c.x - body.width/2, y: c.y - body.height/2,
                               width: body.width, height: body.height)
             return UIBezierPath(ovalIn: rect)
+        case .serpentine:
+            return serpentinePath(width: body.width, height: body.height, center: c)
+        case .halfcircle:
+            return halfCirclePath(width: body.width, height: body.height, center: c)
+        case .unknown:
+            let rect = CGRect(x: c.x - body.width/2, y: c.y - body.height/2,
+                              width: body.width, height: body.height)
+            return UIBezierPath(roundedRect: rect, cornerRadius: 6)
         }
     }
 
@@ -1768,6 +1786,19 @@ class CanvasTableView: UIView {
         case .sweetheart:
             let inflated = CGSize(width: body.width + 20, height: body.height + 20)
             return sweetheartPath(shape: table.sweetShape, body: inflated, center: c)
+        case .serpentine:
+            // Bounding box of the wave is ~3× the band thickness tall.
+            let rect = CGRect(x: c.x - body.width/2 - 12, y: c.y - body.height * 1.5 - 12,
+                              width: body.width + 24, height: body.height * 3 + 24)
+            return UIBezierPath(roundedRect: rect, cornerRadius: 14)
+        case .halfcircle:
+            let rect = CGRect(x: c.x - body.width/2 - 14, y: c.y - body.height/2 - 14,
+                              width: body.width + 28, height: body.height + 28)
+            return UIBezierPath(roundedRect: rect, cornerRadius: 14)
+        case .unknown:
+            let rect = CGRect(x: c.x - body.width/2 - 10, y: c.y - body.height/2 - 10,
+                              width: body.width + 20, height: body.height + 20)
+            return UIBezierPath(roundedRect: rect, cornerRadius: 14)
         }
     }
 
@@ -1786,7 +1817,7 @@ class CanvasTableView: UIView {
         case .sweetheart:
             let inflated = CGSize(width: body.width + 18, height: body.height + 18)
             return sweetheartPath(shape: table.sweetShape, body: inflated, center: c)
-        case .rect, .head:
+        case .rect, .head, .serpentine, .halfcircle, .unknown:
             return nil
         }
     }
@@ -1815,6 +1846,17 @@ class CanvasTableView: UIView {
             // Head body is ink (no colour ring); sweetheart uses paper +
             // glow, no ring either.
             return UIBezierPath()
+        case .serpentine:
+            // Stroke the same ribbon outline in the table colour (web parity).
+            return serpentinePath(width: body.width, height: body.height, center: c)
+        case .halfcircle:
+            return halfCirclePath(width: body.width, height: body.height, center: c)
+        case .unknown:
+            let path = UIBezierPath()
+            let y = c.y + body.height / 2 + 5
+            path.move(to: CGPoint(x: c.x - body.width / 2 + 6, y: y))
+            path.addLine(to: CGPoint(x: c.x + body.width / 2 - 6, y: y))
+            return path
         }
     }
 
@@ -1840,6 +1882,93 @@ class CanvasTableView: UIView {
             path.close()
             return path
         }
+    }
+
+    // MARK: Serpentine + half-circle geometry (mirrors web App.jsx
+    // serpentineGeometry() / halfCircleGeometry() — SAME formulas + sample
+    // counts so a plan looks identical on web and iOS).
+
+    private static func serpentinePath(width W: CGFloat, height H: CGFloat, center c: CGPoint) -> UIBezierPath {
+        let amp = H * 0.45, half = H / 2, TAU = CGFloat.pi * 2, samples = 48
+        func at(_ u: CGFloat) -> (x: CGFloat, y: CGFloat, nx: CGFloat, ny: CGFloat) {
+            let x = -W/2 + u*W, y = amp * sin(TAU*u)
+            let tx = W, ty = amp * TAU * cos(TAU*u), tl = max(hypot(tx, ty), 0.0001)
+            return (x, y, -ty/tl, tx/tl)
+        }
+        let path = UIBezierPath()
+        for i in 0...samples {
+            let p = at(CGFloat(i)/CGFloat(samples))
+            let pt = CGPoint(x: c.x + p.x + p.nx*half, y: c.y + p.y + p.ny*half)
+            if i == 0 { path.move(to: pt) } else { path.addLine(to: pt) }
+        }
+        for i in stride(from: samples, through: 0, by: -1) {
+            let p = at(CGFloat(i)/CGFloat(samples))
+            path.addLine(to: CGPoint(x: c.x + p.x - p.nx*half, y: c.y + p.y - p.ny*half))
+        }
+        path.close()
+        return path
+    }
+
+    private static func serpentineSeats(width W: CGFloat, height H: CGFloat, n: Int, center c: CGPoint) -> [CGPoint] {
+        guard n > 0 else { return [] }
+        let amp = H * 0.45, half = H / 2, TAU = CGFloat.pi * 2, FINE = 192
+        func at(_ u: CGFloat) -> (x: CGFloat, y: CGFloat, nx: CGFloat, ny: CGFloat) {
+            let x = -W/2 + u*W, y = amp * sin(TAU*u)
+            let tx = W, ty = amp * TAU * cos(TAU*u), tl = max(hypot(tx, ty), 0.0001)
+            return (x, y, -ty/tl, tx/tl)
+        }
+        func place(_ k: Int, _ side: CGFloat) -> [CGPoint] {
+            guard k > 0 else { return [] }
+            var pts: [(x: CGFloat, y: CGFloat, d: CGFloat)] = []
+            var total: CGFloat = 0; var prev: (CGFloat, CGFloat)? = nil
+            for i in 0...FINE {
+                let p = at(CGFloat(i)/CGFloat(FINE))
+                let ex = p.x + side*p.nx*(half+14), ey = p.y + side*p.ny*(half+14)
+                if let pr = prev { total += hypot(ex-pr.0, ey-pr.1) }
+                pts.append((ex, ey, total)); prev = (ex, ey)
+            }
+            var out: [CGPoint] = []
+            for i in 0..<k {
+                let target = (CGFloat(i)+0.5)/CGFloat(k)*total
+                let sPt = pts.first(where: { $0.d >= target }) ?? pts[pts.count-1]
+                out.append(CGPoint(x: c.x + sPt.x, y: c.y + sPt.y))
+            }
+            return out
+        }
+        let topN = (n+1)/2, botN = n - topN
+        return place(topN, 1) + place(botN, -1)
+    }
+
+    private static func halfCirclePath(width W: CGFloat, height H: CGFloat, center c: CGPoint) -> UIBezierPath {
+        let rx = W/2, ry = H
+        func arc(_ t: CGFloat) -> CGPoint { let th = t * .pi; return CGPoint(x: rx*cos(th), y: -ry/2 + ry*sin(th)) }
+        let path = UIBezierPath()
+        path.move(to: CGPoint(x: c.x - rx, y: c.y - ry/2))
+        path.addLine(to: CGPoint(x: c.x + rx, y: c.y - ry/2))
+        let SAMP = 40
+        for i in 0...SAMP { let p = arc(CGFloat(i)/CGFloat(SAMP)); path.addLine(to: CGPoint(x: c.x + p.x, y: c.y + p.y)) }
+        path.close()
+        return path
+    }
+
+    private static func halfCircleSeats(width W: CGFloat, height H: CGFloat, n: Int, center c: CGPoint) -> [CGPoint] {
+        guard n > 0 else { return [] }
+        let rx = W/2, ry = H, FINE = 240
+        func arc(_ t: CGFloat) -> (x: CGFloat, y: CGFloat, th: CGFloat) { let th = t * .pi; return (rx*cos(th), -ry/2 + ry*sin(th), th) }
+        var pts: [(x: CGFloat, y: CGFloat, d: CGFloat, th: CGFloat)] = []
+        var total: CGFloat = 0; var prev: (CGFloat, CGFloat)? = nil
+        for i in 0...FINE {
+            let p = arc(CGFloat(i)/CGFloat(FINE))
+            if let pr = prev { total += hypot(p.x-pr.0, p.y-pr.1) }
+            pts.append((p.x, p.y, total, p.th)); prev = (p.x, p.y)
+        }
+        var out: [CGPoint] = []
+        for i in 0..<n {
+            let target = (CGFloat(i)+0.5)/CGFloat(n)*total
+            let sPt = pts.first(where: { $0.d >= target }) ?? pts[pts.count-1]
+            out.append(CGPoint(x: c.x + sPt.x + cos(sPt.th)*14, y: c.y + sPt.y + sin(sPt.th)*14))
+        }
+        return out
     }
 
     private static func seatPositions(for table: SeatTable, body: CGSize, center c: CGPoint) -> [CGPoint] {
@@ -1895,6 +2024,18 @@ class CanvasTableView: UIView {
             for i in 0..<bot {
                 seats.append(CGPoint(x: c.x - w/2 + sp * CGFloat(i + 1), y: c.y + h/2 + offset))
             }
+            return seats
+        case .serpentine:
+            return serpentineSeats(width: body.width, height: body.height, n: n, center: c)
+        case .halfcircle:
+            return halfCircleSeats(width: body.width, height: body.height, n: n, center: c)
+        case .unknown:
+            let w = body.width, h = body.height
+            let top = (n + 1) / 2, bot = n - top
+            let sp = w / CGFloat(max(top, bot) + 1)
+            var seats: [CGPoint] = []
+            for i in 0..<top { seats.append(CGPoint(x: c.x - w/2 + sp * CGFloat(i + 1), y: c.y - h/2 - offset)) }
+            for i in 0..<bot { seats.append(CGPoint(x: c.x - w/2 + sp * CGFloat(i + 1), y: c.y + h/2 + offset)) }
             return seats
         }
     }
