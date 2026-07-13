@@ -283,35 +283,43 @@ struct EditorView: View {
             // Multi-room picker — only when the plan actually has 2+ rooms.
             // Room add/rename/delete stays on web; iOS switches + renders.
             if roomTabs.count > 1 {
+                // Icon-only room switcher. The old text-capsule showed the room
+                // name inline, which stole ~50pt and truncated BOTH the event
+                // title and the room name ("Jayne &…" / "Recept… ⌄"). Now a
+                // single rooms glyph frees the title's full width; the active
+                // room name lives in the menu's section header + its checkmark.
+                let activeRoomName = roomTabs.first { $0.id == plan?.activeRoomId }?.name ?? roomTabs[0].name
                 Menu {
-                    ForEach(roomTabs, id: \.id) { room in
-                        Button {
-                            switchToRoom(room.id)
-                        } label: {
-                            if room.id == plan?.activeRoomId {
-                                Label(room.name, systemImage: "checkmark")
-                            } else {
-                                Text(room.name)
+                    Section("Room · \(activeRoomName)") {
+                        ForEach(roomTabs, id: \.id) { room in
+                            Button {
+                                switchToRoom(room.id)
+                            } label: {
+                                if room.id == plan?.activeRoomId {
+                                    Label(room.name, systemImage: "checkmark")
+                                } else {
+                                    Text(room.name)
+                                }
                             }
+                            .disabled(room.id == plan?.activeRoomId)
                         }
-                        .disabled(room.id == plan?.activeRoomId)
                     }
                 } label: {
-                    HStack(spacing: 4) {
-                        Text(roomTabs.first { $0.id == plan?.activeRoomId }?.name ?? roomTabs[0].name)
-                            .font(.system(size: 12, weight: .medium))
+                    HStack(spacing: 3) {
+                        Image(systemName: "rectangle.3.group")
+                            .font(.system(size: 13, weight: .medium))
                             .foregroundStyle(Color.sbCharcoal)
-                            .lineLimit(1)
                         Image(systemName: "chevron.down")
-                            .font(.system(size: 9, weight: .semibold))
+                            .font(.system(size: 8, weight: .semibold))
                             .foregroundStyle(Color.sbWarm2)
                     }
-                    .padding(.horizontal, 10)
+                    .padding(.horizontal, 9)
                     .padding(.vertical, 8)
                     .background(.ultraThinMaterial)
                     .clipShape(Capsule())
                 }
                 .accessibilityLabel("Switch room")
+                .accessibilityValue(activeRoomName)
                 .accessibilityHint("Show a different room's tables on the canvas")
             }
 
