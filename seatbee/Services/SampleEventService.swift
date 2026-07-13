@@ -186,7 +186,7 @@ private struct SampleTable: Decodable {
         SeatTable(
             id: id,
             name: name,
-            type: SeatTable.TableType(rawValue: type) ?? .round,
+            type: SeatTable.TableType.parse(type),
             seats: seats,
             x: x,
             y: y,

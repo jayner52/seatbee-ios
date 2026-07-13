@@ -143,7 +143,9 @@ Web-parity (preserved on iOS round-trip): `dietaryTags` (array of strings — dr
 
 ### SeatTable
 
-Core: `id`, `name`, `type` (`round`/`rect`/`head`/`sweetheart`/`oval`), `seats`, `x`, `y`, `rotation`, `assignments` (handled separately, see below), `locked`, `color`
+Core: `id`, `name`, `type` (`round`/`rect`/`head`/`sweetheart`/`oval`/`serpentine`/`halfcircle`), `seats`, `x`, `y`, `rotation`, `assignments` (handled separately, see below), `locked`, `color`
+
+> **`serpentine` + `halfcircle`** (web + iOS, 2026-07-12) reuse rect's `width`/`height` — no new fields beyond the `type` string. iOS `TableType` is now a `.unknown(String)`-preserving enum (mirrors `RuleType`), so any future web-only type round-trips safely (renders as rect, keeps its raw type) instead of collapsing to `round`. See Resolved gaps.
 
 Web-parity (preserved on iOS round-trip): `width`, `height` (rect/head/oval), `diameter` (round), `sweetShape` (`HEART`/`OVAL`/`DIAMOND` for sweetheart variants), `oneSide` (boolean for head table), `notes` (free-text per-table notes — kitchen, vendor, internal), `roomId` (string, multi-room 2026-07-08 — which room this table lives in; **dropping this on round-trip glues all tables into one room**)
 
@@ -251,6 +253,7 @@ Map of `guestId → { tableId, seatIndex }`. iOS deconstructs this on read (assi
 | 2026-05-03 | `ObjectDTO` missing fields (`color`, `category`, `icon`, `isObstacle`) | iOS PR #4 |
 | 2026-05-03 | `PlanDataDTO` missing `groups`, `floorPlanImage`, `floorPlanOpacity` | iOS PR #4 |
 | 2026-05-03 | iOS `toPlanData` hardcoded `categories: nil`, `parties: nil` (wiped arrays on every save) | iOS PR #4 (now writes from raw passthrough fields) |
+| 2026-07-12 | Curved table types (`serpentine`, `halfcircle`) + `TableType` round-trip data loss. Web added the types 2026-07-12; old iOS decoded any unrecognised type via `TableType(rawValue:) ?? .round` and re-saved as `round`, flattening the shape. | iOS PR `jayne/ios-curved-tables` — **`TableType` hardened to a `RuleType`-style enum with `.unknown(String)`** (preserves any unrecognised type on round-trip); both `?? .round` sites (`SeatingPlanDTO`, `SampleEventService`) now use `.parse()`. Added `case serpentine`/`case halfcircle` with geometry mirrored from web `serpentineGeometry()`/`halfCircleGeometry()` (48-sample sine centerline / half-ellipse outer arc) in `CanvasViewController` + `CanvasPDFRenderer` (bodySize/shapePath/seatPositions) and pickers (`AddTableSheet`, `TableDrawerView`, `AllTablesListSheet`). **Reaches users only after Shayan ships a new App Store build.** |
 | 2026-07-08 | Multi-room support: new `data.rooms[]` + `data.activeRoomId`, new `roomId` on every table/object. Web ships room tabs, per-room shape/floor-plan/viewport, room-scoped auto-seat + auto-arrange. Old iOS drops `roomId`/`rooms` on save (Codable ignores undeclared fields) — web auto-recovers by re-tagging into one room | Web direct-to-main `0d6af99` — `_hydrateRooms` migration at all 6 state-ingress points, `_snapshotActiveRoom` before every rooms[] persist. iOS PR `jayne/multi-room` — `roomId` on `TableDTO`/`ObjectDTO`/`SeatTable`/`RoomObject`, `rooms`/`activeRoomId` passthrough on `PlanDataDTO`/`SeatingPlan`, room picker + canvas filter in `EditorView` |
 | 2026-05-03 | Web rule evaluator silent on unknown types | Web direct-to-main commit `1423fdd` (now `console.warn`s) |
 | 2026-05-03 | Venue objects render as black rectangles when `color` field is missing | Web direct-to-main commit `968a70d` (`VObj` falls back to `VENUE_OBJECTS` defaults) |

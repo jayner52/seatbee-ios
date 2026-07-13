@@ -107,18 +107,18 @@ struct TableDrawerView: View {
 
                 // Table type
                 Menu {
-                    ForEach(SeatTable.TableType.allCases, id: \.self) { type in
+                    ForEach(SeatTable.TableType.selectableCases, id: \.self) { type in
                         Button {
                             changeTableType(type)
                         } label: {
-                            Label(type.rawValue.capitalized, systemImage: typeIcon(type))
+                            Label(type.displayName, systemImage: typeIcon(type))
                         }
                     }
                 } label: {
                     HStack(spacing: 4) {
                         Image(systemName: typeIcon(table.type))
                             .font(.system(size: 12))
-                        Text(table.type.rawValue.capitalized)
+                        Text(table.type.displayName)
                             .font(SBFont.inter(12, weight: .semibold))
                     }
                     .foregroundStyle(Color.sbGoldDk)
@@ -575,6 +575,11 @@ struct TableDrawerView: View {
                 HStack(spacing: 8) {
                     shapeButton("Head", type: .head)
                     shapeButton("Sweet", type: .sweetheart)
+                    shapeButton("Serpentine", type: .serpentine)
+                }
+                HStack(spacing: 8) {
+                    shapeButton("Half-circle", type: .halfcircle)
+                    Spacer().frame(maxWidth: .infinity)
                     Spacer().frame(maxWidth: .infinity)
                 }
             }
@@ -684,7 +689,7 @@ struct TableDrawerView: View {
                            value: bindingNoSave(get: { Double(table.height ?? 60) },
                                                 set: { v in mutateTable(save: false) { $0.height = v } }),
                            range: 40...200, step: 5)
-            case .rect, .head, .sweetheart:
+            case .rect, .head, .sweetheart, .serpentine, .halfcircle, .unknown:
                 sizeSlider(label: "W",
                            value: bindingNoSave(get: { Double(table.width ?? 100) },
                                                 set: { v in mutateTable(save: false) { $0.width = v } }),
@@ -889,6 +894,9 @@ struct TableDrawerView: View {
             case .round:      return 12
             case .oval:       return 14   // ellipse perimeter > round, slightly higher
             case .rect, .head: return 200
+            case .serpentine:  return 200
+            case .halfcircle:  return 40
+            case .unknown:     return 200
             }
         }()
         let newCount = max(2, min(maxSeats, t.seats + delta))
@@ -948,6 +956,18 @@ struct TableDrawerView: View {
             t.height = t.height ?? 60
             t.diameter = nil
             t.oneSide = nil
+        case .serpentine:
+            t.width = t.width ?? t.diameter ?? 240
+            t.height = t.height ?? 38
+            t.diameter = nil
+            t.oneSide = nil
+        case .halfcircle:
+            t.width = t.width ?? t.diameter ?? 180
+            t.height = t.height ?? 90
+            t.diameter = nil
+            t.oneSide = nil
+        case .unknown:
+            break
         }
         plan.tables[idx] = t
         appState.activePlan = plan
@@ -962,6 +982,9 @@ struct TableDrawerView: View {
         case .head:       return "person.2"
         case .sweetheart: return "heart"
         case .oval:       return "oval"
+        case .serpentine: return "point.topleft.down.to.point.bottomright.curvepath"
+        case .halfcircle: return "circle.bottomhalf.filled"
+        case .unknown:    return "rectangle"
         }
     }
 

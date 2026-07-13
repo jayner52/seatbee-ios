@@ -164,6 +164,9 @@ struct AllTablesListSheet: View {
         case .rect:       symbol = "rectangle"
         case .round:      symbol = "circle"
         case .oval:       symbol = "oval"
+        case .serpentine: symbol = "point.topleft.down.to.point.bottomright.curvepath"
+        case .halfcircle: symbol = "circle.bottomhalf.filled"
+        case .unknown:    symbol = "rectangle"
         }
         return Image(systemName: symbol)
             .font(.system(size: 13, weight: .medium))

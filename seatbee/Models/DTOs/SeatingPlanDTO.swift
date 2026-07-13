@@ -232,7 +232,7 @@ struct TableDTO: Codable {
         SeatTable(
             id: id,
             name: name ?? "Table",
-            type: SeatTable.TableType(rawValue: type ?? "round") ?? .round,
+            type: SeatTable.TableType.parse(type),
             seats: seats ?? 8,
             x: x ?? 0,
             y: y ?? 0,

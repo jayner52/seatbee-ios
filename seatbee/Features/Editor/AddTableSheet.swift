@@ -10,6 +10,8 @@ struct AddTableSheet: View {
         (.rect, "Rectangular", "rectangle", 6, "Long table"),
         (.head, "Head Table", "person.2", 12, "Main table for the wedding party"),
         (.sweetheart, "Sweetheart", "heart", 2, "Intimate table for the couple"),
+        (.serpentine, "Serpentine", "point.topleft.down.to.point.bottomright.curvepath", 14, "Long, gently S-curved banquet"),
+        (.halfcircle, "Half-circle", "circle.bottomhalf.filled", 10, "Crescent / half-round head table"),
     ]
 
     var body: some View {
@@ -378,6 +380,7 @@ enum TableDefaults {
         switch type {
         case .round, .oval, .rect:  return [4, 6, 8, 10]
         case .head, .sweetheart:    return nil
+        case .serpentine, .halfcircle, .unknown: return nil
         }
     }
 
@@ -390,6 +393,7 @@ enum TableDefaults {
         case .oval:  return 8  // existing default 120×60 ≈ 8ft long
         case .rect:  return 6  // existing default 90×37.5 ≈ 6ft long
         case .head, .sweetheart: return nil
+        case .serpentine, .halfcircle, .unknown: return nil
         }
     }
 
@@ -414,6 +418,12 @@ enum TableDefaults {
             // ~2:1 ratio (web's existing 8ft × 4ft default).
             let longFt = Double(sizeFt ?? 8)
             return Dimensions(width: longFt * pxPerFoot, height: longFt * pxPerFoot / 2)
+        case .serpentine:
+            return Dimensions(width: 240, height: 37.5) // 16ft × 2.5ft
+        case .halfcircle:
+            return Dimensions(width: 180, height: 90)   // 12ft × 6ft
+        case .unknown:
+            return Dimensions(width: 90, height: 37.5)  // rect-like fallback
         }
     }
 }
