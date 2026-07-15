@@ -4,6 +4,7 @@ struct RulesView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
     @State private var showAddRule = false
+    @State private var showNLRules = false
     @State private var showAddParty = false
     @State private var pendingAddType: SeatingRule.RuleType = .mustTogether
     @State private var editingRule: SeatingRule?
@@ -96,6 +97,12 @@ struct RulesView: View {
                 VStack(alignment: .leading, spacing: 16) {
                     headerSummary
 
+                    // "Describe your rules" — natural-language AI drafting,
+                    // mirrors web's NL box at the top of the Rules tab.
+                    if !guests.isEmpty {
+                        nlRulesCard
+                    }
+
                     partiesSection
 
                     ForEach(sectionDefs) { section in
@@ -127,7 +134,58 @@ struct RulesView: View {
             .sheet(isPresented: $showAddParty) {
                 AddPartySheet().environment(appState)
             }
+            .sheet(isPresented: $showNLRules) {
+                NLRulesSheet().environment(appState)
+            }
         }
+    }
+
+    // MARK: - Natural-language rules entry card
+
+    private var nlRulesCard: some View {
+        Button {
+            showNLRules = true
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(Color.sbGold)
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        Text("Describe your rules")
+                            .font(SBFont.bodySemibold)
+                            .foregroundStyle(Color.sbCharcoal)
+                        Text("AI")
+                            .font(SBFont.capsLabel)
+                            .foregroundStyle(Color.sbGoldDk)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.sbGold.opacity(0.12))
+                            .clipShape(Capsule())
+                        if !appState.activePlanLimits.aiGenerate {
+                            Image(systemName: "lock.fill")
+                                .font(.system(size: 10))
+                                .foregroundStyle(Color.sbWarm2)
+                        }
+                    }
+                    Text("Type your wishes — AI drafts the rules")
+                        .font(SBFont.caption)
+                        .foregroundStyle(Color.sbWarm)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Color.sbWarm2)
+            }
+            .padding(14)
+            .background(Color.sbGold.opacity(0.06))
+            .clipShape(RoundedRectangle(cornerRadius: SBRadius.card))
+            .overlay(
+                RoundedRectangle(cornerRadius: SBRadius.card)
+                    .strokeBorder(Color.sbGold.opacity(0.3), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Parties section

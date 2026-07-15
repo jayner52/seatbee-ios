@@ -10,6 +10,7 @@ final class AIService {
         case detectConflicts
         case classifyTags
         case analyzeRulesPreFlight
+        case parseRules
     }
 
     struct SeatingSuggestion: Codable {
@@ -333,6 +334,234 @@ final class AIService {
     }
 
     // MARK: - Errors
+
+    // MARK: - Natural-Language Rules (web parity)
+    //
+    // Mirrors web parseRulesFromText (src/lib/ai.js:1404) + validateProposed
+    // (src/App.jsx:13679). The system prompt is copied VERBATIM from web for
+    // behavioural identity — if the web prompt changes, change it here too
+    // (PARITY.md notes this pairing). Rules produced here persist to the
+    // shared seating_plans.data JSONB, so every field value must match what
+    // web writes.
+
+    /// {id,name} lists sent to the model — identical to web's context arg.
+    struct NLRulesContext {
+        struct IdName: Encodable { let id: String; let name: String }
+        var guests: [IdName]
+        var tables: [IdName]
+        var objects: [IdName]
+        var categories: [IdName]
+    }
+
+    /// Raw rule shape as the model returns it. Everything optional — the
+    /// model may omit fields; validation decides what survives.
+    struct ProposedRuleDTO: Decodable {
+        let type: String?
+        let guests: [String]?
+        let sideA: [String]?
+        let sideB: [String]?
+        let tableId: String?
+        let objectId: String?
+        let categoryId: String?
+        let hard: Bool?
+        let weight: Int?
+        let desc: String?
+
+        enum CodingKeys: String, CodingKey {
+            case type, guests, sideA, sideB, tableId, objectId, categoryId, hard, weight, desc
+        }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            type = try? c.decode(String.self, forKey: .type)
+            guests = try? c.decode([String].self, forKey: .guests)
+            sideA = try? c.decode([String].self, forKey: .sideA)
+            sideB = try? c.decode([String].self, forKey: .sideB)
+            tableId = try? c.decode(String.self, forKey: .tableId)
+            objectId = try? c.decode(String.self, forKey: .objectId)
+            categoryId = try? c.decode(String.self, forKey: .categoryId)
+            hard = try? c.decode(Bool.self, forKey: .hard)
+            // Weight tolerant: Int → Double → numeric String (models vary).
+            if let i = try? c.decode(Int.self, forKey: .weight) { weight = i }
+            else if let d = try? c.decode(Double.self, forKey: .weight) { weight = Int(d.rounded()) }
+            else if let str = try? c.decode(String.self, forKey: .weight), let i = Int(str) { weight = i }
+            else { weight = nil }
+            desc = try? c.decode(String.self, forKey: .desc)
+        }
+    }
+
+    struct ParsedRulesResult {
+        let rules: [ProposedRuleDTO]
+        let skipped: [String]
+    }
+
+    private struct NLRulesEnvelope: Decodable {
+        let rules: [ProposedRuleDTO]?
+        let skipped: [LossyString]?
+        /// Web filters skipped to strings only; mirror by dropping non-strings.
+        struct LossyString: Decodable {
+            let value: String?
+            init(from decoder: Decoder) throws {
+                let c = try decoder.singleValueContainer()
+                value = try? c.decode(String.self)
+            }
+        }
+    }
+
+    func parseRulesFromText(_ text: String, context: NLRulesContext) async throws -> ParsedRulesResult {
+        func js<T: Encodable>(_ v: T) -> String {
+            (try? JSONEncoder().encode(v)).flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
+        }
+        // Prompt text below is verbatim from web src/lib/ai.js:1404.
+        let systemPrompt = #"""
+You convert a wedding host's plain-English seating wishes into structured seating RULES.
+You are given the guests, tables, venue elements, and categories with their IDs. Output ONLY valid JSON — an object of the form {"rules": [...], "skipped": [...]}. No prose, no markdown fences. "rules" is the array of rule objects you created. "skipped" is an array of short strings, ONE FOR EACH wish you could NOT turn into a rule (e.g. a name that isn't in the guest list), each briefly saying why — e.g. "joe at table 3 — no guest named 'Joe' in the list".
+
+Rule types (use these exact strings):
+- "must_together": guests MUST sit at the same table. Fields: guests:[guestId]. ("must be together", "always sit with")
+- "prefer_together": try to seat together (soft). Fields: guests:[guestId]. ("would be nice", "try to", "together" without "must")
+- "must_not": two sets must NOT share a table. Fields: sideA:[guestId], sideB:[guestId]. ("keep apart", "away from", "don't seat with", "exes", "not near")
+- "must_table": force guests to a specific table. Fields: guests:[guestId], tableId. ("put X at [table name]", "seat X at the head table")
+- "near_table": seat guests physically near a table (soft). Fields: guests:[guestId], tableId.
+- "near_object": seat guests near a venue element (soft). Fields: guests:[guestId], objectId. ("near the door/entrance/stage/bar/dance floor/exit/restroom")
+- "category_together": keep everyone in a category together (soft). Fields: categoryId.
+
+Every rule also includes:
+- "hard": boolean — true ONLY for firm "must"/"never"; false for soft "prefer/try/near/would like".
+- "weight": integer 0-100 — hard rules use 100; soft: nice-to-have ~50, important ~75.
+- "desc": a short human label, e.g. "Grandma near the entrance".
+
+Strict rules:
+- Only use IDs that appear in the lists below. Match names case-insensitively; a unique first name maps to that guest. Names may be a single word, a nickname, or a relationship label (e.g. "Grandma", "Uncle Bob", "Mom") — still match them to the guest whose name equals that, case-insensitively.
+- If you cannot confidently match a person/table/element/category, OMIT that rule AND add a line to "skipped" explaining why. Never invent an ID.
+- Prefer must_not with sideA/sideB for any "keep apart" wish.
+- Return {"rules": [], "skipped": [...]} if nothing maps — but STILL list every unmatched wish in "skipped".
+
+GUESTS: \#(js(context.guests))
+TABLES: \#(js(context.tables))
+VENUE ELEMENTS: \#(js(context.objects))
+CATEGORIES: \#(js(context.categories))
+"""#
+
+        let content = try await call(
+            action: .parseRules,
+            systemPrompt: systemPrompt,
+            userMessage: "Convert these seating wishes into rules JSON:\n\n\(text)"
+        )
+
+        // Response cleaning — mirrors web: trim, strip ```json fences, parse;
+        // on failure regex-extract the first {...} or [...]; bare array = rules.
+        var raw = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        for prefix in ["```json", "```JSON", "```"] where raw.hasPrefix(prefix) {
+            raw = String(raw.dropFirst(prefix.count)); break
+        }
+        if raw.hasSuffix("```") { raw = String(raw.dropLast(3)) }
+        raw = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        func decodeEnvelope(_ str: String) -> ParsedRulesResult? {
+            guard let data = str.data(using: .utf8) else { return nil }
+            if let env = try? JSONDecoder().decode(NLRulesEnvelope.self, from: data),
+               env.rules != nil || env.skipped != nil {
+                return ParsedRulesResult(
+                    rules: env.rules ?? [],
+                    skipped: (env.skipped ?? []).compactMap { $0.value }
+                )
+            }
+            if let arr = try? JSONDecoder().decode([ProposedRuleDTO].self, from: data) {
+                return ParsedRulesResult(rules: arr, skipped: [])
+            }
+            return nil
+        }
+
+        if let result = decodeEnvelope(raw) { return result }
+        for pattern in ["\\{[\\s\\S]*\\}", "\\[[\\s\\S]*\\]"] {
+            if let range = raw.range(of: pattern, options: .regularExpression),
+               let result = decodeEnvelope(String(raw[range])) {
+                return result
+            }
+        }
+        // Web returns empty (not an error) when nothing parses — UI shows
+        // the "couldn't turn that into rules" copy.
+        return ParsedRulesResult(rules: [], skipped: [])
+    }
+
+    /// Mirrors web validateProposed (src/App.jsx:13679). Never trust model IDs.
+    static func validateProposedRules(
+        _ proposed: [ProposedRuleDTO],
+        guestIds: Set<String>,
+        tableIds: Set<String>,
+        objectIds: Set<String>,
+        categoryIds: Set<String>
+    ) -> [SeatingRule] {
+        func okG(_ arr: [String]?) -> [String] {
+            (arr ?? []).filter { guestIds.contains($0) }
+        }
+        var out: [SeatingRule] = []
+        for r in proposed {
+            let type = SeatingRule.RuleType.parse(r.type)
+            let hard = r.hard ?? false
+            let weight = max(0, min(100, r.weight ?? (hard ? 100 : 60)))
+            let desc = String((r.desc ?? "").prefix(80))
+            func base(_ t: SeatingRule.RuleType, guests: [String],
+                      tableId: String? = nil, objectId: String? = nil,
+                      categoryId: String? = nil, sideA: [String]? = nil,
+                      sideB: [String]? = nil, forceHard: Bool? = nil) -> SeatingRule {
+                SeatingRule(
+                    id: UUID().uuidString,
+                    type: t,
+                    guests: guests,
+                    tableId: tableId,
+                    weight: forceHard == true ? 100 : weight,
+                    hard: forceHard ?? hard,
+                    enabled: true,
+                    categoryId: categoryId, objectId: objectId, sideValue: nil,
+                    sideA: sideA, sideB: sideB,
+                    desc: desc,
+                    auto: nil, source: "ai",
+                    partyId: nil, groupId: nil
+                )
+            }
+            switch type {
+            case .mustTogether, .preferTogether:
+                let g = okG(r.guests)
+                if g.count >= 2 { out.append(base(type, guests: g)) }
+            case .mustNot:
+                let a = okG(r.sideA), b = okG(r.sideB)
+                if !a.isEmpty && !b.isEmpty {
+                    // Web parity: sideA + sideB + combined flat guests array.
+                    out.append(base(type, guests: a + b, sideA: a, sideB: b))
+                } else {
+                    let flat = okG(r.guests)
+                    if flat.count >= 2 { out.append(base(type, guests: flat)) }
+                }
+            case .mustTable:
+                let g = okG(r.guests)
+                if !g.isEmpty, let t = r.tableId, tableIds.contains(t) {
+                    // Web forces hard:true weight:100 for explicit table pins.
+                    out.append(base(type, guests: g, tableId: t, forceHard: true))
+                }
+            case .nearTable:
+                let g = okG(r.guests)
+                if !g.isEmpty, let t = r.tableId, tableIds.contains(t) {
+                    out.append(base(type, guests: g, tableId: t))
+                }
+            case .nearObject:
+                let g = okG(r.guests)
+                if !g.isEmpty, let o = r.objectId, objectIds.contains(o) {
+                    out.append(base(type, guests: g, objectId: o))
+                }
+            case .categoryTogether:
+                if let c = r.categoryId, categoryIds.contains(c) {
+                    // guests: [] — matches iOS category rules today; web omits
+                    // the field entirely and both shapes round-trip.
+                    out.append(base(type, guests: [], categoryId: c))
+                }
+            default:
+                continue // unknown / auto-only types are dropped, same as web
+            }
+        }
+        return out
+    }
 
     enum AIError: LocalizedError {
         case invalidURL
