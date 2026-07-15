@@ -1,6 +1,7 @@
 import Foundation
 import Security
 import WidgetKit
+import Supabase
 
 /// Mints the read-only widget token while the user is a signed-in admin,
 /// stashes it in the shared keychain, and nudges WidgetKit to refresh.
@@ -36,7 +37,14 @@ enum WidgetTokenProvider {
     }
 
     static func mint() async {
-        guard let accessToken = await AuthService().accessToken else { return }
+        // Read the token DIRECTLY from the shared Supabase client — do NOT use
+        // `AuthService()`. Instantiating AuthService runs its init →
+        // restoreSession() → sets currentUser → fires AuthService.currentUser's
+        // didSet → refreshIfNeeded() → mint() → AuthService() → … infinite loop,
+        // and every restoreSession also fired an "ios:app-session" page-view
+        // ping (flooded page_views ~350k/day). Regression from the widget work;
+        // fixed 2026-07-03.
+        guard let accessToken = try? await SupabaseManager.shared.client.auth.session.accessToken else { return }
 
         var request = URLRequest(url: mintTokenURL)
         request.httpMethod = "POST"
