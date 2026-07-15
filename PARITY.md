@@ -242,6 +242,7 @@ Map of `guestId → { tableId, seatIndex }`. iOS deconstructs this on read (assi
 
 | Date | Gap | Closed by |
 |---|---|---|
+| 2026-07-15 | iOS had no natural-language rule authoring (web's "Describe your rules" AI box, `src/lib/ai.js parseRulesFromText` + `src/App.jsx validateProposed`). No shape gap — `SeatingRule` already carried all fields — but the feature itself was web-only. | iOS PR `jayne/nl-rules` — `NLRulesSheet` + `AIService.parseRulesFromText`/`validateProposedRules`. **System prompt + validation are verbatim ports; web `src/lib/ai.js:1404` is the source of truth — edit both together.** Rule values written match web exactly (`source:'ai'`, weight clamp w/ hard?100:60 default, desc ≤80ch, must_table forced hard/100, must_not writes sideA+sideB+combined guests, category rules `guests: []`). |
 | 2026-05-03 | `RuleType` enum mismatch (iOS 4 camelCase vs web 10 snake_case) | iOS PR #3 (`jayne/rules-parity`) |
 | 2026-05-03 | `RuleDTO` missing fields (`categoryId`, `objectId`, `sideValue`, `desc`, `auto`, `source`, `partyId`, `groupId`) | iOS PR #3 |
 | 2026-05-03 | iOS `RuleType` silent `?? .seatTogether` fallback on unknown read | iOS PR #3 (replaced with `.unknown(raw)` preservation) |
