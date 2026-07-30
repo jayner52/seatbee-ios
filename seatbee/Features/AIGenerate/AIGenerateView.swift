@@ -99,7 +99,7 @@ struct AIGenerateView: View {
             ),
             presenting: tierGateAlert
         ) { _ in
-            Button("Upgrade") { appState.showUpgrade = true }
+            Button("Upgrade") { appState.upgradeTrigger = "ai_generate"; appState.showUpgrade = true }
             Button("Not now", role: .cancel) {}
         } message: { gate in
             Text(gate.message)
@@ -1121,6 +1121,7 @@ struct AIGenerateView: View {
         // Tier gate — skip the alert, go straight to the paywall
         guard appState.activePlanLimits.aiGenerate else {
             HapticEngine.error()
+            appState.upgradeTrigger = "ai_generate"
             appState.showUpgrade = true
             return
         }

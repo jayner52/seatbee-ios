@@ -4,6 +4,33 @@ import Supabase
 final class DatabaseService {
     private var client: SupabaseClient { SupabaseManager.shared.client }
 
+    // MARK: - Analytics
+
+    private struct PaywallEventInsert: Encodable {
+        struct EventData: Encodable {
+            let platform: String
+            let trigger: String
+            let tier: String
+        }
+        let event_name: String
+        let event_data: EventData
+        let user_id: UUID?
+    }
+
+    /// Mirrors web's queueAnalyticsEvent('paywall_shown', …): one row in
+    /// analytics_events per paywall view, with platform:"ios" so the admin
+    /// dashboard can split web vs iOS hits. Fire-and-forget — analytics must
+    /// never block or fail the paywall itself.
+    func logPaywallShown(trigger: String, tier: String) async {
+        let userId = try? await client.auth.session.user.id
+        let payload = PaywallEventInsert(
+            event_name: "paywall_shown",
+            event_data: .init(platform: "ios", trigger: trigger, tier: tier),
+            user_id: userId
+        )
+        _ = try? await client.from("analytics_events").insert(payload).execute()
+    }
+
     // MARK: - Fetch Plans
 
     func fetchPlans() async throws -> [SeatingPlan] {

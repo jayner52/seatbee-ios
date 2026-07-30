@@ -69,6 +69,7 @@ struct SettingsSheet: View {
                     let isPaid = appState.activePlanTier != .free
                     Section {
                         Button {
+                            appState.upgradeTrigger = "settings"
                             appState.showUpgrade = true
                         } label: {
                             HStack(spacing: 12) {

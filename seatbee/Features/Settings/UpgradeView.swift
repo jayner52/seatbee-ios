@@ -96,7 +96,15 @@ struct UpgradeView: View {
                 appearAnimation = true
             }
             startShimmer()
+            // Web parity: paywall_shown analytics. Entitled users see the
+            // manage state, not a paywall — don't count those views.
+            if !isAlreadyEntitled {
+                let trigger = appState.upgradeTrigger
+                let tier = appState.activePlanTier.rawValue
+                Task { await appState.database.logPaywallShown(trigger: trigger, tier: tier) }
+            }
         }
+        .onDisappear { appState.upgradeTrigger = "unknown" }
         .onChange(of: storeKit.purchaseSuccess) { _, success in
             if success {
                 Task {

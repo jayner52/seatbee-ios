@@ -354,6 +354,7 @@ struct DashboardView: View {
         } else if tier == .free || expired {
             // Free / expired → tappable upgrade chip.
             Button {
+                appState.upgradeTrigger = "dashboard_chip"
                 appState.showUpgrade = true
             } label: {
                 HStack(spacing: 8) {
