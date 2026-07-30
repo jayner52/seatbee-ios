@@ -224,6 +224,7 @@ struct ShareView: View {
                             inviteResult = nil
                             showInvitePrompt = true
                         } else {
+                            appState.upgradeTrigger = "share"
                             appState.showUpgrade = true
                         }
                     } label: {
@@ -703,6 +704,7 @@ struct ShareView: View {
             if isPaid {
                 showCanvaSheet = true
             } else {
+                appState.upgradeTrigger = "export"
                 appState.showUpgrade = true
             }
         } label: {
@@ -771,7 +773,7 @@ struct ShareView: View {
                                isPaidGate: Bool, action: @escaping () -> Void) -> some View {
         let locked = isPaidGate && (appState.activePlanTier == .free || appState.isActivePlanExpired)
         return Button {
-            if locked { appState.showUpgrade = true } else { action() }
+            if locked { appState.upgradeTrigger = "export"; appState.showUpgrade = true } else { action() }
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: locked ? "lock.fill" : icon)

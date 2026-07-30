@@ -38,6 +38,10 @@ final class AppState {
     var showAuth = false
     var showOnboarding = false
     var showUpgrade = false
+    /// Which gate opened the paywall — logged with the paywall_shown analytics
+    /// event so the admin dashboard can break iOS hits down by trigger, same
+    /// as web's UpgradeModal. Reset to "unknown" when the sheet dismisses.
+    var upgradeTrigger = "unknown"
 
     // Navigation paths for each tab
     var plansPath = NavigationPath()

@@ -212,7 +212,7 @@ struct EditorView: View {
         }
         .alert("You're at \(appState.seatedGuestCount) of \(appState.activePlanLimits.seatedGuests) seated guests",
                isPresented: $showSoftSeatedNudge) {
-            Button("Upgrade") { appState.showUpgrade = true }
+            Button("Upgrade") { appState.upgradeTrigger = "guest_limit"; appState.showUpgrade = true }
             Button("Keep going", role: .cancel) {}
         } message: {
             Text("The free plan caps seating at \(appState.activePlanLimits.seatedGuests) guests. Upgrade for a larger plan and watermark-free exports.")
@@ -1390,6 +1390,7 @@ struct EditorView: View {
         showGuestPicker = false
         showDetailSheet = false
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+            appState.upgradeTrigger = "guest_limit"
             appState.showUpgrade = true
         }
     }

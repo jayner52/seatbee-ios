@@ -506,6 +506,7 @@ struct OnboardingView: View {
                         .foregroundStyle(Color.sbCharcoal2)
                         .fixedSize(horizontal: false, vertical: true)
                     Button("Upgrade to Seatbee Pro") {
+                        appState.upgradeTrigger = "onboarding"
                         appState.showUpgrade = true
                     }
                     .font(SBFont.bodySmallBold)

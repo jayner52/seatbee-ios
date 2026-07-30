@@ -260,6 +260,7 @@ struct CSVImportSheet: View {
                 Button("Upgrade") {
                     dismiss()
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                        appState.upgradeTrigger = "guest_limit"
                         appState.showUpgrade = true
                     }
                 }

@@ -222,6 +222,7 @@ struct NLRulesSheet: View {
         // Pro gate — mirrors web checkTierLimit('ai_generate') before any call.
         guard appState.activePlanLimits.aiGenerate else {
             HapticEngine.error()
+            appState.upgradeTrigger = "ai_rules"
             appState.showUpgrade = true
             return
         }
