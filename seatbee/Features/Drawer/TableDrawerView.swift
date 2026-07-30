@@ -887,7 +887,8 @@ struct TableDrawerView: View {
         guard var plan = appState.activePlan,
               let idx = plan.tables.firstIndex(where: { $0.id == table.id }) else { return }
         var t = plan.tables[idx]
-        // Web parity: min 2; max 12 round, 200 rect/head, 2 sweetheart.
+        // Web parity (2026-07-30): min 1 — solo vendor tables (DJ, photographer)
+        // count toward the venue's guest total. Sweetheart stays pinned at 2.
         let maxSeats: Int = {
             switch t.type {
             case .sweetheart: return 2
@@ -899,7 +900,7 @@ struct TableDrawerView: View {
             case .unknown:     return 200
             }
         }()
-        let newCount = max(2, min(maxSeats, t.seats + delta))
+        let newCount = max(t.type == .sweetheart ? 2 : 1, min(maxSeats, t.seats + delta))
         guard newCount != t.seats else { return }
         t.seats = newCount
 
