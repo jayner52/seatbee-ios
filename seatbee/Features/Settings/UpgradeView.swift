@@ -1,6 +1,17 @@
 import SwiftUI
 import StoreKit
 
+/// How the paywall was reached, which controls how the user leaves it.
+/// - `standard`: user-initiated or gate-triggered sheet — dismissible via
+///   the top-right X, exactly as before.
+/// - `onboardingFlow`: shown as a step in the first-run flow. No X; the
+///   only way past without subscribing is the small "skip" text link
+///   under the CTA (App Review-safe: the paywall is always escapable).
+enum UpgradeContext {
+    case standard
+    case onboardingFlow
+}
+
 struct UpgradeView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
@@ -12,6 +23,8 @@ struct UpgradeView: View {
     @State private var appearAnimation = false
     /// The eligible free-trial offer, if any (nil until loaded / if ineligible).
     @State private var trialOffer: StoreKitService.FreeTrialOffer?
+
+    var context: UpgradeContext = .standard
 
     private var product: SeatbeeProduct { .proMonthly }
 
@@ -44,19 +57,23 @@ struct UpgradeView: View {
 
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 0) {
-                    HStack {
-                        Spacer()
-                        Button { dismiss() } label: {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 13, weight: .bold))
-                                .foregroundStyle(Color.sbWarm)
-                                .frame(width: 30, height: 30)
-                                .background(.ultraThinMaterial)
-                                .clipShape(Circle())
+                    if context == .standard {
+                        HStack {
+                            Spacer()
+                            Button { dismiss() } label: {
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 13, weight: .bold))
+                                    .foregroundStyle(Color.sbWarm)
+                                    .frame(width: 30, height: 30)
+                                    .background(.ultraThinMaterial)
+                                    .clipShape(Circle())
+                            }
                         }
+                        .padding(.horizontal, 20)
+                        .padding(.top, 16)
+                    } else {
+                        Spacer().frame(height: 46)
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 16)
 
                     heroSection
                         .opacity(appearAnimation ? 1 : 0)
@@ -71,6 +88,17 @@ struct UpgradeView: View {
                     ctaButton
                         .padding(.top, 24)
                         .padding(.horizontal, 20)
+
+                    if context == .onboardingFlow && !isAlreadyEntitled {
+                        Button { dismiss() } label: {
+                            Text("Skip for now — continue with the free version")
+                                .font(SBFont.inter(12, weight: .medium))
+                                .foregroundStyle(Color.sbWarm2)
+                                .underline()
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.top, 14)
+                    }
 
                     errorBanner
                         .padding(.top, 8)
