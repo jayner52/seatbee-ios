@@ -3,6 +3,10 @@ import SwiftUI
 struct AppRouter: View {
     @Environment(AppState.self) private var appState
     @State private var spotlightRects: [String: CGRect] = [:]
+    /// First-run "try Pro" paywall, shown once per device before the
+    /// feature tour. Skippable via the small text link (no X) — see
+    /// UpgradeContext.onboardingFlow.
+    @State private var showOnboardingPaywall = false
 
     var body: some View {
         @Bindable var state = appState
@@ -51,12 +55,39 @@ struct AppRouter: View {
             UpgradeView()
                 .environment(appState)
         }
+        .fullScreenCover(isPresented: $showOnboardingPaywall, onDismiss: {
+            // The feature tour waits its turn behind the intro paywall so a
+            // new user never gets two overlays stacked on first launch.
+            startFeatureTourIfNeeded(after: 0.6)
+        }) {
+            UpgradeView(context: .onboardingFlow)
+                .environment(appState)
+        }
         .onAppear {
-            if !UserDefaults.standard.bool(forKey: "seatbee.hasSeenFeatureTour") {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                    appState.showSpotlightTour = true
+            let defaults = UserDefaults.standard
+            let isFirstRun = !defaults.bool(forKey: "seatbee.hasSeenFeatureTour")
+            let hasSeenIntroPaywall = defaults.bool(forKey: "seatbee.hasSeenOnboardingPaywall")
+
+            // First-run sequence: intro paywall (skippable) → feature tour.
+            // Existing installs already have hasSeenFeatureTour set, so they
+            // never see the intro paywall — only fresh devices do.
+            if isFirstRun && !hasSeenIntroPaywall
+                && appState.userSubscription?.isProEntitled != true {
+                defaults.set(true, forKey: "seatbee.hasSeenOnboardingPaywall")
+                appState.upgradeTrigger = "onboarding_intro"
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                    showOnboardingPaywall = true
                 }
+            } else {
+                startFeatureTourIfNeeded(after: 1.0)
             }
+        }
+    }
+
+    private func startFeatureTourIfNeeded(after delay: Double) {
+        guard !UserDefaults.standard.bool(forKey: "seatbee.hasSeenFeatureTour") else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+            appState.showSpotlightTour = true
         }
     }
 }

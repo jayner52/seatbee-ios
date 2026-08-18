@@ -1500,6 +1500,20 @@ struct OnboardingView: View {
                 try? await Task.sleep(for: .seconds(0.6))
                 dismiss()
                 appState.selectedTab = .edit
+
+                // One-time paywall right after the user's first plan is
+                // created — peak investment, right before the editor where
+                // AI seating (the headline Pro feature) lives. Free tier
+                // only; the delay lets this fullScreenCover finish
+                // dismissing so AppRouter's upgrade sheet can present.
+                let defaults = UserDefaults.standard
+                if appState.activePlanTier == .free,
+                   !defaults.bool(forKey: "seatbee.hasSeenFirstPlanPaywall") {
+                    defaults.set(true, forKey: "seatbee.hasSeenFirstPlanPaywall")
+                    try? await Task.sleep(for: .seconds(0.8))
+                    appState.upgradeTrigger = "first_plan_created"
+                    appState.showUpgrade = true
+                }
             } catch {
                 errorMessage = "Failed to create plan: \(error.localizedDescription)"
                 isCreating = false
