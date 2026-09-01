@@ -13,6 +13,7 @@ struct SignupConsentView: View {
 
     @State private var selectedRoles: Set<String> = []
     @State private var emailMarketingOptIn = true   // matches web default
+    @State private var contactEmail = ""
     @State private var isSubmitting = false
     @State private var enteredName = ""
     /// Tracks whether the user has manually edited the name field. While
@@ -45,6 +46,7 @@ struct SignupConsentView: View {
                     }
                     roleSection
                     marketingSection
+                    penPalsSection
                     tosSection
                     Spacer(minLength: 16)
                     continueButton
@@ -189,6 +191,40 @@ struct SignupConsentView: View {
         }
     }
 
+    private var penPalsSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("LET'S BE PEN PALS  (OPTIONAL)")
+                .font(SBFont.capsLabel)
+                .foregroundStyle(Color.sbWarm)
+                .letterSpacing(1.5)
+            Text("We'll send the occasional seating tip and a good-luck note before your big day — nothing else.")
+                .font(SBFont.caption)
+                .foregroundStyle(Color.sbWarm)
+            TextField("your@email.com", text: $contactEmail)
+                .font(SBFont.body)
+                .keyboardType(.emailAddress)
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.never)
+                .padding(14)
+                .background(Color.sbIvory2)
+                .clipShape(RoundedRectangle(cornerRadius: SBRadius.button))
+                .overlay(
+                    RoundedRectangle(cornerRadius: SBRadius.button)
+                        .strokeBorder(Color.sbLine, lineWidth: 1)
+                )
+            if appState.auth.currentUser?.email?.hasSuffix("@privaterelay.appleid.com") == true {
+                HStack(spacing: 6) {
+                    Image(systemName: "info.circle")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Color.sbGoldDk)
+                    Text("You signed in with Apple's private relay — we can't reach that address. Pop your real one here.")
+                        .font(SBFont.caption)
+                        .foregroundStyle(Color.sbWarm)
+                }
+            }
+        }
+    }
+
     private var tosSection: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("By tapping Continue you agree to Seatbee's")
@@ -221,7 +257,8 @@ struct SignupConsentView: View {
                 await appState.auth.completeSignupConsent(
                     userRoles: Array(selectedRoles),
                     emailMarketingOptIn: emailMarketingOptIn,
-                    displayName: trimmedName
+                    displayName: trimmedName,
+                    contactEmail: contactEmail.isEmpty ? nil : contactEmail
                 )
                 // needsSignupConsent flips to false inside the call,
                 // RootView swaps to AppRouter automatically.
