@@ -3,14 +3,15 @@ import PhotosUI
 import UniformTypeIdentifiers
 import PDFKit
 
-// 5-step onboarding wizard. Mirrors the essentials of web's
+// 6-step onboarding wizard. Mirrors the essentials of web's
 // OnboardingWizard (App.jsx:19180) while staying mobile-friendly.
 //
 //   Step 1 — Event basics      (type, editable name, partners, date, venue)
 //   Step 2 — Guest list        (count + paste/CSV/AI detect/skip)
 //   Step 3 — Room setup        (measurement unit, room size preset, room shape)
 //   Step 4 — Tables & venue    (style, seats/table, head + sweetheart, items)
-//   Step 5 — Review & create   (summary + Create)
+//   Step 5 — Email opt-in      (pen-pals ask; skippable; saves to profiles.contact_email)
+//   Step 6 — Review & create   (summary + Create)
 //
 // Defers to Phase 2 (documented in PARITY.md "Outstanding"):
 //   - Floor plan upload + 3-phase trace inside onboarding (RoomSetupSheet
@@ -81,7 +82,10 @@ struct OnboardingView: View {
     @State private var includeSweetheartTable = true
     @State private var venueItems: Set<String> = []  // type strings
 
-    // MARK: - Step 5 / creating
+    // MARK: - Step 5 / email opt-in
+    @State private var contactEmail = ""
+
+    // MARK: - Step 6 / creating
     @State private var isCreating = false
     @State private var errorMessage: String?
 
@@ -307,7 +311,8 @@ struct OnboardingView: View {
                         case 2: guestsStep
                         case 3: roomSetupStep
                         case 4: tablesStep
-                        case 5: isCreating ? AnyView(creatingStep) : AnyView(reviewStep)
+                        case 5: emailOptInStep
+                        case 6: isCreating ? AnyView(creatingStep) : AnyView(reviewStep)
                         default: EmptyView()
                         }
                     }
@@ -390,7 +395,7 @@ struct OnboardingView: View {
 
     private var progressDots: some View {
         HStack(spacing: 8) {
-            ForEach(1...5, id: \.self) { i in
+            ForEach(1...6, id: \.self) { i in
                 Circle()
                     .fill(i <= step ? Color.sbGold : Color.sbWarm2)
                     .frame(width: i == step ? 9 : 7, height: i == step ? 9 : 7)
@@ -1148,7 +1153,43 @@ struct OnboardingView: View {
         .buttonStyle(.plain)
     }
 
-    // MARK: - Step 5: Review
+    // MARK: - Step 5: Email opt-in
+
+    private var emailOptInStep: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            VStack(spacing: 10) {
+                Image(systemName: "envelope.badge.fill")
+                    .font(.system(size: 32))
+                    .foregroundStyle(Color.sbGoldDk)
+                Text("Let's be pen pals")
+                    .font(SBFont.displayMedium)
+                    .foregroundStyle(Color.sbCharcoal)
+                Text("We'll send you the occasional seating tip and a little good luck note before your big day. That's it — no noise.")
+                    .font(SBFont.body)
+                    .foregroundStyle(Color.sbWarm)
+                    .multilineTextAlignment(.center)
+            }
+            .frame(maxWidth: .infinity)
+
+            sectionLabel("YOUR EMAIL")
+            TextField("you@example.com", text: $contactEmail)
+                .font(SBFont.body)
+                .keyboardType(.emailAddress)
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.never)
+                .padding(14)
+                .background(Color.sbIvory2)
+                .clipShape(RoundedRectangle(cornerRadius: SBRadius.button))
+
+            Text("We'll only reach you about Seatbee. Unsubscribe anytime.")
+                .font(SBFont.caption)
+                .foregroundStyle(Color.sbWarm)
+
+            Spacer(minLength: 40)
+        }
+    }
+
+    // MARK: - Step 6: Review
 
     private var reviewStep: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -1257,6 +1298,18 @@ struct OnboardingView: View {
                     advance(to: 5)
                 }
             case 5:
+                VStack(spacing: 10) {
+                    SBButton(title: "Continue", icon: "arrow.right", variant: .gold, fullWidth: true) {
+                        advance(to: 6)
+                    }
+                    Button("Skip for now") {
+                        contactEmail = ""
+                        advance(to: 6)
+                    }
+                    .font(SBFont.bodySmall)
+                    .foregroundStyle(Color.sbWarm)
+                }
+            case 6:
                 SBButton(title: "Create plan", icon: "sparkles", variant: .gold, fullWidth: true) {
                     finalizePlan()
                 }
@@ -1494,6 +1547,13 @@ struct OnboardingView: View {
                 }
 
                 try await appState.database.savePlanData(plan: plan)
+
+                // Persist opt-in email if provided. Silently no-ops on failure
+                // so a network hiccup never blocks plan creation.
+                let trimmedEmail = contactEmail.trimmingCharacters(in: .whitespaces)
+                if !trimmedEmail.isEmpty {
+                    await appState.database.saveContactEmail(trimmedEmail)
+                }
 
                 appState.activePlan = plan
                 HapticEngine.success()

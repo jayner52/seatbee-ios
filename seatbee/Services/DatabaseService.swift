@@ -221,6 +221,21 @@ final class DatabaseService {
             .execute()
     }
 
+    // MARK: - User Profile
+
+    /// Saves a real contact email the user provided during onboarding.
+    /// Useful when the user chose "hide my email" with Sign in with Apple —
+    /// their auth email is an Apple relay address; this gives us a real one
+    /// for transactional emails. Silently no-ops on any error.
+    func saveContactEmail(_ email: String) async {
+        guard let userId = try? await client.auth.session.user.id else { return }
+        try? await client
+            .from("profiles")
+            .update(["contact_email": email])
+            .eq("id", value: userId.uuidString)
+            .execute()
+    }
+
     // MARK: - User Subscription
     //
     // Cross-app shared shape (PARITY.md). Web's Stripe webhook (or our
