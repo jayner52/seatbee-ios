@@ -364,18 +364,21 @@ final class AuthService {
     /// that creates the profiles row can still be in flight, causing a silent
     /// zero-row update. Without retry, roles were silently lost for users who
     /// completed consent quickly.
-    func completeSignupConsent(userRoles: [String], emailMarketingOptIn: Bool, displayName: String? = nil) async {
+    func completeSignupConsent(userRoles: [String], emailMarketingOptIn: Bool, displayName: String? = nil, contactEmail: String? = nil) async {
         guard let user = currentUser else { return }
         struct ConsentPayload: Encodable {
             let user_roles: [String]
             let email_marketing_opt_in: Bool
             let name: String?
+            let contact_email: String?
         }
         let nameToStore = displayName.flatMap { $0.trimmingCharacters(in: .whitespaces).isEmpty ? nil : $0 }
+        let emailToStore = contactEmail.flatMap { $0.trimmingCharacters(in: .whitespaces).isEmpty ? nil : $0 }
         let payload = ConsentPayload(
             user_roles: userRoles,
             email_marketing_opt_in: emailMarketingOptIn,
-            name: nameToStore
+            name: nameToStore,
+            contact_email: emailToStore
         )
         struct ResponseRow: Decodable { let id: String }
         for attempt in 0..<4 {
