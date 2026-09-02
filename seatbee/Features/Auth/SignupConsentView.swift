@@ -200,7 +200,10 @@ struct SignupConsentView: View {
             Text("We'll send the occasional seating tip and a good-luck note before your big day — nothing else.")
                 .font(SBFont.caption)
                 .foregroundStyle(Color.sbWarm)
-            TextField("your@email.com", text: $contactEmail)
+            // "Email address" rather than a sample address: iOS data-detects an
+            // email-shaped placeholder and draws it in link blue, which reads
+            // as tappable and doesn't match the grey placeholders elsewhere.
+            TextField("Email address", text: $contactEmail)
                 .font(SBFont.body)
                 .keyboardType(.emailAddress)
                 .autocorrectionDisabled()
@@ -212,7 +215,12 @@ struct SignupConsentView: View {
                     RoundedRectangle(cornerRadius: SBRadius.button)
                         .strokeBorder(Color.sbLine, lineWidth: 1)
                 )
-            if appState.auth.currentUser?.email?.hasSuffix("@privaterelay.appleid.com") == true {
+            // Note: unreachable in practice today. signInWithApple passes
+            // skipConsent: true (Guideline 4), so Apple users never reach this
+            // screen — only Google and magic-link users do, and they never have
+            // relay addresses. Kept because it's correct if that ever changes;
+            // ContactEmailSheet is what actually catches the relay cohort.
+            if appState.auth.signInEmailIsAppleRelay {
                 HStack(spacing: 6) {
                     Image(systemName: "info.circle")
                         .font(.system(size: 11))
