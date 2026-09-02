@@ -17,6 +17,12 @@ struct SettingsSheet: View {
     @State private var selectedRoles: Set<String> = []
     @State private var profileLoaded = false
     @State private var profileDisplayName: String? = nil
+    /// Contact email as stored (nil = none on file). Kept separate from
+    /// `contactEmailDraft` so we can tell "unchanged" from "edited".
+    @State private var contactEmail: String? = nil
+    @State private var contactEmailDraft = ""
+    @State private var contactEmailSaving = false
+    @State private var contactEmailError: String?
 
     // Web parity: role IDs must match App.jsx line 22633 exactly.
     private static let roleOptions: [(id: String, label: String, icon: String)] = [
@@ -112,8 +118,15 @@ struct SettingsSheet: View {
                         guard profileLoaded else { return }
                         Task { await appState.auth.updateEmailMarketingOptIn(newValue) }
                     }
+
+                    contactEmailRow
                 } header: {
                     Text("Notifications")
+                } footer: {
+                    // Explain the field, because "why are you asking for my
+                    // email, you have my email" is the obvious reaction for
+                    // anyone who didn't sign in with Hide My Email.
+                    Text("Where we send the emails above. Sign in with Apple hides your real address from us, so add one here if you'd like to hear from us.")
                 }
 
                 // Role multi-select. Web parity (App.jsx ~25261).
@@ -309,6 +322,12 @@ struct SettingsSheet: View {
                 // Fetch name separately so a missing DB column never
                 // breaks role/marketing loading above.
                 profileDisplayName = await appState.auth.loadFullName()
+                // Same reasoning for the contact email: its own read, so a
+                // backend without migration 065 can't break this whole sheet.
+                if let state = await appState.auth.loadContactEmailState() {
+                    contactEmail = state.contact_email
+                    contactEmailDraft = state.contact_email ?? ""
+                }
                 profileLoaded = true
             }
             .onChange(of: appState.showUpgrade) { _, show in
@@ -351,6 +370,102 @@ struct SettingsSheet: View {
             } message: { msg in
                 Text(msg)
             }
+        }
+    }
+
+    // MARK: - Contact Email
+
+    /// Inline add/edit for the address we actually mail. Deliberately manual
+    /// (explicit Save) rather than a live write like the toggles above: an
+    /// email is only meaningful once it's fully typed, so per-keystroke writes
+    /// would persist a stream of malformed addresses.
+    private var contactEmailRow: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Contact email")
+                .foregroundStyle(Color.sbCharcoal)
+
+            HStack(spacing: 8) {
+                // Not a sample address — iOS renders an email-shaped
+                // placeholder in link blue. See ContactEmailSheet.
+                TextField("Email address", text: $contactEmailDraft)
+                    .font(SBFont.body)
+                    .textContentType(.emailAddress)
+                    .keyboardType(.emailAddress)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.never)
+                    .submitLabel(.done)
+                    .disabled(contactEmailSaving)
+                    .onSubmit { saveContactEmail() }
+                    .onChange(of: contactEmailDraft) { contactEmailError = nil }
+
+                if contactEmailDirty {
+                    Button(contactEmailSaving ? "Saving…" : "Save") { saveContactEmail() }
+                        .font(SBFont.bodySmallBold)
+                        .foregroundStyle(Color.sbGoldDk)
+                        .disabled(contactEmailSaving)
+                } else if contactEmail != nil {
+                    // Only offered once something is stored — clearing an
+                    // empty field is a no-op.
+                    Button("Remove") { clearContactEmail() }
+                        .font(SBFont.caption)
+                        .foregroundStyle(Color.sbWarm)
+                        .disabled(contactEmailSaving)
+                }
+            }
+
+            if let contactEmailError {
+                Text(contactEmailError)
+                    .font(SBFont.caption)
+                    .foregroundStyle(Color.sbGoldDk)
+            }
+        }
+        .padding(.vertical, 2)
+    }
+
+    /// True when the field differs from what's stored, so Save only appears
+    /// when there's actually something to write.
+    private var contactEmailDirty: Bool {
+        EmailUtils.normalize(contactEmailDraft) != (contactEmail ?? "")
+    }
+
+    private func saveContactEmail() {
+        guard profileLoaded, !contactEmailSaving, contactEmailDirty else { return }
+        let candidate = EmailUtils.normalize(contactEmailDraft)
+
+        // Emptying the field is a removal, not an invalid address.
+        if candidate.isEmpty {
+            clearContactEmail()
+            return
+        }
+        guard EmailUtils.isValidFormat(candidate) else {
+            contactEmailError = "That doesn't look like an email address."
+            HapticEngine.error()
+            return
+        }
+        Task {
+            contactEmailSaving = true
+            let saved = await appState.auth.saveContactEmail(candidate)
+            contactEmailSaving = false
+            if saved {
+                contactEmail = candidate
+                contactEmailDraft = candidate
+                HapticEngine.success()
+            } else {
+                contactEmailError = "Couldn't save that just now. Check your connection and try again."
+                HapticEngine.error()
+            }
+        }
+    }
+
+    private func clearContactEmail() {
+        guard profileLoaded, !contactEmailSaving else { return }
+        Task {
+            contactEmailSaving = true
+            await appState.auth.clearContactEmail()
+            contactEmailSaving = false
+            contactEmail = nil
+            contactEmailDraft = ""
+            HapticEngine.selection()
         }
     }
 

@@ -45,6 +45,11 @@ final class AuthService {
     /// users do.
     var needsSignupConsent = false
 
+    /// True when the address we authenticated with is an Apple Hide My Email
+    /// relay. Exposed here so views don't have to import Auth just to read
+    /// `currentUser.email`.
+    var signInEmailIsAppleRelay: Bool { EmailUtils.isAppleRelay(currentUser?.email) }
+
     private var supabase: SupabaseClient { SupabaseManager.shared.client }
     private let redirectURL = URL(string: "seatbee://auth/callback")!
 
@@ -62,6 +67,7 @@ final class AuthService {
             currentUser = session.user
             Task { await recordPageViewPing() }
             Task { await backfillSignupPlatformIfMissing() }
+            Task { await backfillContactEmailIfMissing() }
             Task { await recordIOSSignIn() }
         } catch {
             currentUser = nil
@@ -113,6 +119,185 @@ final class AuthService {
         } catch {
             // Don't surface — backfill is best-effort, not load-bearing
             print("[Auth] signup_platform backfill skipped: \(error)")
+        }
+    }
+
+    // MARK: - Contact Email
+
+    /// Copy a usable `auth.users.email` into `profiles.contact_email` when that
+    /// column is still null. This is the silent half of contact-email capture:
+    /// Google and magic-link users already gave us a real inbox at sign-in, so
+    /// there's nothing to ask them — we just need it somewhere queryable,
+    /// because `profiles.email` is frequently null for OAuth signups and
+    /// `auth.users.email` is only reachable with the service-role key.
+    ///
+    /// Deliberately skips Apple relay addresses: writing a
+    /// `@privaterelay.appleid.com` forwarder into contact_email would mark the
+    /// user as reachable and suppress the prompt that's meant to find them.
+    ///
+    /// Null-only write, same shape as backfillSignupPlatformIfMissing(). That
+    /// matters: the web client has an in-code postmortem (useAuth.jsx) about a
+    /// sign-in handler that re-wrote consent state on every session and quietly
+    /// reset returning users. Never widen this to overwrite a non-null value,
+    /// and never touch email_marketing_opt_in from here.
+    private func backfillContactEmailIfMissing() async {
+        guard let user = currentUser else { return }
+        guard let authEmail = user.email, !EmailUtils.isUnreachable(authEmail) else { return }
+        guard let state = await loadContactEmailState() else { return }
+        guard state.contact_email == nil else { return }
+
+        struct Patch: Encodable {
+            let contact_email: String
+            let contact_email_source: String
+            let contact_email_at: String
+        }
+        let patch = Patch(
+            contact_email: EmailUtils.normalize(authEmail),
+            contact_email_source: "auth",
+            contact_email_at: ISO8601DateFormatter().string(from: Date())
+        )
+        do {
+            try await supabase
+                .from("profiles")
+                .update(patch)
+                .eq("id", value: user.id.uuidString)
+                .execute()
+        } catch {
+            // Best-effort, not load-bearing — next session restore retries.
+            print("[Auth] contact_email backfill skipped: \(error)")
+        }
+    }
+
+    /// Reads contact_email + contact_email_prompted_at. Returns nil on any
+    /// failure (offline, RLS, columns missing pre-migration) — callers treat
+    /// nil as "unknown" and stay quiet rather than prompting on bad data.
+    func loadContactEmailState() async -> ContactEmailState? {
+        guard let user = currentUser else { return nil }
+        do {
+            let row: ContactEmailState = try await supabase
+                .from("profiles")
+                .select("contact_email, contact_email_prompted_at")
+                .eq("id", value: user.id.uuidString)
+                .single()
+                .execute()
+                .value
+            return row
+        } catch {
+            print("[Auth] contact email state unavailable: \(error)")
+            return nil
+        }
+    }
+
+    /// True when we should ask this user for an address. Three conditions:
+    /// we can't reach them at their sign-in address, we don't already have a
+    /// contact email, and we haven't asked before.
+    ///
+    /// Note the asymmetry with the backfill above: an Apple user whose relay
+    /// address is on file is *not* reachable, so they qualify — and they're
+    /// the whole point, since signInWithApple skips the consent sheet for
+    /// Guideline 4 reasons and they've never been asked anything.
+    func needsContactEmailPrompt() async -> Bool {
+        guard let user = currentUser else { return false }
+        guard EmailUtils.isUnreachable(user.email) else { return false }
+        guard let state = await loadContactEmailState() else { return false }
+        return state.contact_email == nil && state.contact_email_prompted_at == nil
+    }
+
+    /// Save an address the user typed into the contact-email sheet.
+    ///
+    /// Uses the retry-with-select pattern from writeIOSSignupProfileIfNew()
+    /// because this can fire soon after signup, while the Supabase auth trigger
+    /// that creates the profiles row is still in flight — an update against a
+    /// row that doesn't exist yet succeeds while affecting zero rows.
+    /// Returns whether the write actually landed.
+    @discardableResult
+    func saveContactEmail(_ email: String) async -> Bool {
+        guard let user = currentUser else { return false }
+        let normalized = EmailUtils.normalize(email)
+        guard EmailUtils.isValidFormat(normalized) else { return false }
+
+        struct Payload: Encodable {
+            let contact_email: String
+            let contact_email_source: String
+            let contact_email_at: String
+            let contact_email_prompted_at: String
+        }
+        let now = ISO8601DateFormatter().string(from: Date())
+        // Entering the address IS the consent, so contact_email_at doubles as
+        // the consent timestamp. prompted_at is stamped in the same write so a
+        // later crash can't leave us re-asking someone who already answered.
+        let payload = Payload(
+            contact_email: normalized,
+            contact_email_source: "ios_prompt",
+            contact_email_at: now,
+            contact_email_prompted_at: now
+        )
+        struct ResponseRow: Decodable { let id: String }
+        for attempt in 0..<4 {
+            do {
+                let rows: [ResponseRow] = try await supabase
+                    .from("profiles")
+                    .update(payload)
+                    .eq("id", value: user.id.uuidString)
+                    .select("id")
+                    .execute()
+                    .value
+                if !rows.isEmpty { return true }
+                print("[Auth] contact email write affected 0 rows (attempt \(attempt + 1)/4)")
+            } catch {
+                print("[Auth] contact email save attempt \(attempt + 1) failed: \(error)")
+            }
+            try? await Task.sleep(nanoseconds: 300_000_000)
+        }
+        return false
+    }
+
+    /// Clear a previously saved contact email from Settings. Leaves
+    /// contact_email_prompted_at set, so removing the address doesn't
+    /// re-trigger the prompt. Marketing opt-in is untouched: clearing an
+    /// address is not an unsubscribe.
+    func clearContactEmail() async {
+        guard let user = currentUser else { return }
+        // Must encode explicit JSON nulls. Swift's *synthesized* Encodable
+        // uses encodeIfPresent for optionals, so a struct of all-nil fields
+        // serialises to `{}` and PostgREST would update nothing at all —
+        // making Remove a silent no-op. Hence the hand-written encode.
+        struct NullOutPayload: Encodable {
+            enum CodingKeys: String, CodingKey {
+                case contact_email, contact_email_source, contact_email_at
+            }
+            func encode(to encoder: Encoder) throws {
+                var c = encoder.container(keyedBy: CodingKeys.self)
+                try c.encodeNil(forKey: .contact_email)
+                try c.encodeNil(forKey: .contact_email_source)
+                try c.encodeNil(forKey: .contact_email_at)
+            }
+        }
+        do {
+            try await supabase
+                .from("profiles")
+                .update(NullOutPayload())
+                .eq("id", value: user.id.uuidString)
+                .execute()
+        } catch {
+            print("[Auth] contact email clear failed: \(error)")
+        }
+    }
+
+    /// Record that we asked and the user declined. Stamps only
+    /// contact_email_prompted_at, which is what stops us ever asking again.
+    func markContactEmailPrompted() async {
+        guard let user = currentUser else { return }
+        struct Payload: Encodable { let contact_email_prompted_at: String }
+        let payload = Payload(contact_email_prompted_at: ISO8601DateFormatter().string(from: Date()))
+        do {
+            try await supabase
+                .from("profiles")
+                .update(payload)
+                .eq("id", value: user.id.uuidString)
+                .execute()
+        } catch {
+            print("[Auth] contact email skip stamp failed: \(error)")
         }
     }
 
@@ -268,6 +453,20 @@ final class AuthService {
         let email_marketing_opt_in: Bool?
     }
 
+    /// Contact-email state, read separately from `loadProfile()` for the same
+    /// reason `name` is: if migration 065 hasn't landed on the backend, this
+    /// select 400s, and we don't want that taking roles + marketing down with
+    /// it. A nil return means "unknown", which suppresses the prompt.
+    struct ContactEmailState: Decodable {
+        /// An address we know we can reach the user at, as opposed to
+        /// `auth.users.email`, which is an Apple relay for Hide My Email users.
+        let contact_email: String?
+        /// Set once we've asked (saved or skipped). Server-side on purpose:
+        /// it has to survive reinstalls and follow the user across devices,
+        /// which a UserDefaults flag can't.
+        let contact_email_prompted_at: String?
+    }
+
     /// Fetches the active user's profile row. Returns nil when there
     /// is no signed-in user or the row doesn't exist (legacy / pre-trigger).
     /// Intentionally omits name — fetched separately via loadFullName()
@@ -371,14 +570,32 @@ final class AuthService {
             let email_marketing_opt_in: Bool
             let name: String?
             let contact_email: String?
+            let contact_email_source: String?
+            let contact_email_at: String?
+            let contact_email_prompted_at: String?
         }
         let nameToStore = displayName.flatMap { $0.trimmingCharacters(in: .whitespaces).isEmpty ? nil : $0 }
-        let emailToStore = contactEmail.flatMap { $0.trimmingCharacters(in: .whitespaces).isEmpty ? nil : $0 }
+        // Normalise here too so an address typed on this screen dedupes
+        // against one typed into ContactEmailSheet or backfilled from auth.
+        let emailToStore = contactEmail
+            .map { EmailUtils.normalize($0) }
+            .flatMap { $0.isEmpty ? nil : $0 }
+        // Stamp provenance alongside the address so both capture paths leave
+        // the same row shape, and admin can tell a typed address from one
+        // copied out of auth. prompted_at is set because this screen *is* the
+        // ask: it stops ContactEmailSheet asking the same user again later.
+        // All three stay nil when the field was left blank — synthesized
+        // Encodable omits nil, so a blank field can't null out an address the
+        // auth backfill already wrote.
+        let now = emailToStore == nil ? nil : ISO8601DateFormatter().string(from: Date())
         let payload = ConsentPayload(
             user_roles: userRoles,
             email_marketing_opt_in: emailMarketingOptIn,
             name: nameToStore,
-            contact_email: emailToStore
+            contact_email: emailToStore,
+            contact_email_source: emailToStore == nil ? nil : "signup_consent",
+            contact_email_at: now,
+            contact_email_prompted_at: now
         )
         struct ResponseRow: Decodable { let id: String }
         for attempt in 0..<4 {
